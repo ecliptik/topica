@@ -1,0 +1,66 @@
+/*
+ * editor.h: the text editor inside a document window. Callers see only this
+ * interface; te_editor.c puts TextEdit behind it (32,000 characters at
+ * most), and a custom engine can replace it later.
+ *
+ * Every change to the text goes through EdReplace, so undo, vi mode and
+ * styling see each edit the same way. Text is Mac Roman with CR line ends.
+ */
+#ifndef TOPICA_EDITOR_H
+#define TOPICA_EDITOR_H
+
+#include <Quickdraw.h>
+#include <Events.h>
+
+typedef struct Editor Editor;
+
+/* A new, empty editor drawing into the current port's view rectangle */
+Editor *EdNew(const Rect *view, short font, short size);
+void EdDispose(Editor *ed);
+
+/* The most text the editor can hold */
+long EdMaxLength(void);
+
+void EdSetView(Editor *ed, const Rect *view);  /* after the window is resized */
+void EdDraw(Editor *ed);                       /* in an update */
+void EdActivate(Editor *ed, Boolean active);
+void EdIdle(Editor *ed);                       /* blinks the caret */
+/* A click in the view; extend: Shift was down */
+void EdClick(Editor *ed, Point local, Boolean extend);
+/* Arrow, Home, End, Page Up and Page Down keys: 1 if it was one */
+Boolean EdNavigate(Editor *ed, char c, short modifiers);
+
+long EdLength(Editor *ed);
+/* The text: valid until the next change; don't change it */
+const char *EdLockText(Editor *ed);
+void EdUnlockText(Editor *ed);
+
+void EdGetSelection(Editor *ed, long *start, long *end);
+void EdSetSelection(Editor *ed, long start, long end);
+
+/* Replaces [start, end) with text; 0 when the result would be too long.
+   The caret goes after the new text. */
+Boolean EdReplace(Editor *ed, long start, long end, const char *text, long len);
+/* Replaces all the text (no undo); 0 when it is too long */
+Boolean EdSetText(Editor *ed, const char *text, long len);
+
+/* Scrolling, in lines: the first line shown, the most it can be, and
+   how many lines fit */
+void EdScrollInfo(Editor *ed, short *value, short *max, short *page);
+void EdScrollTo(Editor *ed, short value);
+void EdShowSelection(Editor *ed);
+
+/* The line a text offset is on (0-based) */
+long EdLineOf(Editor *ed, long offset);
+
+/* Puts the selection on the Clipboard */
+void EdCopySelection(Editor *ed);
+/* The Clipboard's text: a handle valid until the next Clipboard call, and
+   its length (0 when the Clipboard holds no text) */
+Handle EdClipboard(long *len);
+
+/* TextEdit's own scrap to the Clipboard and back (dialogs use them too) */
+void TEScrapToClipboard(void);
+Boolean TEScrapFromClipboard(void);
+
+#endif

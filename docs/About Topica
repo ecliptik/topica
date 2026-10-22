@@ -1,0 +1,22 @@
+About Topica
+Version @VERSION@
+
+Topica is a Markdown writer for blogs made with Jekyll, Hugo and other static site generators.
+
+Writing a post
+- File > New Post starts from front matter: the lines between the two "---" at the top.
+- Post > Post Info (Command-E) fills in the title, description, category, tags, layout and date.
+- Post > Insert Image writes a placeholder for a picture you'll add to the blog later.
+- File > Save suggests a name made of today's date and the title, like 2026-10-22-my-post.md.
+
+Undo and Redo
+Command-Z undoes, many steps back. Command-Shift-Z redoes.
+
+Other characters
+Posts are saved in UTF-8, the way a blog wants them. Characters the Macintosh can't show, such as emoji, appear as codes like &#x1F600; while you write and go back to the real character when you save.
+
+Limits
+Topica opens posts of up to 32,000 characters. Topica Lite, for 512K Macs, opens two windows at a time.
+
+Topica is free software under the ISC licence.
+Copyright 2026 Topica contributors.

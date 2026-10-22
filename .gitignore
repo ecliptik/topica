@@ -1,0 +1,28 @@
+# Private: plans and agent notes are never committed (the repository is public)
+CLAUDE.md
+.local/
+.claude/
+local.env
+
+# Build output and release artifacts
+build/
+build-*/
+*.bin
+*.dsk
+*.hqx
+*.sit
+*.o
+*.d
+
+# Emulator disks and test output
+diskimages/
+screenshots/
+tests/test_core
+tests/*.dSYM
+__pycache__/
+
+# Retro68 (links to the toolchain, not committed)
+Retro68
+Retro68-build
+
+.DS_Store

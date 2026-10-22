@@ -1,0 +1,251 @@
+/* Topica: resources (Rez). CMake fills in the @...@ values. */
+#include "Processes.r"
+#include "Menus.r"
+#include "Windows.r"
+#include "Dialogs.r"
+#include "MacTypes.r"
+
+resource 'MBAR' (128) {
+	{ 128, 129, 130, 131 };
+};
+
+/* Enable flags: bit 0 is item 1 (the menu's own flag is the "enabled" after
+   them). Separators are disabled; in the Apple menu the desk accessories
+   after the separator stay enabled. */
+resource 'MENU' (128, "Apple") {
+	128, textMenuProc, 0x7FFFFFFD, enabled, apple,
+	{
+		"About Topica\311", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain
+	}
+};
+
+resource 'MENU' (129, "File") {
+	129, textMenuProc, 0x17B, enabled, "File",
+	{
+		"New Post", noIcon, "N", noMark, plain;
+		"Open\311", noIcon, "O", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Close", noIcon, "W", noMark, plain;
+		"Save", noIcon, "S", noMark, plain;
+		"Save As\311", noIcon, noKey, noMark, plain;
+		"Revert", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Quit", noIcon, "Q", noMark, plain
+	}
+};
+
+/* Redo is Command-Shift-Z, which a menu can't show: main.c handles it. */
+resource 'MENU' (130, "Edit") {
+	130, textMenuProc, 0x17B, enabled, "Edit",
+	{
+		"Undo", noIcon, "Z", noMark, plain;
+		"Redo", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Cut", noIcon, "X", noMark, plain;
+		"Copy", noIcon, "C", noMark, plain;
+		"Paste", noIcon, "V", noMark, plain;
+		"Clear", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Select All", noIcon, "A", noMark, plain
+	}
+};
+
+resource 'MENU' (131, "Post") {
+	131, textMenuProc, 0x5, enabled, "Post",
+	{
+		"Post Info\311", noIcon, "E", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Insert Image\311", noIcon, noKey, noMark, plain
+	}
+};
+
+/* ---- alerts ---- */
+
+/* Alert rectangles are where System 6 puts them, centred on a 512x342
+   screen; System 7 centres them on any screen (alertPositionMainScreen). */
+resource 'ALRT' (128, "About", purgeable) {
+	{ 77, 86, 227, 426 }, 128,
+	{
+		OK, visible, silent;
+		OK, visible, silent;
+		OK, visible, silent;
+		OK, visible, silent;
+	},
+	alertPositionMainScreen
+};
+
+resource 'DITL' (128, "About", purgeable) {
+	{
+		{ 116, 256, 136, 324 }, Button { enabled, "OK" };
+		{ 12, 16, 32, 324 }, StaticText { disabled, "Topica @TOPICA_VERSION_DISPLAY@" };
+		{ 38, 16, 108, 324 }, StaticText { disabled,
+			"A Markdown writer for blogs.\r"
+			"Named for Aristotle\325s Topics, on finding things to say.\r"
+			"\251 2026 Topica contributors" };
+	}
+};
+
+resource 'ALRT' (129, "Save Changes", purgeable) {
+	{ 88, 82, 204, 430 }, 129,
+	{
+		OK, visible, sound1;
+		OK, visible, sound1;
+		OK, visible, sound1;
+		OK, visible, sound1;
+	},
+	alertPositionMainScreen
+};
+
+resource 'DITL' (129, "Save Changes", purgeable) {
+	{
+		{ 84, 266, 104, 334 }, Button { enabled, "Save" };
+		{ 84, 186, 104, 254 }, Button { enabled, "Cancel" };
+		{ 84, 16, 104, 104 }, Button { enabled, "Don\325t Save" };
+		{ 12, 60, 72, 334 }, StaticText { disabled, "Save changes to \322^0\323 before ^1?" };
+	}
+};
+
+resource 'ALRT' (130, "Message", purgeable) {
+	{ 87, 82, 207, 430 }, 130,
+	{
+		OK, visible, sound1;
+		OK, visible, sound1;
+		OK, visible, sound1;
+		OK, visible, sound1;
+	},
+	alertPositionMainScreen
+};
+
+resource 'DITL' (130, "Message", purgeable) {
+	{
+		{ 88, 266, 108, 334 }, Button { enabled, "OK" };
+		{ 12, 60, 80, 334 }, StaticText { disabled, "^0" };
+	}
+};
+
+resource 'ALRT' (131, "Revert", purgeable) {
+	{ 88, 82, 204, 430 }, 131,
+	{
+		OK, visible, sound1;
+		OK, visible, sound1;
+		OK, visible, sound1;
+		OK, visible, sound1;
+	},
+	alertPositionMainScreen
+};
+
+resource 'DITL' (131, "Revert", purgeable) {
+	{
+		{ 84, 266, 104, 334 }, Button { enabled, "Revert" };
+		{ 84, 186, 104, 254 }, Button { enabled, "Cancel" };
+		{ 12, 60, 72, 334 }, StaticText { disabled,
+			"Revert to the last saved version of \322^0\323? Your changes will be lost." };
+	}
+};
+
+/* ---- dialogs (dBoxProc; util.c makes them movable on System 7) ---- */
+
+resource 'DLOG' (140, "Post Info", purgeable) {
+	{ 0, 0, 236, 420 }, dBoxProc, invisible, noGoAway, 0x0, 140, "Post Info", noAutoCenter
+};
+
+resource 'DITL' (140, "Post Info", purgeable) {
+	{
+		{ 204, 338, 224, 406 }, Button { enabled, "OK" };
+		{ 204, 254, 224, 322 }, Button { enabled, "Cancel" };
+		{ 200, 334, 228, 410 }, UserItem { disabled };
+		{ 36, 104, 52, 406 }, EditText { enabled, "" };
+		{ 62, 104, 78, 406 }, EditText { enabled, "" };
+		{ 88, 104, 104, 406 }, EditText { enabled, "" };
+		{ 114, 104, 130, 406 }, EditText { enabled, "" };
+		{ 140, 104, 156, 406 }, EditText { enabled, "" };
+		{ 166, 104, 182, 406 }, EditText { enabled, "" };
+		{ 36, 14, 52, 98 }, StaticText { disabled, "Title:" };
+		{ 62, 14, 78, 98 }, StaticText { disabled, "Description:" };
+		{ 88, 14, 104, 98 }, StaticText { disabled, "Category:" };
+		{ 114, 14, 130, 98 }, StaticText { disabled, "Tags:" };
+		{ 140, 14, 156, 98 }, StaticText { disabled, "Layout:" };
+		{ 166, 14, 182, 98 }, StaticText { disabled, "Date:" };
+		{ 8, 14, 26, 300 }, StaticText { disabled, "Post Info" };
+		{ 196, 14, 228, 236 }, StaticText { disabled, "Separate tags with spaces." };
+	}
+};
+
+resource 'DLOG' (141, "Insert Image", purgeable) {
+	{ 0, 0, 160, 400 }, dBoxProc, invisible, noGoAway, 0x0, 141, "Insert Image", noAutoCenter
+};
+
+resource 'DITL' (141, "Insert Image", purgeable) {
+	{
+		{ 128, 318, 148, 386 }, Button { enabled, "Insert" };
+		{ 128, 234, 148, 302 }, Button { enabled, "Cancel" };
+		{ 124, 314, 152, 390 }, UserItem { disabled };
+		{ 36, 110, 52, 386 }, EditText { enabled, "" };
+		{ 62, 110, 78, 386 }, EditText { enabled, "" };
+		{ 36, 14, 52, 104 }, StaticText { disabled, "Description:" };
+		{ 62, 14, 78, 104 }, StaticText { disabled, "File name:" };
+		{ 8, 14, 26, 300 }, StaticText { disabled, "Insert Image" };
+		{ 88, 110, 118, 386 }, StaticText { disabled, "In ^0" };
+	}
+};
+
+/* ---- settings until there are Preferences ---- */
+
+resource 'STR ' (128, "New post layout") {
+	"post"
+};
+
+resource 'STR ' (129, "Image folder") {
+	"/assets/images/posts/"
+};
+
+/* ---- the Finder and MultiFinder ---- */
+
+#include "icons.r"
+
+/* Topica opens and owns text files: its own posts get the post icon */
+resource 'FREF' (128) { 'APPL', 0, "" };
+resource 'FREF' (129) { 'TEXT', 1, "" };
+
+resource 'BNDL' (128) {
+	'TPCA', 0,
+	{
+		'ICN#', { 0, 128; 1, 129 };
+		'FREF', { 0, 128; 1, 129 };
+	}
+};
+
+/* The signature (owner) resource */
+data 'TPCA' (0, "Owner resource") {
+	$"06" "Topica"
+};
+
+resource 'vers' (1) {
+	@TOPICA_VERS_MAJOR@, @TOPICA_VERS_MINOR@, development, 0, verUS,
+	"@TOPICA_VERSION_DISPLAY@",
+	"@TOPICA_VERSION_DISPLAY@, \251 2026 Topica contributors"
+};
+
+/* Not Apple-event aware yet: System 7's Finder hands over documents the
+   System 6 way (CountAppFiles), which main.c reads. */
+resource 'SIZE' (-1) {
+	reserved,
+	acceptSuspendResumeEvents,
+	reserved,
+	canBackground,
+	doesActivateOnFGSwitch,
+	backgroundAndForeground,
+	dontGetFrontClicks,
+	ignoreChildDiedEvents,
+	is32BitCompatible,
+	notHighLevelEventAware,
+	onlyLocalHLEvents,
+	notStationeryAware,
+	dontUseTextEditServices,
+	reserved,
+	reserved,
+	reserved,
+	@TOPICA_SIZE_PREFERRED@ * 1024,
+	@TOPICA_SIZE_MINIMUM@ * 1024
+};
