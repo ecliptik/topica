@@ -16,6 +16,7 @@ void prefs_default(TopicaPrefs *p)
 	p->utf8 = 1;
 	p->lf = 1;
 	p->autosaveMinutes = 2;
+	p->format = 1;
 }
 
 static void Copy(char *dst, size_t cap, const char *src, long n)
@@ -85,6 +86,8 @@ void prefs_read(TopicaPrefs *p, const char *text, long n)
 			p->lf = !Is(text + vs, ve - vs, "cr");
 		else if (Is(text + ks, ke - ks, "autosave-minutes"))
 			p->autosaveMinutes = Number(text + vs, ve - vs, 0, 60, p->autosaveMinutes);
+		else if (Is(text + ks, ke - ks, "formatting"))
+			p->format = !Is(text + vs, ve - vs, "off");
 	}
 }
 
@@ -102,10 +105,12 @@ long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 		"blog: %s%c"
 		"encoding: %s%c"
 		"line-ends: %s%c"
-		"autosave-minutes: %d%c",
+		"autosave-minutes: %d%c"
+		"formatting: %s%c",
 		eol, p->font, eol, p->size, eol, p->imagePath, eol, p->layout, eol,
 		p->profile == kProfileHugo ? "hugo" : "jekyll", eol,
-		p->utf8 ? "utf-8" : "mac-roman", eol, p->lf ? "lf" : "cr", eol, p->autosaveMinutes, eol);
+		p->utf8 ? "utf-8" : "mac-roman", eol, p->lf ? "lf" : "cr", eol, p->autosaveMinutes, eol,
+		p->format ? "on" : "off", eol);
 	if (out != NULL) {
 		if (n > cap)
 			return -1;

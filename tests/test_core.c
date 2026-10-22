@@ -5,6 +5,7 @@
 
 #include "../core/find.h"
 #include "../core/frontmatter.h"
+#include "../core/mdscan.h"
 #include "../core/prefs.h"
 #include "../core/recovery.h"
 #include "../core/post.h"
@@ -496,14 +497,14 @@ static void TestPrefs(void)
 
 	prefs_default(&p);
 	CHECK_STR(p.font, "Monaco");
-	CHECK(p.size == 9 && p.utf8 && p.lf && p.autosaveMinutes == 2 && p.profile == kProfileJekyll);
+	CHECK(p.size == 9 && p.utf8 && p.lf && p.autosaveMinutes == 2 && p.profile == kProfileJekyll && p.format);
 	{
 		const char *text = "# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
-			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\r";
+			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\r";
 		prefs_read(&p, text, (long) strlen(text));
 	}
 	CHECK_STR(p.font, "Geneva");
-	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5);
+	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5 && !p.format);
 	CHECK_STR(p.imagePath, "/img/");
 	CHECK_STR(p.layout, "page");
 	/* bad numbers keep what was there */
@@ -539,6 +540,137 @@ static void TestRecovery(void)
 	CHECK(strlen(title) == sizeof(title) - 1);
 }
 
+/* ---- mdscan ---- */
+
+/* One letter per character: m markup, c code, u address, f meta, l link
+   text, h heading, B bold italic, b bold, i italic, . plain, / line end */
+static void Classes(const char *text, char *out)
+{
+	unsigned char cls[512];
+	MdState s;
+	long n = (long) strlen(text), i;
+
+	md_begin(&s);
+	md_classify(&s, text, n, n, cls);
+	for (i = 0; i < n; i++) {
+		int c = cls[i];
+		out[i] = text[i] == '\n' || text[i] == '\r' ? '/' : c & MD_MARK ? 'm' : c & MD_CODE ? 'c' : c & MD_URL ? 'u'
+			: c & MD_META ? 'f' : c & MD_LINK ? 'l' : c & MD_HEADING ? 'h'
+			: (c & (MD_BOLD | MD_ITALIC)) == (MD_BOLD | MD_ITALIC) ? 'B' : c & MD_BOLD ? 'b' : c & MD_ITALIC ? 'i' : '.';
+	}
+	out[n] = '\0';
+}
+
+static void Styled(const char *text, const char *want, int line)
+{
+	char got[512];
+
+	Classes(text, got);
+	CheckStr(got, want, line);
+}
+#define STYLED(text, want) Styled((text), (want), __LINE__)
+
+static void TestMdscan(void)
+{
+	static const char kDoc[] =
+		"---\ntitle: \"A *post*\"\n# a comment\n---\n\n# One\n\nSome **bold** and a [link](http://x.y/a_b).\n\n"
+		"```c\n# not a heading\nint *p;\n```\n\n## Two ##\n\n> quoted *text*\n\n- item `code`\n### Three\n";
+	char buf[512];
+	unsigned char all[512], part[512];
+	MdHeading h[8];
+	MdState s;
+	long n = (long) strlen(kDoc), at;
+	int count;
+	unsigned long b1, b2;
+
+	STYLED("# Title", "mmhhhhh");
+	STYLED("#No heading", "...........");
+	STYLED("## Two ##", "mmmhhhmmm");
+	STYLED("Some *it* and **bold** and ***both***", "....."   "miim"  "....." "mmbbbbmm" "....." "mmmBBBBmmm");
+	STYLED("a snake_case_word here", "......................");
+	STYLED("2 * 3 * 4", ".........");
+	STYLED("use `x*y*z` now", "....mcccccm....");
+	STYLED("``a`b``", "mmcccmm");
+	STYLED("[Topica](https://example.com/a_b_c) x", "mllllllm" "uuuuuuuuuuuuuuuuuuuuuuuuuuu" "..");
+	STYLED("[![a](i.png)](u)", "mmmlmuuuuuuumuuu");
+	STYLED("see [the docs][ref].", "....mllllllllmuuuuu.");
+	STYLED("a note[^1].", "......mllm.");
+	STYLED("[ref]: https://x.y \"T\"", "mmmmmm" "." "uuuuuuuuuuu" "....");
+	STYLED("**bold *it***", "mmbbbbbmBBmmm");
+	STYLED("[a **b**](u)", "mllmmlmmmuuu");
+	STYLED("\\*not\\*", "mm...mm");
+	STYLED("{% include x.html %} y", "ffffffffffffffffffff..");
+	STYLED("{{ page.title }}", "ffffffffffffffff");
+	STYLED("{: .note}", "fffffffff");
+	STYLED("<br/> and <!-- c -->", "fffff.....ffffffffff");
+	STYLED("<https://a.b> 3 < 4", "muuuuuuuuuuum......");
+	STYLED("> quote *it*", "miiiiiiimiim");
+	STYLED("- item *a*", "mm.....mim");
+	STYLED("1. one", "mmm...");
+	STYLED("- [x] done", "mmmmm.....");
+	STYLED("***", "mmm");
+	STYLED("---\ntitle: *x*\n---\n# H", "mmm/ffffffffff/mmm/mmh");
+	STYLED("x\n---\ny", "./mmm/.");
+	STYLED("```c\n# not\n```\n# yes", "mmmm/ccccc/mmm/mmhhh");
+	STYLED("~~~\n```\n~~~\n*a*", "mmm/ccc/mmm/mim");
+	STYLED("```\nnever closed\n# x", "mmm/cccccccccccc/ccc");
+
+	/* the same classes scanned in one go or from the middle */
+	md_begin(&s);
+	md_classify(&s, kDoc, n, n, all);
+	CHECK(s.pos == n);
+	md_begin(&s);
+	at = md_seek(&s, kDoc, n, 75);
+	CHECK(at > 0 && at <= 75 && (kDoc[at - 1] == '\n'));
+	md_classify(&s, kDoc, n, n, part);
+	CHECK(memcmp(all + at, part, (size_t) (n - at)) == 0);
+	md_begin(&s);
+	at = md_seek(&s, kDoc, n, (long) (strstr(kDoc, "int *p") - kDoc) + 3);
+	CHECK(at == (long) (strstr(kDoc, "int *p") - kDoc));
+	CHECK(s.fence == '`');
+	CHECK(md_line_after(kDoc, n, at) == at + 8);
+	CHECK(md_line_after("ab", 2, 1) == 2);
+
+	count = md_headings(kDoc, n, h, 8);
+	CHECK(count == 3);
+	CHECK(h[0].level == 1 && h[0].len == 3 && memcmp(kDoc + h[0].start, "One", 3) == 0);
+	CHECK(h[1].level == 2 && h[1].len == 3 && memcmp(kDoc + h[1].start, "Two", 3) == 0);
+	CHECK(h[2].level == 3 && memcmp(kDoc + h[2].line, "### Three", 9) == 0);
+	CHECK(md_headings(kDoc, n, h, 1) == 3);
+
+	/* the blocks' number changes with a fence, not with prose */
+	b1 = md_blocks(kDoc, n);
+	strcpy(buf, kDoc);
+	buf[strstr(buf, "Some") - buf] = 'X';
+	CHECK(md_blocks(buf, n) == b1);
+	strcpy(buf, kDoc);
+	memcpy(strstr(buf, "```\n\n##"), "``x", 3);
+	b2 = md_blocks(buf, n);
+	CHECK(b2 != b1);
+	strcpy(buf, kDoc);
+	buf[0] = '-';
+	buf[1] = '+';
+	CHECK(md_blocks(buf, n) != b1);
+
+	/* any text at all: no reads or writes out of bounds (ASan watches) */
+	{
+		static const char kChars[] = "*_`[]()!#>-~{}%<:/\\^ \nab1.";
+		int round, len, i;
+		srand(1);
+		for (round = 0; round < 3000; round++) {
+			len = rand() % 120;
+			for (i = 0; i < len; i++)
+				buf[i] = kChars[rand() % (int) (sizeof(kChars) - 1)];
+			buf[len] = '\0';
+			md_begin(&s);
+			md_classify(&s, buf, len, len, all);
+			(void) md_headings(buf, len, h, 8);
+			(void) md_blocks(buf, len);
+		}
+		CHECK(round == 3000);
+	}
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -549,6 +681,7 @@ int main(void)
 	TestFind();
 	TestPrefs();
 	TestRecovery();
+	TestMdscan();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

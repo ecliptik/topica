@@ -17,6 +17,7 @@ typedef struct {
 	short utf8;                 /* write UTF-8 (else Mac Roman) */
 	short lf;                   /* LF line ends (else CR) */
 	short autosaveMinutes;      /* recovery copies; 0: none */
+	short format;               /* Markdown styled in place */
 } TopicaPrefs;
 
 void prefs_default(TopicaPrefs *p);
