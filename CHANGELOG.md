@@ -20,3 +20,8 @@ The first editor, on System 6 and System 7.
 - Finder icons for the application and its posts; documents open from the
   Finder.
 - Two builds: Topica Lite for 512K Macs and Topica.
+- Saving no longer uses Retro68's GetFInfo/SetFInfo glue, which leaves
+  ioFDirIndex unset: on a file server it could look up another file in the
+  folder and change that file's type and creator.
+- With the clock unset (a Mac with no clock battery wakes in 1904), Save
+  suggests a name without a date.

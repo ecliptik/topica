@@ -130,13 +130,52 @@ static OSErr WriteNew(const unsigned char *name, short vRefNum, const char *data
 	return err != noErr ? err : cerr;
 }
 
+/*
+ * Finder info without Retro68's GetFInfo and SetFInfo glue: it leaves
+ * ioFDirIndex unset, and a non-zero leftover makes the File Manager look up
+ * the Nth file in the folder instead, write that file's name into ours, and
+ * hand back (or change) its Finder info. On a file server that retyped
+ * another application. Here the parameter block starts zeroed, and the File
+ * Manager gets a copy of the name, never the caller's.
+ */
+static OSErr GetInfo(const unsigned char *name, short vRefNum, ParamBlockRec *pb, Str63 copy)
+{
+	memcpy(copy, name, (size_t) (name[0] > 63 ? 63 : name[0]) + 1);
+	memset(pb, 0, sizeof(*pb));
+	pb->fileParam.ioNamePtr = copy;
+	pb->fileParam.ioVRefNum = vRefNum;
+	pb->fileParam.ioFDirIndex = 0;
+	return PBGetFInfoSync(pb);
+}
+
+static Boolean Exists(const unsigned char *name, short vRefNum)
+{
+	ParamBlockRec pb;
+	Str63 copy;
+
+	return GetInfo(name, vRefNum, &pb, copy) == noErr;
+}
+
+static OSErr SetTypeCreator(const unsigned char *name, short vRefNum, OSType type, OSType creator)
+{
+	ParamBlockRec pb;
+	Str63 copy;
+	OSErr err = GetInfo(name, vRefNum, &pb, copy);
+
+	if (err != noErr)
+		return err;
+	pb.fileParam.ioFlFndrInfo.fdType = type;
+	pb.fileParam.ioFlFndrInfo.fdCreator = creator;
+	pb.fileParam.ioFDirIndex = 0;
+	pb.fileParam.ioNamePtr = copy;
+	return PBSetFInfoSync(&pb);
+}
+
 OSErr FileWrite(const FileRef *f, const char *data, long len)
 {
-	FInfo info;
 	Str255 temp;
 	char t[32];
 	OSErr err;
-	Boolean exists;
 
 	sprintf(t, "Topica Save %04ld", (long) (TickCount() % 10000));
 	PStr(temp, t);
@@ -146,8 +185,7 @@ OSErr FileWrite(const FileRef *f, const char *data, long len)
 		(void) FSDelete(temp, f->vRefNum);
 		return err;
 	}
-	exists = GetFInfo(f->name, f->vRefNum, &info) == noErr;
-	if (exists) {
+	if (Exists(f->name, f->vRefNum)) {
 		err = FSDelete(f->name, f->vRefNum);
 		if (err != noErr) {
 			(void) FSDelete(temp, f->vRefNum);
@@ -157,11 +195,7 @@ OSErr FileWrite(const FileRef *f, const char *data, long len)
 	err = Rename(temp, f->vRefNum, f->name);
 	if (err != noErr)
 		return err;                     /* the post is safe under the temporary name */
-	if (GetFInfo(f->name, f->vRefNum, &info) == noErr) {
-		info.fdType = kPostType;
-		info.fdCreator = kCreator;
-		(void) SetFInfo(f->name, f->vRefNum, &info);
-	}
+	(void) SetTypeCreator(f->name, f->vRefNum, kPostType, kCreator);
 	(void) FlushVol(NULL, f->vRefNum);
 	return noErr;
 }

@@ -67,7 +67,7 @@ void post_filename(int year, int month, int day, const char *title, int maxLen, 
 	int room = (int) sizeof(slug);
 
 	if (maxLen > 0) {
-		room = maxLen - 11 - 3 + 1;     /* "YYYY-MM-DD-" and ".md" */
+		room = maxLen - (year > 0 ? 11 : 0) - 3 + 1;    /* "YYYY-MM-DD-" and ".md" */
 		if (room > (int) sizeof(slug))
 			room = (int) sizeof(slug);
 		if (room < 2)
@@ -80,7 +80,10 @@ void post_filename(int year, int month, int day, const char *title, int maxLen, 
 	}
 	if (cap > 0) {
 		char name[96];
-		sprintf(name, "%04d-%02d-%02d-%s.md", year % 10000, month % 100, day % 100, slug);
+		if (year > 0)
+			sprintf(name, "%04d-%02d-%02d-%s.md", year % 10000, month % 100, day % 100, slug);
+		else
+			sprintf(name, "%s.md", slug);
 		strncpy(out, name, (size_t) cap - 1);
 		out[cap - 1] = '\0';
 	}

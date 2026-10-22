@@ -414,6 +414,8 @@ static void TestPost(void)
 	post_filename(2026, 10, 22, "Three Days with Claude Code", 31, s, sizeof(s));
 	CHECK_STR(s, "2026-10-22-three-days-with.md");
 	CHECK(strlen(s) <= 31);
+	post_filename(0, 1, 1, "Three Days with Claude Code", 31, s, sizeof(s));
+	CHECK_STR(s, "three-days-with-claude-code.md");
 	post_filename(2026, 1, 2, "", 31, s, sizeof(s));
 	CHECK_STR(s, "2026-01-02-untitled.md");
 	post_filename(2026, 1, 2, "Supercalifragilisticexpialidocious", 31, s, sizeof(s));

@@ -457,7 +457,8 @@ static void SuggestName(Doc *d, char *out, int cap)
 	GetDateTime(&secs);
 #pragma GCC diagnostic pop
 	SecondsToDate(secs, &dt);
-	post_filename(dt.year, dt.month, dt.day, title, 31, out, cap);
+	/* a Mac with no clock battery wakes up in 1904: no date then */
+	post_filename(dt.year >= 1990 ? dt.year : 0, dt.month, dt.day, title, 31, out, cap);
 }
 
 Boolean DocSaveAs(Doc *d)
