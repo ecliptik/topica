@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../core/find.h"
 #include "../core/frontmatter.h"
+#include "../core/prefs.h"
 #include "../core/post.h"
 #include "../core/textconv.h"
 #include "../core/undo.h"
@@ -436,6 +438,75 @@ static void TestPost(void)
 	CHECK(post_minutes(401) == 3);
 }
 
+/* ---- find ---- */
+
+static void TestFind(void)
+{
+	const char *t = "The cat sat. Concatenate CAT! caf\x8E Caf\x83";
+	long n = (long) strlen(t), count;
+	char out[128];
+
+	CHECK(find_next(t, n, "cat", 3, 0, 0) == 4);
+	CHECK(find_next(t, n, "cat", 3, 5, 0) == 16);               /* inside Concatenate */
+	CHECK(find_next(t, n, "cat", 3, 5, kFindWord) == 25);       /* CAT, a whole word */
+	CHECK(find_next(t, n, "cat", 3, 5, kFindWord | kFindCase) == 4);   /* wraps round */
+	CHECK(find_next(t, n, "dog", 3, 0, 0) == -1);
+	CHECK(find_next(t, n, "caf\x8E", 4, 0, 0) == 30);
+	CHECK(find_next(t, n, "caf\x8E", 4, 31, 0) == 35);         /* E-acute finds e-acute */
+	CHECK(find_next(t, n, "caf\x8E", 4, 31, kFindCase) == 30);
+	CHECK(find_prev(t, n, "cat", 3, 16, 0) == 4);
+	CHECK(find_prev(t, n, "cat", 3, 3, 0) == 25);               /* wraps to the end */
+	CHECK(find_is_match(t, n, "CAT", 3, 4, 0));
+	CHECK(!find_is_match(t, n, "CAT", 3, 4, kFindCase));
+	CHECK(!find_is_match(t, n, "cat", 3, 16, kFindWord));
+	CHECK(find_next(t, n, "", 0, 0, 0) == -1);
+	CHECK(find_lower(0x83) == 0x8E);
+	CHECK(find_is_word_char(0x8E) && !find_is_word_char(0xD1));
+
+	n = find_replace_all(t, (long) strlen(t), "cat", 3, "dog", 3, kFindWord, out, sizeof(out) - 1, &count);
+	CHECK(n == (long) strlen(t) && count == 2);
+	out[n < 0 ? 0 : n] = '\0';
+	CHECK_STR(out, "The dog sat. Concatenate dog! caf\x8E Caf\x83");
+	n = find_replace_all("aaa", 3, "a", 1, "bb", 2, 0, out, sizeof(out) - 1, &count);
+	out[n < 0 ? 0 : n] = '\0';
+	CHECK_STR(out, "bbbbbb");
+	CHECK(count == 3);
+	CHECK(find_replace_all("aaa", 3, "a", 1, "bb", 2, 0, out, 4, &count) == -1);
+	CHECK(find_replace_all("aaa", 3, "a", 1, "", 0, 0, NULL, 0, &count) == 0);
+}
+
+/* ---- prefs ---- */
+
+static void TestPrefs(void)
+{
+	TopicaPrefs p, q;
+	char buf[512];
+	long n;
+
+	prefs_default(&p);
+	CHECK_STR(p.font, "Monaco");
+	CHECK(p.size == 9 && p.utf8 && p.lf && p.autosaveMinutes == 2 && p.profile == kProfileJekyll);
+	{
+		const char *text = "# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
+			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\r";
+		prefs_read(&p, text, (long) strlen(text));
+	}
+	CHECK_STR(p.font, "Geneva");
+	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5);
+	CHECK_STR(p.imagePath, "/img/");
+	CHECK_STR(p.layout, "page");
+	/* bad numbers keep what was there */
+	prefs_read(&p, "size: 99\nautosave-minutes: x\n", (long) strlen("size: 99\nautosave-minutes: x\n"));
+	CHECK(p.size == 12 && p.autosaveMinutes == 5);
+	/* written and read back */
+	n = prefs_write(&p, '\r', buf, sizeof(buf));
+	CHECK(n > 0 && n == prefs_write(&p, '\r', NULL, 0));
+	prefs_default(&q);
+	prefs_read(&q, buf, n);
+	CHECK(memcmp(&p, &q, sizeof(p)) == 0);
+	CHECK(prefs_write(&p, '\r', buf, 10) == -1);
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -443,6 +514,8 @@ int main(void)
 	TestFrontmatterUpdate();
 	TestUndo();
 	TestPost();
+	TestFind();
+	TestPrefs();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }
