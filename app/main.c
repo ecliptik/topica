@@ -22,6 +22,7 @@
 #include "docwin.h"
 #include "fileio.h"
 #include "findwin.h"
+#include "headings.h"
 #include "postinfo.h"
 #include "settings.h"
 #include "util.h"
@@ -31,7 +32,7 @@ enum { kAboutItem = 1 };
 enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kRevertItem = 7, kQuitItem = 9 };
 enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
 	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kPrefsItem = 15 };
-enum { kPostInfoItem = 1, kInsertImageItem = 3 };
+enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6 };
 /* osEvt's suspend/resume (Inside Macintosh VI) */
 enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
 
@@ -65,6 +66,15 @@ static void SetUndoItem(MenuHandle m, short item, int kind, Boolean redo)
 	PStr(p, s);
 	SetMenuItemText(m, item, p);
 	Enable(m, item, kind != kUndoNone);
+}
+
+/* A whole menu on or off: 1 if that changed it */
+static Boolean EnableMenu(MenuHandle m, Boolean on)
+{
+	if (((**m).enableFlags & 1) == (unsigned long) on)
+		return false;
+	Enable(m, 0, on);
+	return true;
 }
 
 static Boolean IsDA(WindowPtr w)
@@ -103,10 +113,11 @@ static void AdjustMenus(void)
 	Enable(edit, kFindItem, d != NULL);
 	Enable(edit, kFindAgainItem, d != NULL && FindHasPattern());
 	Enable(edit, kReplaceAgainItem, d != NULL && FindHasPattern());
-	if (((**post).enableFlags & 1) != (d != NULL)) {     /* the whole menu */
-		Enable(post, 0, d != NULL);
+	Enable(post, kFormattingItem, d != NULL && DocCanStyle(d));
+	SetMenuItemText(post, kFormattingItem, gPrefs.format ? "\pHide Formatting" : "\pShow Formatting");
+	/* whole menus */
+	if (EnableMenu(post, d != NULL) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
 		DrawMenuBar();
-	}
 }
 
 static Boolean DoQuit(void)
@@ -212,10 +223,20 @@ static void DoMenu(long choice)
 		if (d == NULL)
 			break;
 		DocSealUndo(d);
-		if (item == kPostInfoItem)
+		if (item == kPostInfoItem) {
 			(void) PostInfo(d);
-		else if (item == kInsertImageItem)
+		} else if (item == kInsertImageItem) {
 			InsertImage(d);
+		} else if (item == kInsertLinkItem) {
+			InsertLink(d);
+		} else if (item == kFormattingItem) {
+			gPrefs.format = !gPrefs.format;
+			SettingsSave();
+			DocRestyleAll();
+		}
+		break;
+	case kHeadingsMenu:
+		HeadingsGo(d, item);
 		break;
 	}
 	HiliteMenu(0);
@@ -230,6 +251,7 @@ static void DoMouseDown(EventRecord *e)
 	switch (part) {
 	case inMenuBar:
 		AdjustMenus();
+		HeadingsMenu(DocFront());
 		DoMenu(MenuSelect(e->where));
 		break;
 	case inSysWindow:
@@ -308,6 +330,7 @@ static void OpenFinderFiles(void)
 	CountAppFiles(&message, &count);
 	for (i = 1; i <= count; i++) {
 		GetAppFiles(i, &af);
+		memset(&f, 0, sizeof(f));       /* dirID 0: vRefNum is a working directory */
 		f.vRefNum = af.vRefNum;
 		memcpy(f.name, af.fName, (size_t) (af.fName[0] > 63 ? 63 : af.fName[0]) + 1);
 		if (DocOpen(&f) != NULL)

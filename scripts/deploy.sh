@@ -51,6 +51,9 @@ snow)
     hdel ":untyped.md" 2>/dev/null || true
     hcopy -r "$fixtures/round-trip.md" ":untyped.md"
     hattrib -t '????' -c '????' ":untyped.md"
+    hdel ":Formatting" 2>/dev/null || true
+    hcopy -r "$fixtures/formatting.md" ":Formatting"
+    hattrib -t TEXT -c TPCA ":Formatting"
     humount >/dev/null
     echo "deploy: Topica ($preset) is on $img"
     if [ $launch = 1 ]; then
@@ -62,6 +65,7 @@ basilisk)
     mkdir -p "$EMU/unix/Topica"
     python3 "$EMU/basilisk/macbin_to_extfs.py" "$bin" "$EMU/unix/Topica" Topica >/dev/null
     cp "$fixtures/round-trip.md" "$EMU/unix/Topica/round-trip.md"
+    cp "$fixtures/formatting.md" "$EMU/unix/Topica/formatting.md"
     echo "deploy: Topica ($preset) is in $EMU/unix/Topica (the Unix disk in Basilisk II)"
     if [ $launch = 1 ]; then
         prefs="$here/diskimages/basilisk_prefs"

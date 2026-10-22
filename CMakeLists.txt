@@ -1,7 +1,7 @@
 # Topica: a Markdown writer for blogs, for the classic Macintosh.
 # Built with Retro68: scripts/build.sh --preset lite|full.
 cmake_minimum_required(VERSION 3.13)
-project(Topica VERSION 0.2.0 LANGUAGES C)
+project(Topica VERSION 0.3.0 LANGUAGES C)
 
 # Lite: the Macintosh 512Ke (512K, no MultiFinder). Full: everything else.
 option(TOPICA_LITE "Build for 512K Macs: fewer windows, a smaller undo history" OFF)
@@ -41,6 +41,7 @@ set(TOPICA_SOURCES
     app/ae.c
     app/findwin.c
     app/settings.c
+    app/headings.c
     core/textconv.c
     core/frontmatter.c
     core/undo.c
@@ -48,6 +49,7 @@ set(TOPICA_SOURCES
     core/find.c
     core/prefs.c
     core/recovery.c
+    core/mdscan.c
 )
 
 add_application(Topica CREATOR "TPCA" ${TOPICA_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/topica.r)

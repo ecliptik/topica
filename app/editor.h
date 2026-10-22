@@ -18,6 +18,11 @@ typedef struct Editor Editor;
 Editor *EdNew(const Rect *view, short font, short size);
 void EdDispose(Editor *ed);
 
+/* Styles: core/mdscan.h's classes, one per character of [start, end); the
+   editor decides how each looks. 0 is plain text. */
+Boolean EdCanStyle(Editor *ed);
+void EdSetClasses(Editor *ed, long start, long end, const unsigned char *cls);
+
 /* The most text the editor can hold */
 long EdMaxLength(void);
 

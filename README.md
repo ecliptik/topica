@@ -8,13 +8,18 @@ front matter, Markdown, and UTF-8 files a blog can use as they are.
 The name is Aristotle's *Topics*, his book on finding things to say: the
 *topoi*, the "places" a writer goes for material.
 
-> Topica is new and unfinished (0.2). See [TODO.md](TODO.md) for what's
+> Topica is new and unfinished (0.3). See [TODO.md](TODO.md) for what's
 > coming.
 
 ## What it does today
 
 - **Edits posts** in windows that fit a 512×342 screen, in Monaco 9 with
   the text wrapped to the window. Several windows at once.
+- **Shows the formatting as you write:** headings and **strong** text in
+  bold, *emphasis* in italics, `code` in Monaco, link text underlined, in
+  color on a color screen. Post › Hide Formatting turns it off; it starts
+  off on a 68000, where it slows down long posts.
+- **The Headings menu** lists the post's headings; choose one to go there.
 - **Undo and Redo** many steps (⌘Z, ⌘⇧Z): Typing, Delete, Cut, Paste,
   Clear, Post Info and Insert Image each undo as one step.
 - **Post Info** (⌘E) edits the front matter's title, description,
@@ -24,7 +29,8 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 - **New Post** (⌘N) starts from a front-matter template; Save suggests a
   `YYYY-MM-DD-title.md` name that fits the Mac's 31 characters.
 - **Insert Image** writes a Markdown image placeholder,
-  `![description](/assets/images/posts/<category>/<file>)`.
+  `![description](/assets/images/posts/<category>/<file>)`, and **Insert
+  Link** (⌘K) a link around the selection.
 - **UTF-8 in, UTF-8 out.** Posts are UTF-8 with LF line ends on disk and
   Mac Roman in the editor. Characters Mac Roman doesn't have (`ａ`, `→`,
   emoji) show as `&#xFF41;` while you edit and are written back as the same
@@ -72,7 +78,8 @@ covers the emulators.
 ## Layout
 
 - `core/`: portable C89 with no Toolbox calls: UTF-8 and Mac Roman, front
-  matter, undo, post names and word counts. Tested on the host.
+  matter, undo, post names and word counts, and a Markdown scanner for
+  styling and headings. Tested on the host.
 - `app/`: the Macintosh application. Every edit goes through one call
   (`EdReplace` in `app/editor.h`), with TextEdit behind it today.
 - `resources/`: menus, dialogs, alerts and icons (Rez).

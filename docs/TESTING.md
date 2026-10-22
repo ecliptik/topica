@@ -8,7 +8,7 @@ make -C tests test
 
 They build `core/` as C89 with `-Werror`, AddressSanitizer and UBSan, and
 check the UTF-8 round trip, front matter reading and writing, undo and
-redo, and post names.
+redo, post names, and the Markdown scanner (with random text, for ASan).
 
 ## Emulators
 
@@ -33,8 +33,9 @@ scripts/deploy.sh basilisk --launch   # System 7 in 256 colors
 memory-mapped while Snow runs). Never run Snow and Basilisk II at once, and
 shut Basilisk II down from the Special menu rather than killing it.
 
-`deploy.sh` also puts two copies of `tests/fixtures/round-trip.md` on the
-disk: "Round Trip", typed as another application's text file, and
+`deploy.sh` also puts `tests/fixtures/formatting.md` on the disk as
+"Formatting", a post with every kind of Markdown Topica styles, and two
+copies of `tests/fixtures/round-trip.md`: "Round Trip", typed as another application's text file, and
 "untyped.md", with no type, as a file server might leave it. To check the
 round trip, open "Round Trip", Save As another name, quit, and compare the
 copy with the fixture: they must be the same bytes.
@@ -46,6 +47,9 @@ file beside the application.
 
 - New Post, Post Info, typing, Undo and Redo, Save, Revert, Close and Quit
   with unsaved changes.
+- Formatting: open "Formatting", type emphasis, open and close a code
+  fence (the rest of the post restyles), Undo, Hide and Show Formatting,
+  a font change in Preferences; colors on System 7.
 - Opening a UTF-8 post with characters Mac Roman lacks, and saving it.
 - Saving to an AppleShare volume, and a full or locked disk.
 - Topica Lite on a 512K Mac.

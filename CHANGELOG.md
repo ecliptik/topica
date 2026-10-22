@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+Formatting in place.
+
+- Markdown styled as you write: headings and strong text bold, emphasis in
+  italics, code in Monaco, link text underlined and addresses condensed.
+  On a color screen, headings, links, code, markup and front matter each
+  have a color. A code fence or the front matter's end restyles the rest
+  of the post.
+- Post › Show Formatting / Hide Formatting, kept in Preferences. It starts
+  off on a 68000 (512Ke, Plus, SE), where styled TextEdit takes seconds
+  to lay out a long post, and on with a 68020 or better.
+- Post › Insert Link (⌘K): the selection becomes the link's text, or its
+  address when it looks like one.
+- The Headings menu: the post's headings, indented by level, with a check
+  mark on the one you're in; choosing one scrolls to it.
+- Copy puts plain text on the Clipboard.
+- Fixed: posts opened from the Finder on System 6 couldn't be found (0.2).
+
 ## 0.2.0 (unreleased)
 
 The Mac's manners.

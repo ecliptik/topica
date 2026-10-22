@@ -2,6 +2,10 @@
  * te_editor.c: the editor interface (editor.h) on TextEdit. TextEdit wraps
  * the text to the view's width and holds at most 32,767 characters; we
  * stop at 32,000 to leave it room.
+ *
+ * Styled TextEdit (System 6 has it on the Plus and the 512Ke too) shows the
+ * Markdown classes. Every style keeps the base font's size and the line
+ * height stays fixed, so scrolling still goes by whole lines.
  */
 #include <Quickdraw.h>
 #include <Fonts.h>
@@ -9,12 +13,19 @@
 #include <Memory.h>
 #include <Events.h>
 #include <ToolUtils.h>
+#include <OSUtils.h>
+#include <Traps.h>
 #include <string.h>
 
+#include "../core/mdscan.h"
 #include "editor.h"
+#include "util.h"
 
 struct Editor {
 	TEHandle te;
+	Boolean styled;                     /* styled TextEdit */
+	short font, size;                   /* the base style */
+	short height, ascent;               /* every line's */
 };
 
 enum { kMaxText = 32000 };
@@ -33,6 +44,71 @@ static void TextRect(const Rect *view, Rect *r)
 	InsetRect(r, 4, 2);
 }
 
+static Boolean HasStyledTE(void)
+{
+	return NGetTrapAddress(_TEStyleNew, kToolboxTrapType) != NGetTrapAddress(_Unimplemented, kToolboxTrapType);
+}
+
+/* Colors only on a color screen; each is dark enough to come out black if
+   the screen goes to black and white */
+static Boolean ColorScreen(void)
+{
+	static short color = -1;
+
+	if (color < 0) {
+		color = 0;
+		if (HasColorQD()) {
+			GDHandle gd = GetMainDevice();
+			color = gd != NULL && (**(**gd).gdPMap).pixelSize >= 4;
+		}
+	}
+	return color;
+}
+
+/* Fixes the line height from the base font: TextEdit's own fields for plain
+   TextEdit, and -1 there would mean a height per line for styled */
+static void Metrics(Editor *ed)
+{
+	FontInfo fi;
+	TEPtr t;
+
+	TextFont(ed->font);
+	TextSize(ed->size);
+	TextFace(0);
+	GetFontInfo(&fi);
+	ed->ascent = fi.ascent;
+	ed->height = (short) (fi.ascent + fi.descent + fi.leading);
+	t = *ed->te;
+	if (!ed->styled) {
+		t->txFont = ed->font;
+		t->txSize = ed->size;
+	}
+	t->fontAscent = ed->ascent;
+	t->lineHeight = ed->height;
+}
+
+static void BaseStyle(Editor *ed, TextStyle *ts)
+{
+	memset(ts, 0, sizeof(*ts));
+	ts->tsFont = ed->font;
+	ts->tsSize = ed->size;
+}
+
+/* All the text in the base style, through the selection's fields so that
+   nothing is drawn */
+static void Plain(Editor *ed)
+{
+	TextStyle ts;
+	short s = (*ed->te)->selStart, e = (*ed->te)->selEnd;
+
+	BaseStyle(ed, &ts);
+	(*ed->te)->selStart = 0;
+	(*ed->te)->selEnd = (*ed->te)->teLength;
+	TESetStyle(doAll, &ts, false, ed->te);
+	(*ed->te)->selStart = s;
+	(*ed->te)->selEnd = e;
+}
+
 Editor *EdNew(const Rect *view, short font, short size)
 {
 	Editor *ed = (Editor *) NewPtrClear(sizeof(Editor));
@@ -40,16 +116,25 @@ Editor *EdNew(const Rect *view, short font, short size)
 
 	if (ed == NULL)
 		return NULL;
+	ed->font = font;
+	ed->size = size;
 	TextFont(font);
 	TextSize(size);
 	TextRect(view, &r);
-	ed->te = TENew(&r, &r);
+	ed->styled = HasStyledTE();
+	ed->te = ed->styled ? TEStyleNew(&r, &r) : TENew(&r, &r);
 	if (ed->te == NULL) {
 		DisposePtr((Ptr) ed);
 		return NULL;
 	}
+	Metrics(ed);                        /* TEStyleNew took the port's font */
 	TEAutoView(true, ed->te);
 	return ed;
+}
+
+Boolean EdCanStyle(Editor *ed)
+{
+	return ed->styled;
 }
 
 void EdDispose(Editor *ed)
@@ -79,17 +164,11 @@ void EdSetView(Editor *ed, const Rect *view)
 
 void EdSetFont(Editor *ed, short font, short size)
 {
-	FontInfo fi;
-	TEPtr t;
-
-	TextFont(font);
-	TextSize(size);
-	GetFontInfo(&fi);
-	t = *ed->te;
-	t->txFont = font;
-	t->txSize = size;
-	t->fontAscent = fi.ascent;
-	t->lineHeight = (short) (fi.ascent + fi.descent + fi.leading);
+	ed->font = font;
+	ed->size = size;
+	Metrics(ed);
+	if (ed->styled)
+		Plain(ed);                      /* the window restyles it afterwards */
 	TECalText(ed->te);
 }
 
@@ -304,10 +383,17 @@ Boolean TEScrapFromClipboard(void)
 	return true;
 }
 
+/* Straight from the text: styled TextEdit's TECopy writes the Clipboard
+   itself, styles and all, and a post wants plain text */
 void EdCopySelection(Editor *ed)
 {
-	TECopy(ed->te);
-	TEScrapToClipboard();
+	long s = (*ed->te)->selStart, e = (*ed->te)->selEnd;
+	Handle h = (Handle) TEGetText(ed->te);
+
+	(void) ZeroScrap();
+	HLock(h);
+	(void) PutScrap(e - s, 'TEXT', *h + s);
+	HUnlock(h);
 }
 
 Handle EdClipboard(long *len)
@@ -318,4 +404,213 @@ Handle EdClipboard(long *len)
 	}
 	*len = LMGetTEScrpLength();
 	return LMGetTEScrpHandle();
+}
+
+/* ---- styles ---- */
+
+static const RGBColor kBlack = { 0, 0, 0 };
+static const RGBColor kMarkColor = { 0x6000, 0x6000, 0x6000 };
+static const RGBColor kCodeColor = { 0x0000, 0x6000, 0x0000 };
+static const RGBColor kLinkColor = { 0x0000, 0x0000, 0xC000 };
+static const RGBColor kHeadingColor = { 0x0000, 0x0000, 0x8000 };
+static const RGBColor kMetaColor = { 0x7000, 0x3800, 0x0000 };
+
+/* How a Markdown class looks */
+static void ClassStyle(Editor *ed, int cls, ScrpSTElement *e)
+{
+	Style face = 0;
+
+	memset(e, 0, sizeof(*e));
+	if (cls & (MD_BOLD | MD_HEADING))
+		face |= bold;
+	if (cls & MD_ITALIC)
+		face |= italic;
+	if ((cls & (MD_LINK | MD_URL | MD_MARK)) == MD_LINK)
+		face |= underline;
+	if (cls & MD_URL)
+		face |= condense;
+	e->scrpFont = (cls & MD_CODE) ? kMonaco : ed->font;
+	e->scrpFace = face;
+	e->scrpSize = ed->size;
+	e->scrpHeight = ed->height;
+	e->scrpAscent = ed->ascent;
+	e->scrpColor = kBlack;
+	if (ColorScreen()) {
+		if (cls & (MD_MARK | MD_URL))
+			e->scrpColor = kMarkColor;
+		else if (cls & MD_CODE)
+			e->scrpColor = kCodeColor;
+		else if (cls & MD_LINK)
+			e->scrpColor = kLinkColor;
+		else if (cls & MD_HEADING)
+			e->scrpColor = kHeadingColor;
+		else if (cls & MD_META)
+			e->scrpColor = kMetaColor;
+	}
+}
+
+static Boolean SameStyle(const ScrpSTElement *a, const ScrpSTElement *b)
+{
+	return a->scrpFont == b->scrpFont && a->scrpFace == b->scrpFace && a->scrpSize == b->scrpSize
+		&& a->scrpColor.red == b->scrpColor.red && a->scrpColor.green == b->scrpColor.green
+		&& a->scrpColor.blue == b->scrpColor.blue;
+}
+
+static Boolean SameAsTE(const STElement *st, const ScrpSTElement *e)
+{
+	return st->stFont == e->scrpFont && st->stFace == e->scrpFace && st->stSize == e->scrpSize
+		&& st->stColor.red == e->scrpColor.red && st->stColor.green == e->scrpColor.green
+		&& st->stColor.blue == e->scrpColor.blue;
+}
+
+/* Does TextEdit already show [from, to) in style e? run: a hint, the run to
+   start looking from */
+static Boolean Shows(TEHandle te, long from, long to, const ScrpSTElement *e, short *run)
+{
+	TEStyleHandle sh = TEGetStyleHandle(te);
+	TEStylePtr sp = *sh;
+	STPtr tab = *sp->styleTab;
+	short i = *run;
+
+	if (i >= sp->nRuns || sp->runs[i].startChar > from)
+		i = 0;
+	while (i + 1 < sp->nRuns && sp->runs[i + 1].startChar <= from)
+		i++;
+	*run = i;
+	for (; i < sp->nRuns && sp->runs[i].startChar < to; i++)
+		if (!SameAsTE(&tab[sp->runs[i].styleIndex], e))
+			return false;
+	return true;
+}
+
+/* The lines from from to to drawn again now, or to the bottom of the view
+   when the text wrapped anew (to < 0) */
+static void Redraw(Editor *ed, long from, long to)
+{
+	TEPtr t = *ed->te;
+	Rect r = t->viewRect;
+	long top = t->destRect.top + EdLineOf(ed, from) * (long) ed->height;
+	RgnHandle clip;
+
+	if (top > r.top)
+		r.top = (short) top;
+	if (to >= 0) {
+		long bottom = t->destRect.top + (EdLineOf(ed, to > from ? to - 1 : from) + 1) * (long) ed->height;
+		if (bottom < r.bottom)
+			r.bottom = (short) bottom;
+	}
+	if (r.top >= r.bottom || (clip = NewRgn()) == NULL)
+		return;
+	GetClip(clip);
+	ClipRect(&r);
+	EraseRect(&r);
+	TEUpdate(&r, ed->te);
+	SetClip(clip);
+	DisposeRgn(clip);
+}
+
+/* Restyles [from, to) by taking its text out and putting it back with the
+   new styles. TEUseStyleScrap would add faces rather than set them, skip a
+   scrap's last style, and leave the lines unwrapped; TECalText after it
+   takes seconds on a long post on a 68000. Nothing shows until the lines
+   are drawn again at the end. */
+static void Reinsert(Editor *ed, long from, long to, StScrpHandle styles)
+{
+	TEHandle te = ed->te;
+	long s = (*te)->selStart, e = (*te)->selEnd, len = to - from;
+	short lines = (*te)->nLines;
+	Boolean active = (*te)->active != 0;
+	Ptr copy = NewPtr(len);
+	RgnHandle clip = NewRgn();
+	Rect none = { 0, 0, 0, 0 };
+
+	if (copy == NULL || clip == NULL) {
+		if (copy != NULL)
+			DisposePtr(copy);
+		if (clip != NULL)
+			DisposeRgn(clip);
+		return;
+	}
+	BlockMove(*(*te)->hText + from, copy, len);
+	if (active)
+		TEDeactivate(te);               /* the caret off while it can draw */
+	GetClip(clip);
+	ClipRect(&none);
+	TEAutoView(false, te);
+	TESetSelect(from, to, te);
+	TEDelete(te);
+	TEStyleInsert(copy, len, styles, te);
+	TESetSelect(s, e, te);
+	TEAutoView(true, te);
+	SetClip(clip);
+	DisposeRgn(clip);
+	DisposePtr(copy);
+	Redraw(ed, from, (*te)->nLines == lines ? to : -1);
+	if (active)
+		TEActivate(te);
+}
+
+void EdSetClasses(Editor *ed, long start, long end, const unsigned char *cls)
+{
+	StScrpHandle want, set;
+	ScrpSTElement e, *w;
+	long i, n = 0, cap = 16, from = -1, to = -1, runEnd;
+	short run = 0, k, first = -1, last = -1;
+
+	if (!ed->styled || end <= start)
+		return;
+	/* the runs wanted, merged where classes look the same */
+	want = (StScrpHandle) NewHandle(sizeof(short) + sizeof(ScrpSTElement) * cap);
+	if (want == NULL)
+		return;
+	for (i = start; i < end; i++) {
+		if (i > start && cls[i - start] == cls[i - start - 1])
+			continue;
+		ClassStyle(ed, cls[i - start], &e);
+		if (n > 0 && SameStyle(&(*want)->scrpStyleTab[n - 1], &e))
+			continue;
+		if (n == cap) {
+			cap += 32;
+			SetHandleSize((Handle) want, (long) sizeof(short) + (long) sizeof(ScrpSTElement) * cap);
+			if (MemError() != noErr) {
+				DisposeHandle((Handle) want);
+				return;
+			}
+		}
+		e.scrpStartChar = i;
+		(*want)->scrpStyleTab[n++] = e;
+	}
+	(*want)->scrpNStyles = (short) n;
+	/* the runs TextEdit doesn't show yet: restyling only those keeps the
+	   rest from flickering */
+	HLock((Handle) want);
+	w = (*want)->scrpStyleTab;
+	for (k = 0; k < n; k++) {
+		runEnd = k + 1 < n ? w[k + 1].scrpStartChar : end;
+		if (!Shows(ed->te, w[k].scrpStartChar, runEnd, &w[k], &run)) {
+			if (first < 0) {
+				first = k;
+				from = w[k].scrpStartChar;
+			}
+			last = k;
+			to = runEnd;
+		}
+	}
+	HUnlock((Handle) want);
+	if (first < 0) {
+		DisposeHandle((Handle) want);
+		return;
+	}
+	/* a scrap of just those, its offsets from the start of the range */
+	set = (StScrpHandle) NewHandle(sizeof(short) + sizeof(ScrpSTElement) * (last - first + 1));
+	if (set != NULL) {
+		(*set)->scrpNStyles = (short) (last - first + 1);
+		for (k = first; k <= last; k++) {
+			(*set)->scrpStyleTab[k - first] = (*want)->scrpStyleTab[k];
+			(*set)->scrpStyleTab[k - first].scrpStartChar -= from;
+		}
+		Reinsert(ed, from, to, set);
+		DisposeHandle((Handle) set);
+	}
+	DisposeHandle((Handle) want);
 }

@@ -4,6 +4,7 @@
 #include <Dialogs.h>
 #include <Memory.h>
 #include <ToolUtils.h>
+#include <OSUtils.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,8 +35,12 @@ void SettingsLoad(void)
 	FileRef f;
 	Ptr data;
 	long len;
+	SysEnvRec env;
 
 	prefs_default(&gPrefs);
+	/* styled TextEdit takes seconds to lay out a long post on a 68000 */
+	if (SysEnvirons(1, &env) != noErr || env.processor < env68020)
+		gPrefs.format = 0;
 	if (FilePrefsFolder(kPrefsName, &f) != noErr || FileRead(&f, &data, &len) != noErr)
 		return;
 	prefs_read(&gPrefs, data, len);

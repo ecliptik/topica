@@ -25,7 +25,8 @@ enum {
 	kPostInfoDialog = 140,
 	kImageDialog = 141,
 	kFindDialog = 142,
-	kPrefsDialog = 143
+	kPrefsDialog = 143,
+	kLinkDialog = 144
 };
 
 /* C string to Pascal string (cut at 255) and back */
@@ -34,6 +35,7 @@ void CStr(char *out, const unsigned char *p);
 
 /* System facts, read once */
 Boolean HasWaitNextEvent(void);
+Boolean HasColorQD(void);
 Boolean IsSystem7(void);
 
 /* A modal dialog from a DLOG: a plain box on System 6, movable on 7 */

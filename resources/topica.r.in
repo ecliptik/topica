@@ -6,7 +6,7 @@
 #include "MacTypes.r"
 
 resource 'MBAR' (128) {
-	{ 128, 129, 130, 131 };
+	{ 128, 129, 130, 131, 132 };
 };
 
 /* Enable flags: bit 0 is item 1 (the menu's own flag is the "enabled" after
@@ -58,11 +58,22 @@ resource 'MENU' (130, "Edit") {
 };
 
 resource 'MENU' (131, "Post") {
-	131, textMenuProc, 0x5, enabled, "Post",
+	131, textMenuProc, 0x2D, enabled, "Post",
 	{
 		"Post Info\311", noIcon, "E", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Insert Image\311", noIcon, noKey, noMark, plain
+		"Insert Image\311", noIcon, noKey, noMark, plain;
+		"Insert Link\311", noIcon, "K", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Hide Formatting", noIcon, noKey, noMark, plain
+	}
+};
+
+/* Filled with the front post's headings when the menu bar is clicked */
+resource 'MENU' (132, "Headings") {
+	132, textMenuProc, 0x0, enabled, "Headings",
+	{
+		"No Headings", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -193,6 +204,23 @@ resource 'DITL' (141, "Insert Image", purgeable) {
 		{ 62, 14, 78, 104 }, StaticText { disabled, "File name:" };
 		{ 8, 14, 26, 300 }, StaticText { disabled, "Insert Image" };
 		{ 88, 110, 118, 386 }, StaticText { disabled, "In ^0" };
+	}
+};
+
+resource 'DLOG' (144, "Insert Link", purgeable) {
+	{ 0, 0, 130, 400 }, dBoxProc, invisible, noGoAway, 0x0, 144, "Insert Link", noAutoCenter
+};
+
+resource 'DITL' (144, "Insert Link", purgeable) {
+	{
+		{ 98, 318, 118, 386 }, Button { enabled, "Insert" };
+		{ 98, 234, 118, 302 }, Button { enabled, "Cancel" };
+		{ 94, 314, 122, 390 }, UserItem { disabled };
+		{ 36, 110, 52, 386 }, EditText { enabled, "" };
+		{ 62, 110, 78, 386 }, EditText { enabled, "" };
+		{ 36, 14, 52, 104 }, StaticText { disabled, "Text:" };
+		{ 62, 14, 78, 104 }, StaticText { disabled, "Address:" };
+		{ 8, 14, 26, 300 }, StaticText { disabled, "Insert Link" };
 	}
 };
 

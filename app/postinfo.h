@@ -1,6 +1,7 @@
 /*
  * postinfo.h: the Post menu's dialogs. Post Info edits the front matter's
- * usual fields; Insert Image writes a Markdown image placeholder.
+ * usual fields; Insert Image writes a Markdown image placeholder, and
+ * Insert Link a link.
  */
 #ifndef TOPICA_POSTINFO_H
 #define TOPICA_POSTINFO_H
@@ -10,5 +11,6 @@
 /* 1 when the writer clicked OK (and the front matter changed if needed) */
 Boolean PostInfo(Doc *d);
 void InsertImage(Doc *d);
+void InsertLink(Doc *d);
 
 #endif

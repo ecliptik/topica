@@ -16,10 +16,12 @@
 
 ## Formatting preview and images
 
-- [ ] A Markdown line and span scanner in `core/`
-- [ ] Headings, emphasis, code and links styled in place (styled TextEdit)
-- [ ] Insert Link, a Headings menu to jump around the post
+- [x] A Markdown line and span scanner in `core/`
+- [x] Headings, emphasis, code and links styled in place (styled TextEdit)
+- [x] Insert Link, a Headings menu to jump around the post
 - [ ] Image placeholders drawn as framed boxes in the previews
+- [ ] Faster styling on a 68000: style the visible lines first and the
+      rest while idle, or build TextEdit's style runs directly
 
 ## Web preview
 

@@ -20,6 +20,7 @@
 #include <stdio.h>
 
 #include "../core/frontmatter.h"
+#include "../core/mdscan.h"
 #include "../core/post.h"
 #include "../core/recovery.h"
 #include "../core/textconv.h"
@@ -40,6 +41,7 @@ enum { kScrollWidth = 16, kStatusHeight = 15 };
 enum { kMinWidth = 200, kMinHeight = 120 };
 enum { kStatusEvery = 30 };             /* ticks between word counts */
 enum { kRecoveryPause = 120 };          /* ticks of quiet before a recovery copy */
+enum { kStylePause = 30 };              /* ticks of quiet before restyling */
 
 #define kRecoveryFolder "Topica Recovery"
 
@@ -61,6 +63,10 @@ struct Doc {
 	Boolean hasRec;
 	Boolean recDue;                     /* changed since the last copy */
 	unsigned long changedAt, recAt;     /* ticks */
+	Boolean styleDue;                   /* [styleFrom, styleTo) needs restyling */
+	long styleFrom, styleTo;
+	unsigned long styleAt;              /* not before this tick */
+	unsigned long blocks;               /* md_blocks when last restyled */
 };
 
 static void Resized(Doc *d);
@@ -278,7 +284,12 @@ static Doc *MakeDoc(void)
 	if (d == NULL)
 		goto nomem;
 	NewWindowRect(&r);
-	d->w = NewWindow(NULL, &r, "\p", false, kZoomDocProc, (WindowPtr) -1L, true, 0);
+	/* a color port where there's Color QuickDraw: an old one shows only
+	   QuickDraw's eight colors */
+	if (HasColorQD())
+		d->w = NewCWindow(NULL, &r, "\p", false, kZoomDocProc, (WindowPtr) -1L, true, 0);
+	else
+		d->w = NewWindow(NULL, &r, "\p", false, kZoomDocProc, (WindowPtr) -1L, true, 0);
 	if (d->w == NULL)
 		goto nomem;
 	SetPort(d->w);
@@ -306,8 +317,109 @@ nomem:
 	return NULL;
 }
 
+/* ---- styles ---- */
+
+/* An edit replaced [start, oldEnd) with newLen characters: restyle there,
+   along with what was waiting */
+static void Touch(Doc *d, long start, long oldEnd, long newLen)
+{
+	long delta = newLen - (oldEnd - start), from = start, to = start + newLen, f, t;
+
+	if (d->styleDue) {
+		f = d->styleFrom >= oldEnd ? d->styleFrom + delta : d->styleFrom > start ? start : d->styleFrom;
+		t = d->styleTo >= oldEnd ? d->styleTo + delta : d->styleTo > start ? start : d->styleTo;
+		if (f < from)
+			from = f;
+		if (t > to)
+			to = t;
+	}
+	d->styleFrom = from;
+	d->styleTo = to;
+	d->styleDue = true;
+	d->styleAt = TickCount() + kStylePause;
+}
+
+static void TouchAll(Doc *d)
+{
+	d->styleFrom = 0;
+	d->styleTo = EdLength(d->ed);
+	d->styleDue = true;
+	d->styleAt = TickCount();
+}
+
+/* Classes for the lines that changed; all of the rest of the post when a
+   code fence or the front matter's end moved */
+static void Restyle(Doc *d)
+{
+	Editor *ed = d->ed;
+	long n = EdLength(ed), from = d->styleFrom, to = d->styleTo;
+	const char *t;
+	unsigned long blocks;
+	MdState s;
+	Ptr buf;
+	Boolean whole;
+
+	d->styleDue = false;
+	if (!EdCanStyle(ed))
+		return;
+	SetPort(d->w);
+	if (from > n)
+		from = n;
+	if (to > n)
+		to = n;
+	t = EdLockText(ed);
+	blocks = md_blocks(t, n);
+	if (blocks != d->blocks) {
+		d->blocks = blocks;
+		to = n;
+	}
+	md_begin(&s);
+	from = md_seek(&s, t, n, from);
+	to = md_line_after(t, n, to > from ? to - 1 : from);
+	buf = to > from ? NewPtr(to - from) : NULL;
+	if (buf == NULL) {
+		EdUnlockText(ed);
+		return;
+	}
+	if (gPrefs.format)
+		md_classify(&s, t, n, to, (unsigned char *) buf);
+	else
+		memset(buf, 0, (size_t) (to - from));
+	EdUnlockText(ed);
+	whole = to - from > 4096;
+	if (whole)
+		SetCursor(*GetCursor(watchCursor));
+	EdSetClasses(ed, from, to, (unsigned char *) buf);
+	DisposePtr(buf);
+	if (whole)
+		InitCursor();
+	SyncScrollBar(d);
+}
+
+static void StyleIdle(Doc *d)
+{
+	if (d->styleDue && TickCount() >= d->styleAt)
+		Restyle(d);
+}
+
+void DocRestyleAll(void)
+{
+	short i;
+
+	for (i = 0; i < TOPICA_MAX_DOCS; i++)
+		if (gDocs[i] != NULL)
+			TouchAll(gDocs[i]);
+}
+
+Boolean DocCanStyle(Doc *d)
+{
+	return EdCanStyle(d->ed);
+}
+
 static void ShowDoc(Doc *d)
 {
+	TouchAll(d);
+	Restyle(d);                         /* before it shows: no plain flash */
 	SetTitle(d);
 	SyncScrollBar(d);
 	CountWords(d);
@@ -457,6 +569,7 @@ void DocApplySettings(void)
 			continue;
 		SetPort(d->w);
 		EdSetFont(d->ed, SettingsFontNumber(), gPrefs.size);
+		TouchAll(d);
 		Resized(d);
 	}
 }
@@ -629,6 +742,8 @@ void DocRevert(Doc *d)
 	if (CautionAlert(kRevertAlert, (ModalFilterUPP) StandardFilter) != kOK)
 		return;
 	if (Load(d, &d->file)) {
+		TouchAll(d);
+		Restyle(d);
 		SetPort(d->w);
 		InvalRect(&d->w->portRect);
 		SyncScrollBar(d);
@@ -684,10 +799,21 @@ Boolean DocReplace(Doc *d, int kind, long start, long end, const char *text, lon
 	undo_record(&d->undo, kind, start, t + start, end - start, text, len);
 	EdUnlockText(d->ed);
 	(void) EdReplace(d->ed, start, end, text, len);
+	Touch(d, start, end, len);
 	EdShowSelection(d->ed);
 	SyncScrollBar(d);
 	Changed(d);
 	return true;
+}
+
+void DocShowLine(Doc *d, long offset)
+{
+	SetPort(d->w);
+	undo_seal(&d->undo);
+	EdSetSelection(d->ed, offset, offset);
+	EdScrollTo(d->ed, (short) EdLineOf(d->ed, offset));
+	SyncScrollBar(d);
+	UpdateStatus(d, false);
 }
 
 Boolean DocHasSelection(Doc *d)
@@ -714,6 +840,7 @@ void DocUndo(Doc *d, Boolean redo)
 		SysBeep(10);
 		return;
 	}
+	Touch(d, a.pos, a.pos + a.removeLen, a.insertLen);
 	EdSetSelection(d->ed, a.selStart, a.selEnd);
 	EdShowSelection(d->ed);
 	SyncScrollBar(d);
@@ -795,8 +922,10 @@ void DocIdleAll(void)
 	short i;
 
 	for (i = 0; i < TOPICA_MAX_DOCS; i++)
-		if (gDocs[i] != NULL)
+		if (gDocs[i] != NULL) {
+			StyleIdle(gDocs[i]);
 			RecoveryIdle(gDocs[i]);
+		}
 }
 
 static Doc *gScrolling;

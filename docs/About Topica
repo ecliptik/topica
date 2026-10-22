@@ -9,6 +9,13 @@ Writing a post
 - Post > Insert Image writes a placeholder for a picture you'll add to the blog later.
 - File > Save suggests a name made of today's date and the title, like 2026-10-22-my-post.md.
 
+Formatting
+Topica shows Markdown's formatting as you write: headings and strong text in bold, emphasis in italics, code in Monaco, link text underlined. Post > Hide Formatting shows plain text. On a 68000 Mac (the Macintosh Plus, SE, 512Ke) formatting starts off, because it makes long posts slow to open; Post > Show Formatting turns it on.
+
+The Headings menu lists the post's headings. Choose one to go there.
+
+Post > Insert Link (Command-K) puts a link around the selected text.
+
 Undo and Redo
 Command-Z undoes, many steps back. Command-Shift-Z redoes.
 

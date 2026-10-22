@@ -43,6 +43,16 @@ static Boolean TrapExists(short trap, TrapType type)
 	return NGetTrapAddress(trap, type) != NGetTrapAddress(_Unimplemented, kToolboxTrapType);
 }
 
+Boolean HasColorQD(void)
+{
+	static short has = -1;
+	SysEnvRec env;
+
+	if (has < 0)
+		has = SysEnvirons(1, &env) == noErr && env.hasColorQD;
+	return has;
+}
+
 Boolean HasWaitNextEvent(void)
 {
 	static short has = -1;

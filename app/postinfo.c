@@ -15,6 +15,8 @@
 
 /* Post Info's items (Insert Image's heading is its item 8) */
 enum { kOutline = 3, kFirstField = 4, kFieldCount = 6, kInfoHeading = 16, kImageHeading = 8 };
+/* Insert Link's */
+enum { kLinkTextField = 4, kLinkAddressField = 5, kLinkHeading = 8 };
 
 enum { kFieldLen = 256 };
 
@@ -201,6 +203,75 @@ void InsertImage(Doc *d)
 	strcat(md, ")");
 	n = (long) strlen(md);
 	(void) DocReplace(d, kUndoInsert, s, e, md, n);
+	DocSealUndo(d);
+	DisposePtr((Ptr) md);
+}
+
+static Boolean IsAddress(const char *s)
+{
+	return strncmp(s, "http://", 7) == 0 || strncmp(s, "https://", 8) == 0 || strncmp(s, "mailto:", 7) == 0
+		|| s[0] == '/';
+}
+
+void InsertLink(Doc *d)
+{
+	Editor *ed = DocEditor(d);
+	char text[kFieldLen], address[kFieldLen];
+	char *md;
+	DialogPtr dlg;
+	long s, e, n;
+	const char *t;
+
+	/* the selection: the link's text, or its address if it looks like one */
+	text[0] = address[0] = '\0';
+	EdGetSelection(ed, &s, &e);
+	if (e > s && e - s < kFieldLen) {
+		t = EdLockText(ed);
+		if (memchr(t + s, '\r', (size_t) (e - s)) == NULL) {
+			memcpy(text, t + s, (size_t) (e - s));
+			text[e - s] = '\0';
+		}
+		EdUnlockText(ed);
+	}
+	if (IsAddress(text)) {
+		strcpy(address, text);
+		text[0] = '\0';
+	}
+	dlg = GetModalDialog(kLinkDialog);
+	if (dlg == NULL) {
+		SysBeep(10);
+		return;
+	}
+	SetItemText(dlg, kLinkTextField, text);
+	SetItemText(dlg, kLinkAddressField, address);
+	if (RunDialog(dlg, text[0] != '\0' ? kLinkAddressField : kLinkTextField, kLinkHeading) != kOK) {
+		DisposeDialog(dlg);
+		return;
+	}
+	GetItemText(dlg, kLinkTextField, text, sizeof(text));
+	GetItemText(dlg, kLinkAddressField, address, sizeof(address));
+	DisposeDialog(dlg);
+	if (text[0] == '\0' && address[0] == '\0')
+		return;
+	md = (char *) NewPtr(2 * kFieldLen + 8);
+	if (md == NULL) {
+		SysBeep(10);
+		return;
+	}
+	if (text[0] == '\0') {             /* just the address: an automatic link */
+		strcpy(md, "<");
+		strcat(md, address);
+		strcat(md, ">");
+	} else {
+		strcpy(md, "[");
+		strcat(md, text);
+		strcat(md, "](");
+		strcat(md, address);
+		strcat(md, ")");
+	}
+	n = (long) strlen(md);
+	if (DocReplace(d, kUndoInsert, s, e, md, n) && address[0] == '\0')
+		EdSetSelection(ed, s + n - 1, s + n - 1);      /* in the ( ), to type the address */
 	DocSealUndo(d);
 	DisposePtr((Ptr) md);
 }

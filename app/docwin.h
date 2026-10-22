@@ -55,6 +55,11 @@ void DocSealUndo(Doc *d);
 short DocRecoverAll(void);
 /* After Preferences: the font and size in every window */
 void DocApplySettings(void);
+/* After Show or Hide Formatting: every window restyled when idle */
+void DocRestyleAll(void);
+Boolean DocCanStyle(Doc *d);
+/* Puts the caret at offset, with its line at the top of the window */
+void DocShowLine(Doc *d, long offset);
 /* Recovery copies for every window, from the event loop */
 void DocIdleAll(void);
 
