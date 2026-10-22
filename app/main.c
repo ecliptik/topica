@@ -18,21 +18,26 @@
 #include <string.h>
 
 #include "../core/undo.h"
+#include "ae.h"
 #include "docwin.h"
 #include "fileio.h"
+#include "findwin.h"
 #include "postinfo.h"
+#include "settings.h"
 #include "util.h"
 
 enum { kAppleMenu = 128, kFileMenu = 129, kEditMenu = 130, kPostMenu = 131 };
 enum { kAboutItem = 1 };
 enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kRevertItem = 7, kQuitItem = 9 };
-enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9 };
+enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
+	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kPrefsItem = 15 };
 enum { kPostInfoItem = 1, kInsertImageItem = 3 };
 /* osEvt's suspend/resume (Inside Macintosh VI) */
 enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
 
 static Boolean gQuit;
 static Boolean gInBackground;
+static Boolean gHaveAE;
 
 static const char *const kUndoNames[kUndoKinds] = {
 	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace"
@@ -52,7 +57,7 @@ static void SetUndoItem(MenuHandle m, short item, int kind, Boolean redo)
 	Str255 p;
 
 	if (kind == kUndoNone) {
-		strcpy(s, redo ? "Can't Redo" : "Can't Undo");
+		strcpy(s, redo ? "Can\xD5t Redo" : "Can\xD5t Undo");
 	} else {
 		strcpy(s, redo ? "Redo " : "Undo ");
 		strcat(s, kUndoNames[kind]);
@@ -95,13 +100,16 @@ static void AdjustMenus(void)
 	Enable(edit, kPasteItem, d != NULL || da);
 	Enable(edit, kClearItem, sel || da);
 	Enable(edit, kSelectAllItem, d != NULL);
+	Enable(edit, kFindItem, d != NULL);
+	Enable(edit, kFindAgainItem, d != NULL && FindHasPattern());
+	Enable(edit, kReplaceAgainItem, d != NULL && FindHasPattern());
 	if (((**post).enableFlags & 1) != (d != NULL)) {     /* the whole menu */
 		Enable(post, 0, d != NULL);
 		DrawMenuBar();
 	}
 }
 
-static void DoQuit(void)
+static Boolean DoQuit(void)
 {
 	Doc *d;
 
@@ -117,9 +125,10 @@ static void DoQuit(void)
 			d = DocFromWindow(w);
 		}
 		if (!DocClose(d, true))
-			return;
+			return false;
 	}
 	gQuit = true;
+	return true;
 }
 
 static void DoClose(void)
@@ -151,7 +160,7 @@ static void DoMenu(long choice)
 	case kAppleMenu:
 		if (item == kAboutItem) {
 			InitCursor();
-			(void) Alert(kAboutAlert, NULL);
+			(void) Alert(kAboutAlert, (ModalFilterUPP) StandardFilter);
 		} else {
 			Str255 name;
 			GetMenuItemText(GetMenuHandle(kAppleMenu), item, name);
@@ -169,7 +178,7 @@ static void DoMenu(long choice)
 		case kSaveItem: if (d != NULL) (void) DocSave(d); break;
 		case kSaveAsItem: if (d != NULL) (void) DocSaveAs(d); break;
 		case kRevertItem: if (d != NULL) DocRevert(d); break;
-		case kQuitItem: DoQuit(); break;
+		case kQuitItem: (void) DoQuit(); break;
 		}
 		break;
 	case kEditMenu: {
@@ -178,6 +187,11 @@ static void DoMenu(long choice)
 		if (item < (short) (sizeof(kSystemEdit) / sizeof(kSystemEdit[0])) && kSystemEdit[item] >= 0
 				&& SystemEdit(kSystemEdit[item]))
 			break;
+		if (item == kPrefsItem) {
+			if (SettingsDialog())
+				DocApplySettings();
+			break;
+		}
 		if (d == NULL)
 			break;
 		switch (item) {
@@ -188,6 +202,9 @@ static void DoMenu(long choice)
 		case kPasteItem: DocEdit(d, kEdPaste); break;
 		case kClearItem: DocEdit(d, kEdClear); break;
 		case kSelectAllItem: DocEdit(d, kEdSelectAll); break;
+		case kFindItem: FindDialog(d); break;
+		case kFindAgainItem: FindAgain(d); break;
+		case kReplaceAgainItem: ReplaceAndFindAgain(d); break;
 		}
 		break;
 	}
@@ -297,10 +314,22 @@ static void OpenFinderFiles(void)
 			opened = true;
 		ClrAppFiles(i);
 	}
-	if (!opened && message == appOpen)
+	/* with Apple events, the open application event makes the new post */
+	if (!opened && message == appOpen && !gHaveAE && DocCount() == 0)
 		(void) DocNew(true);
 	if (message == appPrint)
 		gQuit = true;                   /* nothing to print with yet */
+}
+
+static void OpenAppEvent(void)
+{
+	if (DocCount() == 0)
+		(void) DocNew(true);
+}
+
+static void OpenFileEvent(const FileRef *f)
+{
+	(void) DocOpen(f);
 }
 
 static void Setup(void)
@@ -321,6 +350,22 @@ static void Setup(void)
 	AppendResMenu(GetMenuHandle(kAppleMenu), 'DRVR');
 	DrawMenuBar();
 	gUpdateHook = Update;
+	SettingsLoad();
+	gHaveAE = AppleEventsInit(DoQuit, OpenAppEvent, OpenFileEvent);
+}
+
+/* Posts a crash left unsaved come back first, before anything else opens */
+static void Recover(void)
+{
+	short n = DocRecoverAll();
+	EventRecord e;
+
+	while (GetNextEvent(updateMask, &e))   /* the windows first, then the note */
+		Update((WindowPtr) e.message);
+	if (n > 0)
+		ShowNote(n == 1
+			? "Topica found a post that wasn\xD5t saved when it last quit. It\xD5s open now: save it or close it."
+			: "Topica found posts that weren\xD5t saved when it last quit. They\xD5re open now: save them or close them.");
 }
 
 static Boolean GetEvent(EventRecord *e, long sleep)
@@ -336,6 +381,7 @@ int main(void)
 	EventRecord e;
 
 	Setup();
+	Recover();
 	OpenFinderFiles();
 	while (!gQuit) {
 		Doc *front = DocFront();
@@ -357,6 +403,9 @@ int main(void)
 					DocActivate(d, (e.modifiers & activeFlag) != 0);
 				break;
 			}
+			case kHighLevelEvent:
+				AppleEventsHandle(&e);
+				break;
 			case osEvt:
 				if (((e.message >> 24) & 0xFF) == kSuspendResumeMessage) {
 					gInBackground = (e.message & kResumeFlag) == 0;
@@ -366,6 +415,7 @@ int main(void)
 				break;
 			}
 		}
+		DocIdleAll();
 		front = DocFront();
 		if (front != NULL && !gInBackground) {
 			DocIdle(front);

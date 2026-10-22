@@ -24,8 +24,8 @@ enum {
 	kRevertAlert = 131,         /* Revert, Cancel */
 	kPostInfoDialog = 140,
 	kImageDialog = 141,
-	kLayoutString = 128,        /* STR: the new post's layout */
-	kImagePathString = 129      /* STR: where the blog keeps a post's images */
+	kFindDialog = 142,
+	kPrefsDialog = 143
 };
 
 /* C string to Pascal string (cut at 255) and back */

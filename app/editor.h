@@ -22,6 +22,7 @@ void EdDispose(Editor *ed);
 long EdMaxLength(void);
 
 void EdSetView(Editor *ed, const Rect *view);  /* after the window is resized */
+void EdSetFont(Editor *ed, short font, short size);   /* in the window's port */
 void EdDraw(Editor *ed);                       /* in an update */
 void EdActivate(Editor *ed, Boolean active);
 void EdIdle(Editor *ed);                       /* blinks the caret */

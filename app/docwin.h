@@ -51,6 +51,13 @@ Boolean DocIsDirty(Doc *d);
 Boolean DocHasFile(Doc *d);
 void DocSealUndo(Doc *d);
 
+/* Opens the recovery copies a crash left behind; how many */
+short DocRecoverAll(void);
+/* After Preferences: the font and size in every window */
+void DocApplySettings(void);
+/* Recovery copies for every window, from the event loop */
+void DocIdleAll(void);
+
 /* For the Post menu's dialogs */
 Editor *DocEditor(Doc *d);
 /* Replaces [start, end) with text as one undoable change; 0 (after an

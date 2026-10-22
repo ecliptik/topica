@@ -21,10 +21,12 @@
 
 #include "../core/frontmatter.h"
 #include "../core/post.h"
+#include "../core/recovery.h"
 #include "../core/textconv.h"
 #include "../core/undo.h"
 #include "docwin.h"
 #include "postinfo.h"
+#include "settings.h"
 #include "util.h"
 
 #ifndef TOPICA_MAX_DOCS
@@ -37,6 +39,9 @@
 enum { kScrollWidth = 16, kStatusHeight = 15 };
 enum { kMinWidth = 200, kMinHeight = 120 };
 enum { kStatusEvery = 30 };             /* ticks between word counts */
+enum { kRecoveryPause = 120 };          /* ticks of quiet before a recovery copy */
+
+#define kRecoveryFolder "Topica Recovery"
 
 struct Doc {
 	WindowPtr w;
@@ -51,7 +56,14 @@ struct Doc {
 	unsigned long countAt;              /* not before this tick */
 	long words;
 	long line;                          /* shown in the status line */
+	Str63 untitled;                     /* the title while it has no file */
+	FileRef rec;                        /* its recovery copy, when it has one */
+	Boolean hasRec;
+	Boolean recDue;                     /* changed since the last copy */
+	unsigned long changedAt, recAt;     /* ticks */
 };
+
+static void Resized(Doc *d);
 
 static Doc *gDocs[TOPICA_MAX_DOCS];
 static short gUntitled;
@@ -201,6 +213,8 @@ static void UpdateStatus(Doc *d, Boolean force)
 static void Changed(Doc *d)
 {
 	d->dirty = true;
+	d->recDue = true;
+	d->changedAt = TickCount();
 	if (!d->countDue) {
 		d->countDue = true;
 		d->countAt = TickCount() + kStatusEvery;
@@ -211,18 +225,21 @@ static void Changed(Doc *d)
 
 static void SetTitle(Doc *d)
 {
-	if (d->hasFile) {
-		SetWTitle(d->w, d->file.name);
-	} else {
-		char s[32];
-		Str255 p;
-		if (gUntitled <= 1)
-			strcpy(s, "untitled");
-		else
-			sprintf(s, "untitled %d", gUntitled);
-		PStr(p, s);
-		SetWTitle(d->w, p);
-	}
+	SetWTitle(d->w, d->hasFile ? d->file.name : d->untitled);
+}
+
+static void NameUntitled(Doc *d)
+{
+	char s[32];
+	Str255 p;
+
+	gUntitled++;
+	if (gUntitled <= 1)
+		strcpy(s, "untitled");
+	else
+		sprintf(s, "untitled %d", gUntitled);
+	PStr(p, s);
+	memcpy(d->untitled, p, (size_t) p[0] + 1);
 }
 
 /* Where a new window goes: as big as the screen allows (at most a page's
@@ -266,7 +283,7 @@ static Doc *MakeDoc(void)
 		goto nomem;
 	SetPort(d->w);
 	ViewRect(d, &v);
-	d->ed = EdNew(&v, kMonaco, 9);
+	d->ed = EdNew(&v, SettingsFontNumber(), gPrefs.size);
 	BarRect(d, &r);
 	d->vbar = NewControl(d->w, &r, "\p", true, 0, 0, 0, scrollBarProc, 0);
 	d->undoBuf = NewPtr(TOPICA_UNDO_BYTES);
@@ -285,7 +302,7 @@ nomem:
 			DisposeWindow(d->w);
 		DisposePtr((Ptr) d);
 	}
-	ErrorAlert("The window couldn't be opened.", memFullErr);
+	ErrorAlert("The window couldn\xD5t be opened.", memFullErr);
 	return NULL;
 }
 
@@ -298,6 +315,24 @@ static void ShowDoc(Doc *d)
 	SelectWindow(d->w);
 }
 
+/* Today as YYYY-MM-DD, or "" when the clock isn't set (a Mac with no
+   clock battery wakes up in 1904) */
+static void Today(char out[16])
+{
+	unsigned long secs;
+	DateTimeRec dt;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"   /* the clock is a low-memory global */
+	GetDateTime(&secs);
+#pragma GCC diagnostic pop
+	SecondsToDate(secs, &dt);
+	if (dt.year < 1990)
+		out[0] = '\0';
+	else
+		sprintf(out, "%04d-%02d-%02d", dt.year % 10000, dt.month % 100, dt.day % 100);
+}
+
 Doc *DocNew(Boolean withTemplate)
 {
 	Doc *d = MakeDoc();
@@ -306,16 +341,11 @@ Doc *DocNew(Boolean withTemplate)
 
 	if (d == NULL)
 		return NULL;
-	gUntitled++;
+	NameUntitled(d);
 	if (withTemplate) {
-		Str255 layout;
-		char l[64] = "post";
-		Handle h = GetResource('STR ', kLayoutString);
-		if (h != NULL) {
-			memcpy(layout, *h, (size_t) (**h + 1));
-			CStr(l, layout);
-		}
-		n = post_template(l, '\r', t, sizeof(t));
+		char date[16];
+		Today(date);
+		n = post_template(gPrefs.profile == kProfileHugo, gPrefs.layout, date, '\r', t, sizeof(t));
 		if (n > 0) {
 			(void) EdSetText(d->ed, t, n);
 			EdSetSelection(d->ed, n, n);
@@ -325,12 +355,113 @@ Doc *DocNew(Boolean withTemplate)
 	return d;
 }
 
-/* ---- files ---- */
+/* ---- recovery copies ---- */
 
-static Boolean SameFile(const FileRef *a, const FileRef *b)
+static void DiscardRecovery(Doc *d)
 {
-	return a->vRefNum == b->vRefNum && EqualString(a->name, b->name, false, true);
+	if (d->hasRec)
+		(void) FileDelete(&d->rec);
+	d->hasRec = false;
 }
+
+/* A copy of an unsaved post in the System Folder's Topica Recovery folder,
+   a few minutes apart, when the writer pauses */
+static void WriteRecovery(Doc *d)
+{
+	FileRef dir;
+	Str255 title;
+	char name[32], t[256];
+	long h, len = EdLength(d->ed);
+	Ptr buf;
+
+	d->recDue = false;
+	d->recAt = TickCount();
+	if (!d->hasRec) {
+		if (FileSystemSubfolder(kRecoveryFolder, &dir) != noErr)
+			return;
+		sprintf(name, "Post %lu", (unsigned long) (TickCount() % 1000000UL));
+		FileRefSibling(&dir, name, &d->rec);
+		d->hasRec = true;
+	}
+	GetWTitle(d->w, title);
+	CStr(t, title);
+	h = recovery_header(t, NULL, 0);
+	buf = NewPtr(h + len > 0 ? h + len : 1);
+	if (buf == NULL)
+		return;
+	(void) recovery_header(t, buf, h);
+	memcpy(buf + h, EdLockText(d->ed), (size_t) len);
+	EdUnlockText(d->ed);
+	(void) FileWrite(&d->rec, buf, h + len, kPostType, kCreator);
+	DisposePtr(buf);
+}
+
+static void RecoveryIdle(Doc *d)
+{
+	unsigned long now = TickCount();
+
+	if (gPrefs.autosaveMinutes <= 0 || !d->dirty || !d->recDue)
+		return;
+	if (now - d->changedAt < kRecoveryPause)
+		return;
+	if (d->hasRec && now - d->recAt < (unsigned long) gPrefs.autosaveMinutes * 3600UL)
+		return;
+	WriteRecovery(d);
+}
+
+short DocRecoverAll(void)
+{
+	FileRef dir, f;
+	short i, opened = 0;
+	OSErr err;
+
+	if (FileSystemSubfolder(kRecoveryFolder, &dir) != noErr)
+		return 0;
+	for (i = 1; DocCount() < TOPICA_MAX_DOCS; i++) {
+		Ptr data;
+		long len, body;
+		char title[64];
+		Doc *d;
+		err = FileIndexed(&dir, i, &f);
+		if (err == dirNFErr)
+			continue;
+		if (err != noErr)
+			break;
+		if (FileRead(&f, &data, &len) != noErr)
+			continue;
+		if (recovery_parse(data, len, title, sizeof(title) - 12, &body)
+				&& len - body <= EdMaxLength() && (d = MakeDoc()) != NULL) {
+			Str255 p;
+			strcat(title, " (recovered)");
+			PStr(p, title);
+			memcpy(d->untitled, p, (size_t) (p[0] > 63 ? 63 : p[0]) + 1);
+			(void) EdSetText(d->ed, data + body, len - body);
+			d->rec = f;
+			d->hasRec = true;
+			d->dirty = true;
+			ShowDoc(d);
+			opened++;
+		}
+		DisposePtr(data);
+	}
+	return opened;
+}
+
+void DocApplySettings(void)
+{
+	short i;
+
+	for (i = 0; i < TOPICA_MAX_DOCS; i++) {
+		Doc *d = gDocs[i];
+		if (d == NULL)
+			continue;
+		SetPort(d->w);
+		EdSetFont(d->ed, SettingsFontNumber(), gPrefs.size);
+		Resized(d);
+	}
+}
+
+/* ---- files ---- */
 
 /* Reads a file into a doc's editor; 0 (after an alert) when it can't */
 static Boolean Load(Doc *d, const FileRef *f)
@@ -342,7 +473,7 @@ static Boolean Load(Doc *d, const FileRef *f)
 	char what[200], name[64];
 
 	CStr(name, f->name);
-	sprintf(what, "\xD2%s\xD3 couldn't be opened.", name);
+	sprintf(what, "\xD2%s\xD3 couldn\xD5t be opened.", name);
 	SetCursor(*GetCursor(watchCursor));
 	err = FileRead(f, &data, &len);
 	if (err != noErr) {
@@ -380,7 +511,7 @@ Doc *DocOpen(const FileRef *f)
 	Doc *d;
 
 	for (i = 0; i < TOPICA_MAX_DOCS; i++) {
-		if (gDocs[i] != NULL && gDocs[i]->hasFile && SameFile(&gDocs[i]->file, f)) {
+		if (gDocs[i] != NULL && gDocs[i]->hasFile && FileRefSame(&gDocs[i]->file, f)) {
 			SelectWindow(gDocs[i]->w);
 			return gDocs[i];
 		}
@@ -413,19 +544,19 @@ static Boolean Write(Doc *d, const FileRef *f)
 	char what[128], name[64];
 
 	CStr(name, f->name);
-	sprintf(what, "\xD2%s\xD3 couldn't be saved.", name);
+	sprintf(what, "\xD2%s\xD3 couldn\xD5t be saved.", name);
 	t = EdLockText(d->ed);
-	n = tc_to_disk(t, len, NULL, 0, 1, 1);
+	n = tc_to_disk(t, len, NULL, 0, gPrefs.utf8, gPrefs.lf);
 	out = NewPtr(n > 0 ? n : 1);
 	if (out == NULL) {
 		EdUnlockText(d->ed);
 		ErrorAlert(what, memFullErr);
 		return false;
 	}
-	(void) tc_to_disk(t, len, out, n, 1, 1);
+	(void) tc_to_disk(t, len, out, n, gPrefs.utf8, gPrefs.lf);
 	EdUnlockText(d->ed);
 	SetCursor(*GetCursor(watchCursor));
-	err = FileWrite(f, out, n);
+	err = FileWrite(f, out, n, kPostType, kCreator);
 	DisposePtr(out);
 	InitCursor();
 	if (err != noErr) {
@@ -434,6 +565,7 @@ static Boolean Write(Doc *d, const FileRef *f)
 	}
 	d->dirty = false;
 	undo_seal(&d->undo);
+	DiscardRecovery(d);
 	return true;
 }
 
@@ -457,8 +589,10 @@ static void SuggestName(Doc *d, char *out, int cap)
 	GetDateTime(&secs);
 #pragma GCC diagnostic pop
 	SecondsToDate(secs, &dt);
-	/* a Mac with no clock battery wakes up in 1904: no date then */
-	post_filename(dt.year >= 1990 ? dt.year : 0, dt.month, dt.day, title, 31, out, cap);
+	/* a Mac with no clock battery wakes up in 1904: no date then; Hugo
+	   posts carry their date inside */
+	post_filename(dt.year >= 1990 && gPrefs.profile != kProfileHugo ? dt.year : 0, dt.month, dt.day,
+		title, 31, out, cap);
 }
 
 Boolean DocSaveAs(Doc *d)
@@ -492,7 +626,7 @@ void DocRevert(Doc *d)
 		return;
 	memcpy(name, d->file.name, (size_t) d->file.name[0] + 1);
 	ParamText(name, "\p", "\p", "\p");
-	if (CautionAlert(kRevertAlert, NULL) != kOK)
+	if (CautionAlert(kRevertAlert, (ModalFilterUPP) StandardFilter) != kOK)
 		return;
 	if (Load(d, &d->file)) {
 		SetPort(d->w);
@@ -512,7 +646,7 @@ Boolean DocClose(Doc *d, Boolean quitting)
 		ParamText(name, quitting ? "\pquitting" : "\pclosing", "\p", "\p");
 		SelectWindow(d->w);
 		InitCursor();
-		switch (CautionAlert(kSaveChangesAlert, NULL)) {
+		switch (CautionAlert(kSaveChangesAlert, (ModalFilterUPP) StandardFilter)) {
 		case 1:                         /* Save */
 			if (!DocSave(d))
 				return false;
@@ -521,6 +655,7 @@ Boolean DocClose(Doc *d, Boolean quitting)
 			return false;
 		}
 	}
+	DiscardRecovery(d);
 	for (i = 0; i < TOPICA_MAX_DOCS; i++)
 		if (gDocs[i] == d)
 			gDocs[i] = NULL;
@@ -653,6 +788,15 @@ void DocIdle(Doc *d)
 	SetPort(d->w);
 	EdIdle(d->ed);
 	UpdateStatus(d, false);
+}
+
+void DocIdleAll(void)
+{
+	short i;
+
+	for (i = 0; i < TOPICA_MAX_DOCS; i++)
+		if (gDocs[i] != NULL)
+			RecoveryIdle(gDocs[i]);
 }
 
 static Doc *gScrolling;

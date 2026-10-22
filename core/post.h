@@ -18,8 +18,10 @@ void post_slug(const char *title, char *out, int cap);
 void post_filename(int year, int month, int day, const char *title, int maxLen, char *out, int cap);
 
 /* A new post's text: front matter with the usual keys, then a blank line.
-   Returns its length (-1 when it doesn't fit). */
-long post_template(const char *layout, char eol, char *out, long cap);
+   Jekyll: layout (given), title, description, category, tags. Hugo: title,
+   date (given; left empty when ""), draft: true, description, categories,
+   tags. Returns its length (-1 when it doesn't fit). */
+long post_template(int hugo, const char *layout, const char *date, char eol, char *out, long cap);
 
 /* Words in text, front matter left out. */
 long post_words(const char *text, long n);

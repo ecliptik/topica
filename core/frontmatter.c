@@ -414,6 +414,17 @@ static int NextItem(const char *v, long *pos, long *a, long *b)
 	return 1;
 }
 
+/* Keys that Jekyll and Hugo read as true or false */
+static int IsBooleanKey(const char *key)
+{
+	return strcmp(key, "draft") == 0 || strcmp(key, "published") == 0;
+}
+
+static int IsBoolean(const char *v)
+{
+	return strcmp(v, "true") == 0 || strcmp(v, "false") == 0;
+}
+
 static void PutEntry(Out *o, const char *key, const char *value, int style, long indent, char eol)
 {
 	long pos = 0, a, b, k;
@@ -446,7 +457,10 @@ static void PutEntry(Out *o, const char *key, const char *value, int style, long
 	}
 	if (value[0] != '\0') {
 		PutC(o, ' ');
-		PutScalar(o, value, (long) strlen(value), style);
+		if (IsBooleanKey(key) && IsBoolean(value))
+			PutS(o, value);             /* draft: true stays a boolean */
+		else
+			PutScalar(o, value, (long) strlen(value), style);
 	}
 	PutC(o, eol);
 }

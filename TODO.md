@@ -2,12 +2,14 @@
 
 ## Next: the Mac's manners
 
-- [ ] System 7 Apple events (open, print, quit) and Balloon Help
-- [ ] Find and Replace (⌘F, ⌘G)
-- [ ] Recover posts after a crash: an autosave copy offered at the next launch
-- [ ] Preferences: font and size, the image folder, the new post's layout,
-      straight quotes in code and front matter
-- [ ] About box with the build's commit
+- [x] System 7 Apple events (open, print, quit)
+- [ ] Balloon Help
+- [x] Find and Replace (⌘F, ⌘G)
+- [x] Recover posts after a crash: an autosave copy reopened at the next launch
+- [x] Preferences: font and size, the image folder, the new post's layout,
+      Jekyll or Hugo, encoding and line ends, autosave
+- [ ] Straight quotes in code and front matter
+- [x] About box with the build's commit
 - [ ] Swap files in place on volumes that can (FSpExchangeFiles), keeping
       the Finder's comments and dates
 - [ ] A smaller application for the 512Ke (newlib's printf is most of it)

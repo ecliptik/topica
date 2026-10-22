@@ -89,19 +89,23 @@ void post_filename(int year, int month, int day, const char *title, int maxLen, 
 	}
 }
 
-long post_template(const char *layout, char eol, char *out, long cap)
+long post_template(int hugo, const char *layout, const char *date, char eol, char *out, long cap)
 {
-	static const char *const kKeys[] = { "layout", "title", "description", "category", "tags", NULL };
 	char buf[256];
 	long n = 0;
-	int i;
 
 	n += sprintf(buf + n, "---%c", eol);
-	for (i = 0; kKeys[i] != NULL; i++) {
-		if (i == 0 && layout != NULL && layout[0] != '\0' && strlen(layout) < 64)
-			n += sprintf(buf + n, "%s: %s%c", kKeys[i], layout, eol);
-		else if (i > 0)
-			n += sprintf(buf + n, "%s:%c", kKeys[i], eol);
+	if (hugo) {
+		n += sprintf(buf + n, "title:%c", eol);
+		if (date != NULL && date[0] != '\0' && strlen(date) < 32)
+			n += sprintf(buf + n, "date: %s%c", date, eol);
+		else
+			n += sprintf(buf + n, "date:%c", eol);
+		n += sprintf(buf + n, "draft: true%cdescription:%ccategories:%ctags:%c", eol, eol, eol, eol);
+	} else {
+		if (layout != NULL && layout[0] != '\0' && strlen(layout) < 64)
+			n += sprintf(buf + n, "layout: %s%c", layout, eol);
+		n += sprintf(buf + n, "title:%cdescription:%ccategory:%ctags:%c", eol, eol, eol, eol);
 	}
 	n += sprintf(buf + n, "---%c%c", eol, eol);
 	if (out != NULL) {

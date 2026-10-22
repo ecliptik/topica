@@ -8,7 +8,7 @@ front matter, Markdown, and UTF-8 files a blog can use as they are.
 The name is Aristotle's *Topics*, his book on finding things to say: the
 *topoi*, the "places" a writer goes for material.
 
-> Topica is new and unfinished (0.1). See [TODO.md](TODO.md) for what's
+> Topica is new and unfinished (0.2). See [TODO.md](TODO.md) for what's
 > coming.
 
 ## What it does today
@@ -34,10 +34,16 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   network leaves the old post whole. Open shows text files and files named
   `.md`, `.markdown` or `.txt` whatever their type, since a file server
   may not know a `.md` file is text.
+- **Find and Replace** (⌘F, ⌘G, ⌘=), with whole words and matching case.
+- **Preferences:** font and size, Jekyll or Hugo, UTF-8 or Mac Roman, the
+  image folder and autosave, in a text file you can read.
+- **Crash recovery:** unsaved posts are copied aside when you pause, and
+  come back after a crash.
 - **The status line** shows the words, the reading time and the line.
 - **Mac manners:** the 1992 Human Interface Guidelines' menus and alerts
   (Save, Don't Save, Cancel), ⌘. cancels dialogs, the Clipboard is shared
-  with desk accessories, documents open from the Finder, and its own icons.
+  with desk accessories, documents open from the Finder (System 7's Apple
+  events included), and its own icons.
 
 ## Requirements
 

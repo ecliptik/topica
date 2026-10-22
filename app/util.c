@@ -123,6 +123,20 @@ void OutlineDefault(DialogPtr d, short item)
 	SetDialogItem(d, item, userItem, (Handle) DrawOutline, &r);
 }
 
+/* 1 when a dialog's item is a push button */
+static Boolean IsButton(DialogPtr d, short item)
+{
+	short type;
+	Handle h;
+	Rect r;
+
+	/* the item list starts with the count less one (CountDITL is System 7's) */
+	if (item > **(short **) ((DialogPeek) d)->items + 1)
+		return false;
+	GetDialogItem(d, item, &type, &h, &r);
+	return (type & ~itemDisable) == ctrlItem + btnCtrl;
+}
+
 void FlashButton(DialogPtr d, short item)
 {
 	short type;
@@ -130,6 +144,8 @@ void FlashButton(DialogPtr d, short item)
 	Rect r;
 	long t;
 
+	if (!IsButton(d, item))
+		return;
 	GetDialogItem(d, item, &type, &h, &r);
 	HiliteControl((ControlHandle) h, 1);
 	Delay(8, &t);
@@ -151,9 +167,14 @@ pascal Boolean StandardFilter(DialogPtr d, EventRecord *e, short *item)
 			return true;
 		}
 		if (c == 0x1B || ((e->modifiers & cmdKey) && c == '.')) {
-			FlashButton(d, kCancel);
-			*item = kCancel;
+			short cancelItem = IsButton(d, kCancel) ? kCancel : kOK;   /* OK-only alerts */
+			FlashButton(d, cancelItem);
+			*item = cancelItem;
 			return true;
+		}
+		if ((e->modifiers & cmdKey) && ((DialogPeek) d)->editField < 0) {
+			e->what = nullEvent;            /* an alert: no text to edit */
+			return false;
 		}
 		if (e->modifiers & cmdKey) {
 			TEHandle te = ((DialogPeek) d)->textH;
@@ -210,16 +231,16 @@ static const char *Reason(OSErr err)
 	case fLckdErr: return "The file is locked.";
 	case permErr:
 	case wrPermErr:
-	case kAfpAccessDenied: return "You don't have permission to change it.";
+	case kAfpAccessDenied: return "You don\xD5t have permission to change it.";
 	case fBsyErr:
 	case opWrErr: return "The file is in use.";
 	case fnfErr:
-	case dirNFErr: return "It couldn't be found.";
+	case dirNFErr: return "It couldn\xD5t be found.";
 	case nsvErr:
-	case volOffLinErr: return "The disk isn't available.";
+	case volOffLinErr: return "The disk isn\xD5t available.";
 	case ioErr: return "There was a problem reading or writing the disk.";
-	case memFullErr: return "There isn't enough memory. Close a window and try again.";
-	case bdNamErr: return "The name can't be used.";
+	case memFullErr: return "There isn\xD5t enough memory. Close a window and try again.";
+	case bdNamErr: return "The name can\xD5t be used.";
 	}
 	return NULL;
 }
@@ -237,7 +258,7 @@ void ErrorAlert(const char *what, OSErr err)
 	PStr(p, msg);
 	ParamText(p, "\p", "\p", "\p");
 	InitCursor();
-	StopAlert(kErrorAlert, NULL);
+	StopAlert(kErrorAlert, (ModalFilterUPP) StandardFilter);
 }
 
 void ShowNote(const char *msg)
@@ -247,7 +268,7 @@ void ShowNote(const char *msg)
 	PStr(p, msg);
 	ParamText(p, "\p", "\p", "\p");
 	InitCursor();
-	NoteAlert(kErrorAlert, NULL);
+	NoteAlert(kErrorAlert, (ModalFilterUPP) StandardFilter);
 }
 
 #ifdef TOPICA_DEBUG

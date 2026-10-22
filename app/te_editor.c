@@ -77,6 +77,22 @@ void EdSetView(Editor *ed, const Rect *view)
 	TECalText(ed->te);
 }
 
+void EdSetFont(Editor *ed, short font, short size)
+{
+	FontInfo fi;
+	TEPtr t;
+
+	TextFont(font);
+	TextSize(size);
+	GetFontInfo(&fi);
+	t = *ed->te;
+	t->txFont = font;
+	t->txSize = size;
+	t->fontAscent = fi.ascent;
+	t->lineHeight = (short) (fi.ascent + fi.descent + fi.leading);
+	TECalText(ed->te);
+}
+
 void EdDraw(Editor *ed)
 {
 	Rect r = (*ed->te)->viewRect;

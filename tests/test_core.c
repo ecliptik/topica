@@ -6,6 +6,7 @@
 #include "../core/find.h"
 #include "../core/frontmatter.h"
 #include "../core/prefs.h"
+#include "../core/recovery.h"
 #include "../core/post.h"
 #include "../core/textconv.h"
 #include "../core/undo.h"
@@ -253,6 +254,10 @@ static void TestFrontmatterUpdate(void)
 	/* a value with a line end in it stays on one line */
 	f[0].value = "two\rlines";
 	Update("---\ntitle: x\n---\n", f, 1, '\n', "---\ntitle: two lines\n---\n", __LINE__);
+	/* booleans Jekyll and Hugo read stay unquoted; a title "true" is quoted */
+	f[0].key = "draft"; f[0].value = "false";
+	f[1].key = "title"; f[1].value = "true";
+	Update("---\ndraft: true\n---\n", f, 2, '\n', "---\ndraft: false\ntitle: \"true\"\n---\n", __LINE__);
 	/* too small */
 	CHECK(fm_update(kPost, (long) strlen(kPost), f, 1, '\n', out, sizeof(out)) == -1);
 
@@ -423,11 +428,17 @@ static void TestPost(void)
 	post_filename(2026, 1, 2, "Supercalifragilisticexpialidocious", 31, s, sizeof(s));
 	CHECK(strlen(s) <= 31);
 
-	n = post_template("post", '\r', t, sizeof(t) - 1);
+	n = post_template(0, "post", NULL, '\r', t, sizeof(t) - 1);
 	CHECK(n > 0);
 	t[n] = '\0';
 	CHECK_STR(t, "---\rlayout: post\rtitle:\rdescription:\rcategory:\rtags:\r---\r\r");
-	CHECK(post_template("post", '\r', t, 5) == -1);
+	CHECK(post_template(0, "post", NULL, '\r', t, 5) == -1);
+	n = post_template(1, "post", "2026-10-22", '\n', t, sizeof(t) - 1);
+	t[n < 0 ? 0 : n] = '\0';
+	CHECK_STR(t, "---\ntitle:\ndate: 2026-10-22\ndraft: true\ndescription:\ncategories:\ntags:\n---\n\n");
+	n = post_template(1, NULL, "", '\n', t, sizeof(t) - 1);
+	t[n < 0 ? 0 : n] = '\0';
+	CHECK_STR(t, "---\ntitle:\ndate:\ndraft: true\ndescription:\ncategories:\ntags:\n---\n\n");
 
 	CHECK(post_words("---\ntitle: a b c\n---\nOne two, three-four don't.\n", 46) == 4);
 	CHECK(post_words("caf\x8E na\x95ve \xD1 r\x8Esum\x8E", 18) == 3);
@@ -507,6 +518,27 @@ static void TestPrefs(void)
 	CHECK(prefs_write(&p, '\r', buf, 10) == -1);
 }
 
+/* ---- recovery ---- */
+
+static void TestRecovery(void)
+{
+	char buf[64], title[16];
+	long n, body;
+
+	n = recovery_header("my post.md", buf, sizeof(buf));
+	CHECK(n == recovery_header("my post.md", NULL, 0));
+	memcpy(buf + n, "---\rtext", 9);
+	CHECK(recovery_parse(buf, n + 9, title, sizeof(title), &body));
+	CHECK_STR(title, "my post.md");
+	CHECK(body == n && memcmp(buf + body, "---", 3) == 0);
+	CHECK(!recovery_parse("---\rtitle: x\r", 14, title, sizeof(title), &body));
+	CHECK(!recovery_parse("Topica recovery: no end", 23, title, sizeof(title), &body));
+	CHECK(recovery_header("x", buf, 5) == -1);
+	n = recovery_header("a very long title that will be cut", buf, sizeof(buf));
+	CHECK(recovery_parse(buf, n, title, sizeof(title), &body));
+	CHECK(strlen(title) == sizeof(title) - 1);
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -516,6 +548,7 @@ int main(void)
 	TestPost();
 	TestFind();
 	TestPrefs();
+	TestRecovery();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

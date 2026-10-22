@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0 (unreleased)
+
+The Mac's manners.
+
+- Find and Replace (⌘F): match case, whole words, Replace, Replace All
+  (one undo step), Find Again (⌘G), Replace & Find Again (⌘=).
+- Preferences (Edit menu): font and size, Jekyll or Hugo, UTF-8 with LF or
+  Mac Roman with CR, the image folder, the new post's layout, how often to
+  autosave. Kept as readable text in Topica Preferences (the Preferences
+  folder on System 7, the System Folder before it).
+- Crash recovery: unsaved posts are copied to the System Folder's Topica
+  Recovery folder when you pause; after a crash Topica reopens them.
+- System 7 Apple events: documents dropped on Topica or opened from the
+  Finder, and Quit (a Cancel in Save Changes cancels Shut Down too).
+- Hugo: a front-matter template with `date` and `draft: true`, Post Info
+  edits `categories` and `draft`, file names without a date.
+- Every File Manager call uses its own zeroed parameter block.
+- Alerts redraw the windows behind them; ⌘. and Escape cancel them.
+
 ## 0.1.0 (unreleased)
 
 The first editor, on System 6 and System 7.

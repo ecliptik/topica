@@ -10,6 +10,7 @@
 #include "../core/post.h"
 #include "../core/undo.h"
 #include "postinfo.h"
+#include "settings.h"
 #include "util.h"
 
 /* Post Info's items (Insert Image's heading is its item 8) */
@@ -17,8 +18,10 @@ enum { kOutline = 3, kFirstField = 4, kFieldCount = 6, kInfoHeading = 16, kImage
 
 enum { kFieldLen = 256 };
 
-/* The fields, in the dialog's order */
+/* The fields, in the dialog's order, and their labels (items 10-15) */
 static const char *const kKeys[kFieldCount] = { "title", "description", "category", "tags", "layout", "date" };
+static const char *const kHugoKeys[kFieldCount] = { "title", "description", "categories", "tags", "draft", "date" };
+enum { kFirstLabel = 10 };
 
 /* A key's value from the post's text */
 static int Get(Doc *d, const char *key, char *out)
@@ -65,15 +68,20 @@ Boolean PostInfo(Doc *d)
 		SysBeep(10);
 		return false;
 	}
-	memcpy(keys, kKeys, sizeof(keys));
-	/* a post with "categories" and no "category" edits that */
-	if (Get(d, "category", values[2]) == kFmAbsent && Get(d, "categories", values[2]) != kFmAbsent)
+	memcpy(keys, gPrefs.profile == kProfileHugo ? kHugoKeys : kKeys, sizeof(keys));
+	/* a Jekyll post with "categories" and no "category" edits that */
+	if (gPrefs.profile != kProfileHugo && Get(d, "category", values[2]) == kFmAbsent
+			&& Get(d, "categories", values[2]) != kFmAbsent)
 		keys[2] = "categories";
 	dlg = GetModalDialog(kPostInfoDialog);
 	if (dlg == NULL) {
 		DisposePtr((Ptr) values);
 		SysBeep(10);
 		return false;
+	}
+	if (gPrefs.profile == kProfileHugo) {
+		SetItemText(dlg, kFirstLabel + 2, "Categories:");
+		SetItemText(dlg, kFirstLabel + 4, "Draft:");
 	}
 	for (i = 0; i < kFieldCount; i++) {
 		if (Get(d, keys[i], values[i]) != kFmFound)
@@ -137,14 +145,11 @@ void InsertImage(Doc *d)
 	DialogPtr dlg;
 	long s, e, n;
 	const char *t;
-	Handle h;
 	char *sp;
 
 	/* the folder: the blog's image path and the post's category */
-	strcpy(prefix, "/assets/images/posts/");
-	h = GetResource('STR ', kImagePathString);
-	if (h != NULL && **h > 0)
-		CStr(prefix, (unsigned char *) *h);
+	strncpy(prefix, gPrefs.imagePath, sizeof(prefix) - 1);
+	prefix[sizeof(prefix) - 1] = '\0';
 	if (Get(d, "category", category) != kFmFound && Get(d, "categories", category) != kFmFound)
 		category[0] = '\0';
 	if ((sp = strchr(category, ' ')) != NULL)

@@ -46,6 +46,16 @@ def shot(snow, name):
     print("shot", path)
 
 
+def snow_has_focus():
+    """Keystrokes go to whatever window has the focus. Stop rather than
+    type into another application (a password prompt that popped up)."""
+    env = {**os.environ, "DISPLAY": ":0"}
+    name = subprocess.run(["xdotool", "getactivewindow", "getwindowname"], env=env,
+                          capture_output=True, text=True).stdout.strip()
+    if "Snow" not in name:
+        sys.exit("snow_session: the focused window is %r, not Snow: stopping before typing" % name)
+
+
 def at(snow, xy, double=False):
     x, y = snow.mac_to_screen(*xy)
     snow.move_to(x, y)
@@ -62,6 +72,8 @@ def main(steps):
     for step in steps:
         print("step", step, flush=True)
         kind, _, arg = step.partition(":")
+        if kind in ("cmd", "cmdshift", "type", "key"):
+            snow_has_focus()
         if kind in ("click", "dclick"):
             x, y = (int(v) for v in arg.split(","))
             at(snow, (x, y), double=kind == "dclick")

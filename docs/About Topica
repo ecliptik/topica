@@ -12,6 +12,15 @@ Writing a post
 Undo and Redo
 Command-Z undoes, many steps back. Command-Shift-Z redoes.
 
+Find
+Edit > Find (Command-F) finds and replaces. Command-G finds again; Command-= replaces the selection and finds again.
+
+Preferences
+Edit > Preferences sets the font, Jekyll or Hugo, how posts are saved, the image folder and how often Topica keeps a recovery copy. They are kept in Topica Preferences, a text file in the Preferences folder (System 7) or the System Folder.
+
+After a crash
+While you write, Topica keeps a copy of each unsaved post in the System Folder's Topica Recovery folder. If the Mac crashes, Topica opens those posts again the next time it starts.
+
 Other characters
 Posts are saved in UTF-8, the way a blog wants them. Characters the Macintosh can't show, such as emoji, appear as codes like &#x1F600; while you write and go back to the real character when you save.
 

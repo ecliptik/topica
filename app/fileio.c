@@ -1,14 +1,155 @@
-/* fileio.c: see fileio.h. */
+/*
+ * fileio.c: see fileio.h.
+ *
+ * Every File Manager call here builds its own parameter block, zeroed
+ * first, and hands the File Manager a copy of the name. Retro68's glue
+ * leaves fields unset: GetFInfo's ioFDirIndex (a leftover makes it look up
+ * another file and write that file's name into ours; on a file server that
+ * retyped another application) and HOpen's ioMisc (taken as a buffer).
+ */
 #include <Files.h>
 #include <StandardFile.h>
 #include <Memory.h>
 #include <Events.h>
 #include <Errors.h>
+#include <Gestalt.h>
+#include <OSUtils.h>
+#include <Traps.h>
 #include <string.h>
 #include <stdio.h>
 
 #include "fileio.h"
 #include "util.h"
+
+#ifndef kOnSystemDisk
+#define kOnSystemDisk ((short) 0x8000)
+#endif
+#ifndef kPreferencesFolderType
+#define kPreferencesFolderType 'pref'
+#endif
+enum { kDirectoryBit = 0x10 };
+
+static void CopyName(Str63 dst, const unsigned char *src)
+{
+	memcpy(dst, src, (size_t) (src[0] > 63 ? 63 : src[0]) + 1);
+	if (dst[0] > 63)
+		dst[0] = 63;
+}
+
+void FileRefFromFSSpec(const FSSpec *s, FileRef *f)
+{
+	f->vRefNum = s->vRefNum;
+	f->dirID = s->parID;
+	CopyName(f->name, s->name);
+}
+
+void FileRefSibling(const FileRef *dir, const char *name, FileRef *f)
+{
+	Str255 p;
+
+	f->vRefNum = dir->vRefNum;
+	f->dirID = dir->dirID;
+	PStr(p, name);
+	CopyName(f->name, p);
+}
+
+Boolean FileRefSame(const FileRef *a, const FileRef *b)
+{
+	return a->vRefNum == b->vRefNum && a->dirID == b->dirID && EqualString(a->name, b->name, false, true);
+}
+
+/* A zeroed parameter block for f, with a copy of its name */
+static void Block(HParamBlockRec *pb, const FileRef *f, Str63 copy)
+{
+	CopyName(copy, f->name);
+	memset(pb, 0, sizeof(*pb));
+	pb->fileParam.ioNamePtr = copy;
+	pb->fileParam.ioVRefNum = f->vRefNum;
+	pb->fileParam.ioDirID = f->dirID;
+}
+
+static OSErr OpenFile(const FileRef *f, SignedByte perm, short *ref)
+{
+	HParamBlockRec pb;
+	Str63 copy;
+	OSErr err;
+
+	Block(&pb, f, copy);
+	pb.ioParam.ioPermssn = perm;
+	pb.ioParam.ioMisc = NULL;
+	err = PBHOpenDFSync(&pb);
+	if (err == paramErr) {              /* no OpenDF before System 7 */
+		Block(&pb, f, copy);
+		pb.ioParam.ioPermssn = perm;
+		err = PBHOpenSync(&pb);
+	}
+	*ref = pb.ioParam.ioRefNum;
+	return err;
+}
+
+static OSErr GetInfo(const FileRef *f, HParamBlockRec *pb, Str63 copy)
+{
+	Block(pb, f, copy);
+	pb->fileParam.ioFDirIndex = 0;
+	return PBHGetFInfoSync(pb);
+}
+
+static Boolean Exists(const FileRef *f)
+{
+	HParamBlockRec pb;
+	Str63 copy;
+
+	return GetInfo(f, &pb, copy) == noErr;
+}
+
+static OSErr SetTypeCreator(const FileRef *f, OSType type, OSType creator)
+{
+	HParamBlockRec pb;
+	Str63 copy;
+	OSErr err = GetInfo(f, &pb, copy);
+
+	if (err != noErr)
+		return err;
+	pb.fileParam.ioFlFndrInfo.fdType = type;
+	pb.fileParam.ioFlFndrInfo.fdCreator = creator;
+	pb.fileParam.ioFDirIndex = 0;
+	pb.fileParam.ioNamePtr = copy;
+	pb.fileParam.ioDirID = f->dirID;    /* PBHGetFInfo put the file number there */
+	return PBHSetFInfoSync(&pb);
+}
+
+static OSErr CreateFile(const FileRef *f, OSType type, OSType creator)
+{
+	HParamBlockRec pb;
+	Str63 copy;
+	OSErr err;
+
+	Block(&pb, f, copy);
+	err = PBHCreateSync(&pb);
+	if (err != noErr)
+		return err;
+	return SetTypeCreator(f, type, creator);
+}
+
+OSErr FileDelete(const FileRef *f)
+{
+	HParamBlockRec pb;
+	Str63 copy;
+
+	Block(&pb, f, copy);
+	return PBHDeleteSync(&pb);
+}
+
+static OSErr RenameTo(const FileRef *f, const unsigned char *newName)
+{
+	HParamBlockRec pb;
+	Str63 copy, to;
+
+	Block(&pb, f, copy);
+	CopyName(to, newName);
+	pb.ioParam.ioMisc = (Ptr) to;
+	return PBHRenameSync(&pb);
+}
 
 /* Shows text files, and files named like posts whatever their type (a
    file server may not know a .md file is text). TRUE hides a file. */
@@ -56,8 +197,9 @@ Boolean FileAskOpen(FileRef *f)
 	SFGetFile(DialogSpot(348), "\p", (FileFilterUPP) OpenFilter, -1, NULL, NULL, &r);
 	if (!r.good)
 		return false;
-	f->vRefNum = r.vRefNum;
-	memcpy(f->name, r.fName, (size_t) r.fName[0] + 1);
+	f->vRefNum = r.vRefNum;             /* a working directory */
+	f->dirID = 0;
+	CopyName(f->name, r.fName);
 	return true;
 }
 
@@ -74,7 +216,8 @@ Boolean FileAskSave(const char *prompt, const char *defaultName, FileRef *f)
 	if (!r.good)
 		return false;
 	f->vRefNum = r.vRefNum;
-	memcpy(f->name, r.fName, (size_t) r.fName[0] + 1);
+	f->dirID = 0;
+	CopyName(f->name, r.fName);
 	return true;
 }
 
@@ -87,7 +230,7 @@ OSErr FileRead(const FileRef *f, Ptr *data, long *len)
 
 	*data = NULL;
 	*len = 0;
-	err = FSOpen(f->name, f->vRefNum, &ref);
+	err = OpenFile(f, fsRdPerm, &ref);
 	if (err != noErr)
 		return err;
 	err = GetEOF(ref, &n);
@@ -110,16 +253,16 @@ OSErr FileRead(const FileRef *f, Ptr *data, long *len)
 	return err != noErr ? err : cerr;
 }
 
-static OSErr WriteNew(const unsigned char *name, short vRefNum, const char *data, long len)
+static OSErr WriteNew(const FileRef *f, const char *data, long len, OSType type, OSType creator)
 {
 	short ref;
 	OSErr err, cerr;
 	long n = len;
 
-	err = Create(name, vRefNum, kCreator, kPostType);
+	err = CreateFile(f, type, creator);
 	if (err != noErr)
 		return err;
-	err = FSOpen(name, vRefNum, &ref);
+	err = OpenFile(f, fsRdWrPerm, &ref);
 	if (err != noErr)
 		return err;
 	if (n > 0)
@@ -130,72 +273,120 @@ static OSErr WriteNew(const unsigned char *name, short vRefNum, const char *data
 	return err != noErr ? err : cerr;
 }
 
-/*
- * Finder info without Retro68's GetFInfo and SetFInfo glue: it leaves
- * ioFDirIndex unset, and a non-zero leftover makes the File Manager look up
- * the Nth file in the folder instead, write that file's name into ours, and
- * hand back (or change) its Finder info. On a file server that retyped
- * another application. Here the parameter block starts zeroed, and the File
- * Manager gets a copy of the name, never the caller's.
- */
-static OSErr GetInfo(const unsigned char *name, short vRefNum, ParamBlockRec *pb, Str63 copy)
+OSErr FileWrite(const FileRef *f, const char *data, long len, OSType type, OSType creator)
 {
-	memcpy(copy, name, (size_t) (name[0] > 63 ? 63 : name[0]) + 1);
-	memset(pb, 0, sizeof(*pb));
-	pb->fileParam.ioNamePtr = copy;
-	pb->fileParam.ioVRefNum = vRefNum;
-	pb->fileParam.ioFDirIndex = 0;
-	return PBGetFInfoSync(pb);
-}
-
-static Boolean Exists(const unsigned char *name, short vRefNum)
-{
-	ParamBlockRec pb;
-	Str63 copy;
-
-	return GetInfo(name, vRefNum, &pb, copy) == noErr;
-}
-
-static OSErr SetTypeCreator(const unsigned char *name, short vRefNum, OSType type, OSType creator)
-{
-	ParamBlockRec pb;
-	Str63 copy;
-	OSErr err = GetInfo(name, vRefNum, &pb, copy);
-
-	if (err != noErr)
-		return err;
-	pb.fileParam.ioFlFndrInfo.fdType = type;
-	pb.fileParam.ioFlFndrInfo.fdCreator = creator;
-	pb.fileParam.ioFDirIndex = 0;
-	pb.fileParam.ioNamePtr = copy;
-	return PBSetFInfoSync(&pb);
-}
-
-OSErr FileWrite(const FileRef *f, const char *data, long len)
-{
-	Str255 temp;
+	FileRef temp;
 	char t[32];
 	OSErr err;
 
 	sprintf(t, "Topica Save %04ld", (long) (TickCount() % 10000));
-	PStr(temp, t);
-	(void) FSDelete(temp, f->vRefNum);          /* a left-over from a crash */
-	err = WriteNew(temp, f->vRefNum, data, len);
+	FileRefSibling(f, t, &temp);
+	(void) FileDelete(&temp);               /* a left-over from a crash */
+	err = WriteNew(&temp, data, len, type, creator);
 	if (err != noErr) {
-		(void) FSDelete(temp, f->vRefNum);
+		(void) FileDelete(&temp);
 		return err;
 	}
-	if (Exists(f->name, f->vRefNum)) {
-		err = FSDelete(f->name, f->vRefNum);
+	if (Exists(f)) {
+		err = FileDelete(f);
 		if (err != noErr) {
-			(void) FSDelete(temp, f->vRefNum);
+			(void) FileDelete(&temp);
 			return err;
 		}
 	}
-	err = Rename(temp, f->vRefNum, f->name);
+	err = RenameTo(&temp, f->name);
 	if (err != noErr)
-		return err;                     /* the post is safe under the temporary name */
-	(void) SetTypeCreator(f->name, f->vRefNum, kPostType, kCreator);
+		return err;                         /* the post is safe under the temporary name */
 	(void) FlushVol(NULL, f->vRefNum);
 	return noErr;
+}
+
+/* The System Folder: a working directory from SysEnvirons */
+static short SystemFolder(void)
+{
+	SysEnvRec env;
+
+	if (SysEnvirons(1, &env) != noErr)
+		return 0;
+	return env.sysVRefNum;
+}
+
+OSErr FilePrefsFolder(const char *name, FileRef *f)
+{
+	FileRef dir;
+	long attr;
+
+	dir.vRefNum = SystemFolder();
+	dir.dirID = 0;
+	dir.name[0] = 0;
+	if (NGetTrapAddress(_Gestalt, kToolboxTrapType) != NGetTrapAddress(_Unimplemented, kToolboxTrapType)
+			&& Gestalt(gestaltFindFolderAttr, &attr) == noErr && (attr & 1)) {
+		short v;
+		long d;
+		if (FindFolder(kOnSystemDisk, kPreferencesFolderType, true, &v, &d) == noErr) {
+			dir.vRefNum = v;
+			dir.dirID = d;
+		}
+	}
+	FileRefSibling(&dir, name, f);
+	return noErr;
+}
+
+OSErr FileSystemSubfolder(const char *folder, FileRef *dir)
+{
+	CInfoPBRec cpb;
+	HParamBlockRec hpb;
+	Str255 p;
+	Str63 name;
+	short sys = SystemFolder();
+	OSErr err;
+
+	PStr(p, folder);
+	CopyName(name, p);
+	memset(&cpb, 0, sizeof(cpb));
+	cpb.dirInfo.ioNamePtr = name;
+	cpb.dirInfo.ioVRefNum = sys;
+	cpb.dirInfo.ioDrDirID = 0;
+	cpb.dirInfo.ioFDirIndex = 0;
+	err = PBGetCatInfoSync(&cpb);
+	dir->vRefNum = sys;
+	dir->name[0] = 0;
+	if (err == noErr) {
+		if (!(cpb.dirInfo.ioFlAttrib & kDirectoryBit))
+			return dupFNErr;            /* a file has the folder's name */
+		dir->dirID = cpb.dirInfo.ioDrDirID;
+		return noErr;
+	}
+	if (err != fnfErr)
+		return err;
+	CopyName(name, p);
+	memset(&hpb, 0, sizeof(hpb));
+	hpb.fileParam.ioNamePtr = name;
+	hpb.fileParam.ioVRefNum = sys;
+	hpb.fileParam.ioDirID = 0;
+	err = PBDirCreateSync(&hpb);
+	if (err == noErr)
+		dir->dirID = hpb.fileParam.ioDirID;
+	return err;
+}
+
+OSErr FileIndexed(const FileRef *dir, short index, FileRef *f)
+{
+	CInfoPBRec pb;
+	Str63 name;
+	OSErr err;
+
+	memset(&pb, 0, sizeof(pb));
+	name[0] = 0;
+	pb.hFileInfo.ioNamePtr = name;
+	pb.hFileInfo.ioVRefNum = dir->vRefNum;
+	pb.hFileInfo.ioDirID = dir->dirID;
+	pb.hFileInfo.ioFDirIndex = index;
+	err = PBGetCatInfoSync(&pb);
+	if (err != noErr)
+		return err;
+	f->vRefNum = dir->vRefNum;
+	f->dirID = dir->dirID;
+	CopyName(f->name, name);
+	return (pb.hFileInfo.ioFlAttrib & kDirectoryBit) ? dirNFErr : noErr;
 }
