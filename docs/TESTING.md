@@ -50,6 +50,15 @@ file beside the application.
 - Formatting: open "Formatting", type emphasis, open and close a code
   fence (the rest of the post restyles), Undo, Hide and Show Formatting,
   a font change in Preferences; colors on System 7.
+- Preview: Show Preview on "Formatting" (every kind of block), on a long
+  post (the screen first, the rest while idle: the scroll bar settles),
+  typing with the preview open (it catches up after a pause), a
+  double-click going back to the post, resizing, colors on System 7.
+- Export HTML of "Formatting": the file matches what the host tests'
+  `mh_page` makes.
+- Print and Page Setup: on System 7 the job reaches PrintMonitor. In Snow
+  the ImageWriter driver prints the page, then waits for good in
+  `PrPicFile` for a printer that isn't there: stop Snow.
 - Opening a UTF-8 post with characters Mac Roman lacks, and saving it.
 - Saving to an AppleShare volume, and a full or locked disk.
 - Topica Lite on a 512K Mac.

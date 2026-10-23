@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+The web preview.
+
+- Post › Show Preview (⌘R): a window that shows the post laid out like its
+  web page. The title, date, category and description come from the
+  front matter; headings, lists with their numbers and task boxes, quotes
+  with a bar, code in a box, tables, rules, footnotes, and images as
+  framed boxes with their description and file. Links are underlined and
+  listed with their addresses at the end. In color on a color screen.
+- The preview follows the front post and catches up a moment after you
+  stop typing. Double-click in it to go to that place in the post.
+- On a 68000 the preview shows the screen you're looking at first and lays
+  out the rest while you read; after an edit, only what changed is laid
+  out again.
+- File › Print… (⌘P) and Page Setup… print that layout, with page numbers.
+  The Finder's Print and System 7's print event work too.
+- File › Export HTML… writes the post as a web page of its own, in UTF-8.
+- Menus dim and undim as soon as a window comes to the front.
+
 ## 0.3.0 (unreleased)
 
 Formatting in place.

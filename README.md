@@ -8,7 +8,7 @@ front matter, Markdown, and UTF-8 files a blog can use as they are.
 The name is Aristotle's *Topics*, his book on finding things to say: the
 *topoi*, the "places" a writer goes for material.
 
-> Topica is new and unfinished (0.3). See [TODO.md](TODO.md) for what's
+> Topica is new and unfinished (0.4). See [TODO.md](TODO.md) for what's
 > coming.
 
 ## What it does today
@@ -20,6 +20,12 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   color on a color screen. Post › Hide Formatting turns it off; it starts
   off on a 68000, where it slows down long posts.
 - **The Headings menu** lists the post's headings; choose one to go there.
+- **Preview** (⌘R) shows the post laid out like its web page: the title and
+  date from the front matter, headings, lists, quotes, code, tables, images
+  as framed boxes, and the links listed at the end. It follows the post as
+  you write; double-click to go to that place in the post.
+- **Print** (⌘P) prints that layout, and **Export HTML** writes the post
+  as a web page of its own.
 - **Undo and Redo** many steps (⌘Z, ⌘⇧Z): Typing, Delete, Cut, Paste,
   Clear, Post Info and Insert Image each undo as one step.
 - **Post Info** (⌘E) edits the front matter's title, description,
@@ -78,8 +84,9 @@ covers the emulators.
 ## Layout
 
 - `core/`: portable C89 with no Toolbox calls: UTF-8 and Mac Roman, front
-  matter, undo, post names and word counts, and a Markdown scanner for
-  styling and headings. Tested on the host.
+  matter, undo, post names and word counts, a Markdown scanner for styling
+  and headings, the post as page blocks, line breaking, and HTML. Tested
+  on the host.
 - `app/`: the Macintosh application. Every edit goes through one call
   (`EdReplace` in `app/editor.h`), with TextEdit behind it today.
 - `resources/`: menus, dialogs, alerts and icons (Rez).

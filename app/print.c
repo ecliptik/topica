@@ -115,6 +115,8 @@ void PrintDoc(Doc *d)
 			height = PageHeight(pg);
 			for (top = 0; top < height && PrError() == noErr; top = bottom, number++) {
 				bottom = PageBreak(pg, text, n, top, top + (body.bottom - body.top));
+				DLOG(("Print: page %d, %ld to %ld of %ld, loop %d", number, top, bottom, height,
+					(int) (**gPrint).prJob.bJDocLoop));
 				PrOpenPage(port, NULL);
 				if (PrError() == noErr) {
 					clip = body;
@@ -125,6 +127,7 @@ void PrintDoc(Doc *d)
 					Footer(&r, number);
 				}
 				PrClosePage(port);
+				DLOG(("Print: page %d closed, error %d", number, PrError()));
 			}
 		} else {
 			PrSetError(memFullErr);

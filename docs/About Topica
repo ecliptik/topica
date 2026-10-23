@@ -16,6 +16,12 @@ The Headings menu lists the post's headings. Choose one to go there.
 
 Post > Insert Link (Command-K) puts a link around the selected text.
 
+Preview
+Post > Show Preview (Command-R) shows the post laid out like its web page, with the title and date from the front matter, the pictures as boxes and the links listed at the end. It follows the post you're writing and catches up when you pause. Double-click in the preview to go to that place in the post.
+
+Printing and HTML
+File > Print (Command-P) prints the post as the preview shows it. File > Export HTML saves it as a web page you can open in a browser.
+
 Undo and Redo
 Command-Z undoes, many steps back. Command-Shift-Z redoes.
 
