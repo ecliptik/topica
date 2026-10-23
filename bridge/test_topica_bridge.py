@@ -4,6 +4,7 @@
 """
 import http.client
 import os
+import socket
 import subprocess
 import tempfile
 import threading
@@ -117,6 +118,16 @@ class BridgeTest(unittest.TestCase):
         status, text = self.send(path="_posts/2026/2026-10-23-hello.md")
         self.assertEqual(status, 200, text)
         self.assertNotEqual(self.remote_file("drafts", "_posts/2026/2026-10-23-hello.md"), b"")
+
+    def test_quiet_client_let_go(self):
+        topica_bridge.Handler.timeout = 1
+        try:
+            s = socket.create_connection(("127.0.0.1", self.server.server_address[1]), timeout=10)
+            s.sendall(b"GET / HTTP/1.0\r\n")       # and never the blank line
+            self.assertEqual(s.recv(100), b"")       # the bridge hangs up
+            s.close()
+        finally:
+            topica_bridge.Handler.timeout = 30
 
     def test_too_large(self):
         self.server.config.max_bytes = 100

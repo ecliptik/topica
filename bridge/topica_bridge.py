@@ -149,6 +149,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     server_version = f"topica-bridge/{VERSION}"
     sys_version = ""
     protocol_version = "HTTP/1.0"
+    timeout = 30            # seconds a client may go quiet before its connection (and thread) is let go
 
     def reply(self, status, text):
         data = (text + "\n").encode("ascii", "replace")
