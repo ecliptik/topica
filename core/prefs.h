@@ -18,6 +18,8 @@ typedef struct {
 	short lf;                   /* LF line ends (else CR) */
 	short autosaveMinutes;      /* recovery copies; 0: none */
 	short format;               /* Markdown styled in place */
+	short vi;                   /* vi keys */
+	short viJk;                 /* jk in insert mode is Escape */
 } TopicaPrefs;
 
 void prefs_default(TopicaPrefs *p);

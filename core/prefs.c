@@ -88,6 +88,10 @@ void prefs_read(TopicaPrefs *p, const char *text, long n)
 			p->autosaveMinutes = Number(text + vs, ve - vs, 0, 60, p->autosaveMinutes);
 		else if (Is(text + ks, ke - ks, "formatting"))
 			p->format = !Is(text + vs, ve - vs, "off");
+		else if (Is(text + ks, ke - ks, "vi"))
+			p->vi = Is(text + vs, ve - vs, "on");
+		else if (Is(text + ks, ke - ks, "vi-jk"))
+			p->viJk = Is(text + vs, ve - vs, "on");
 	}
 }
 
@@ -106,11 +110,13 @@ long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 		"encoding: %s%c"
 		"line-ends: %s%c"
 		"autosave-minutes: %d%c"
-		"formatting: %s%c",
+		"formatting: %s%c"
+		"vi: %s%c"
+		"vi-jk: %s%c",
 		eol, p->font, eol, p->size, eol, p->imagePath, eol, p->layout, eol,
 		p->profile == kProfileHugo ? "hugo" : "jekyll", eol,
 		p->utf8 ? "utf-8" : "mac-roman", eol, p->lf ? "lf" : "cr", eol, p->autosaveMinutes, eol,
-		p->format ? "on" : "off", eol);
+		p->format ? "on" : "off", eol, p->vi ? "on" : "off", eol, p->viJk ? "on" : "off", eol);
 	if (out != NULL) {
 		if (n > cap)
 			return -1;

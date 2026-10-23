@@ -502,13 +502,15 @@ static void TestPrefs(void)
 	prefs_default(&p);
 	CHECK_STR(p.font, "Monaco");
 	CHECK(p.size == 9 && p.utf8 && p.lf && p.autosaveMinutes == 2 && p.profile == kProfileJekyll && p.format);
+	CHECK(!p.vi && !p.viJk);
 	{
 		const char *text = "# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
-			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\r";
+			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\rvi: on\r";
 		prefs_read(&p, text, (long) strlen(text));
 	}
 	CHECK_STR(p.font, "Geneva");
 	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5 && !p.format);
+	CHECK(p.vi && !p.viJk);
 	CHECK_STR(p.imagePath, "/img/");
 	CHECK_STR(p.layout, "page");
 	/* bad numbers keep what was there */
@@ -1097,6 +1099,8 @@ static void VhUndo(void *c, int redo)
 	} while (a.more);
 }
 
+static ViReg gVreg;
+
 static void VhInit(ViHost *h, Vi *v, char *reg, long cap, const char *text)
 {
 	const char *bar = strchr(text, '|');
@@ -1116,7 +1120,11 @@ static void VhInit(ViHost *h, Vi *v, char *reg, long cap, const char *text)
 	gVs = gVe = bar - text;
 	gVbeeps = 0;
 	undo_init(&gVu, gVub, sizeof(gVub));
-	vi_init(v, reg, cap);
+	gVreg.buf = reg;
+	gVreg.cap = cap;
+	gVreg.len = 0;
+	gVreg.lines = 0;
+	vi_init(v, &gVreg);
 	v->on = 1;
 }
 
@@ -1380,8 +1388,17 @@ static void TestVi(void)
 	CHECK(gVs == 0 && gVe == 2);
 	(void) vi_key(&v, &h, 'v', 0);
 	CHECK_STR(vi_status(&v), "-- VISUAL --");
+	(void) vi_key(&v, &h, VI_ESC, 0);
+	gVs = 1;
+	gVe = 1;
 	vi_clicked(&v, &h);
-	CHECK(v.mode == VI_NORMAL && gVs == gVe);
+	CHECK(v.mode == VI_NORMAL && gVs == 1 && gVe == 1);
+	gVs = 0;
+	gVe = 2;
+	vi_clicked(&v, &h);                 /* dragged over "ab": visual */
+	CHECK(v.mode == VI_VISUAL);
+	(void) vi_key(&v, &h, 'd', 0);
+	CHECK(gVn == 0 && v.mode == VI_NORMAL);
 
 	/* jk: quickly, it's Escape; slowly, it's text */
 	VhInit(&h, &v, reg, sizeof(reg), "|ab");

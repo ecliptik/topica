@@ -53,6 +53,13 @@ typedef struct {
 
 #define VI_KEYS 256                 /* the longest change . repeats */
 
+/* The register y d c and p use: one for every window, as vi's is */
+typedef struct {
+	char *buf;
+	long len, cap;
+	int lines;                  /* it holds whole lines */
+} ViReg;
+
 typedef struct {
 	int mode;
 	int on;                     /* vi mode is on: else every key is the app's */
@@ -63,10 +70,7 @@ typedef struct {
 	char op;                    /* d c y, or 0 */
 	char pend;                  /* a key that waits for one more: g r f F t T i a (objects) */
 	char findCmd, findCh;       /* the last f F t T and its character, for ; and , */
-	/* the register */
-	char *reg;
-	long regLen, regCap;
-	int regLines;               /* it holds whole lines */
+	ViReg *reg;
 	/* the change being typed, and the last one, for . */
 	unsigned char rec[VI_KEYS], dot[VI_KEYS];
 	int recLen, dotLen;
@@ -82,15 +86,16 @@ typedef struct {
 	unsigned long jTicks;
 } Vi;
 
-/* reg: the register's buffer, cap bytes */
-void vi_init(Vi *v, char *reg, long cap);
+/* reg->buf (reg->cap bytes) is the caller's */
+void vi_init(Vi *v, ViReg *reg);
 
 /* A key typed (c, its character) at ticks. 1 when vi used it; 0 when the
    app should do what it always does (arrow keys and the like, and every
    key when vi mode is off). */
 int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks);
 
-/* After a click: visual mode ends; an insert goes on where the click was */
+/* After a click: a selection made with the mouse is a visual one; an
+   insert goes on where the click was */
 void vi_clicked(Vi *v, const ViHost *h);
 
 /* The mode for the status line: "", "-- INSERT --", "-- VISUAL --" ... */

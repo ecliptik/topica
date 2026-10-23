@@ -251,14 +251,14 @@ resource 'DITL' (142, "Find", purgeable) {
 };
 
 resource 'DLOG' (143, "Preferences", purgeable) {
-	{ 0, 0, 264, 420 }, dBoxProc, invisible, noGoAway, 0x0, 143, "Preferences", noAutoCenter
+	{ 0, 0, 288, 420 }, dBoxProc, invisible, noGoAway, 0x0, 143, "Preferences", noAutoCenter
 };
 
 resource 'DITL' (143, "Preferences", purgeable) {
 	{
-		{ 232, 338, 252, 406 }, Button { enabled, "OK" };
-		{ 232, 254, 252, 322 }, Button { enabled, "Cancel" };
-		{ 228, 334, 256, 410 }, UserItem { disabled };
+		{ 256, 338, 276, 406 }, Button { enabled, "OK" };
+		{ 256, 254, 276, 322 }, Button { enabled, "Cancel" };
+		{ 252, 334, 280, 410 }, UserItem { disabled };
 		{ 8, 14, 26, 300 }, StaticText { disabled, "Preferences" };
 		{ 32, 100, 50, 180 }, RadioButton { enabled, "Monaco" };
 		{ 32, 184, 50, 264 }, RadioButton { enabled, "Geneva" };
@@ -281,6 +281,9 @@ resource 'DITL' (143, "Preferences", purgeable) {
 		{ 178, 14, 194, 100 }, StaticText { disabled, "Layout:" };
 		{ 204, 14, 220, 100 }, StaticText { disabled, "Autosave:" };
 		{ 204, 142, 220, 406 }, StaticText { disabled, "minutes (0 for never)" };
+		{ 230, 14, 246, 96 }, StaticText { disabled, "Keys:" };
+		{ 228, 100, 246, 160 }, CheckBox { enabled, "vi" };
+		{ 228, 164, 246, 406 }, CheckBox { enabled, "jk leaves insert mode" };
 	}
 };
 

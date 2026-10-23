@@ -44,7 +44,7 @@ static Boolean gInBackground;
 static Boolean gHaveAE;
 
 static const char *const kUndoNames[kUndoKinds] = {
-	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace"
+	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace", "Change"
 };
 
 static void Enable(MenuHandle m, short item, Boolean on)
@@ -333,6 +333,11 @@ static void DoKey(EventRecord *e)
 	Doc *d = DocFront();
 
 	if (e->modifiers & cmdKey) {
+		/* Command-period: vi's Escape */
+		if (c == '.' && d != NULL && DocViOn(d)) {
+			DocViEscape(d);
+			return;
+		}
 		/* Command-Shift-Z: Redo (MenuKey doesn't see Shift) */
 		if ((c == 'z' || c == 'Z') && (e->modifiers & shiftKey) && d != NULL) {
 			DocUndo(d, true);

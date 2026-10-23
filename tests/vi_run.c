@@ -119,7 +119,8 @@ static void Beep(void *ctx)
 
 int main(int argc, char **argv)
 {
-	static char keys[4096], reg[65536];
+	static char keys[4096], regBuf[65536];
+	ViReg reg;
 	FILE *f;
 	long nk, i;
 	Vi v;
@@ -144,7 +145,11 @@ int main(int argc, char **argv)
 	h.undo = Undo;
 	h.group = Group;
 	h.beep = Beep;
-	vi_init(&v, reg, sizeof(reg));
+	reg.buf = regBuf;
+	reg.cap = sizeof(regBuf);
+	reg.len = 0;
+	reg.lines = 0;
+	vi_init(&v, &reg);
 	v.on = 1;
 	for (i = 0; i < nk; i++)
 		(void) vi_key(&v, &h, (unsigned char) keys[i], (unsigned long) i * 100);

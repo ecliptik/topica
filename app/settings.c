@@ -24,7 +24,8 @@ enum {
 	kSize9 = 8, kSize10, kSize12,
 	kJekyllRadio = 11, kHugoRadio,
 	kWebRadio = 13, kMacRadio,
-	kImageField = 15, kLayoutField, kAutosaveField
+	kImageField = 15, kLayoutField, kAutosaveField,
+	kViBox = 27, kJkBox
 };
 
 static const char *const kFonts[] = { "Monaco", "Geneva", "Courier" };
@@ -119,6 +120,8 @@ Boolean SettingsDialog(void)
 	SetItemText(d, kLayoutField, p.layout);
 	sprintf(num, "%d", p.autosaveMinutes);
 	SetItemText(d, kAutosaveField, num);
+	SetControl(d, kViBox, p.vi);
+	SetControl(d, kJkBox, p.viJk);
 	ShowWindow(d);
 	SelectDialogItemText(d, kImageField, 0, 32767);
 	InitCursor();
@@ -138,6 +141,12 @@ Boolean SettingsDialog(void)
 		} else if (item == kWebRadio || item == kMacRadio) {
 			p.utf8 = p.lf = item == kWebRadio;
 			Radio(d, kWebRadio, 2, item);
+		} else if (item == kViBox) {
+			p.vi = !p.vi;
+			SetControl(d, kViBox, p.vi);
+		} else if (item == kJkBox) {
+			p.viJk = !p.viJk;
+			SetControl(d, kJkBox, p.viJk);
 		}
 	}
 	if (item == kOK) {

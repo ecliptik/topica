@@ -59,6 +59,10 @@ void EdShowSelection(Editor *ed);
 /* The line a text offset is on (0-based) */
 long EdLineOf(Editor *ed, long offset);
 
+/* The offset lines screen lines below pos (above when negative), at the
+   horizontal place *goal; *goal < 0 takes pos's own (for vi's j and k) */
+long EdVertical(Editor *ed, long pos, int lines, long *goal);
+
 /* Puts the selection on the Clipboard */
 void EdCopySelection(Editor *ed);
 /* The Clipboard's text: a handle valid until the next Clipboard call, and

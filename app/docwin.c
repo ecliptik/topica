@@ -25,7 +25,9 @@
 #include "../core/recovery.h"
 #include "../core/textconv.h"
 #include "../core/undo.h"
+#include "../core/vi.h"
 #include "docwin.h"
+#include "findwin.h"
 #include "postinfo.h"
 #include "preview.h"
 #include "settings.h"
@@ -36,6 +38,11 @@
 #endif
 #ifndef TOPICA_UNDO_BYTES
 #define TOPICA_UNDO_BYTES 32768L
+#endif
+#ifdef TOPICA_LITE
+#define kViRegister 4096L               /* what vi's y and d can hold */
+#else
+#define kViRegister 32000L
 #endif
 
 enum { kScrollWidth = 16, kStatusHeight = 15 };
@@ -71,11 +78,19 @@ struct Doc {
 	unsigned long changes;              /* counts every change, for the preview */
 	Boolean editDue;                    /* [editFrom, editTo) changed since the preview looked, */
 	long editFrom, editTo, editDelta;   /* moving what follows by editDelta */
+	Vi vi;                              /* vi mode's state */
+	const char *viText;                 /* the text, locked while vi reads it */
+	char viShown[20];                   /* the mode the status line shows */
 };
 
 static void Resized(Doc *d);
+static void ViClicked(Doc *d);
+static void ViSettings(Doc *d);
 
 static Doc *gDocs[TOPICA_MAX_DOCS];
+static ViReg gViReg;                    /* one register for every window, as vi has */
+static char gAppliedFont[32];           /* the font DocApplySettings last set */
+static short gAppliedSize;
 static short gUntitled;
 
 short DocMaxCount(void)
@@ -209,6 +224,12 @@ static void DrawStatus(Doc *d)
 	PStr(p, s);
 	MoveTo((short) (r.left + 6), (short) (r.bottom - 4));
 	DrawString(p);
+	strcpy(d->viShown, vi_status(&d->vi));
+	if (d->viShown[0]) {
+		PStr(p, d->viShown);
+		MoveTo((short) (r.right - 6 - StringWidth(p)), (short) (r.bottom - 4));
+		DrawString(p);
+	}
 	TextFont(kMonaco);
 	TextSize(9);
 }
@@ -232,7 +253,7 @@ static void UpdateStatus(Doc *d, Boolean force)
 		CountWords(d);
 	EdGetSelection(d->ed, &start, &end);
 	line = EdLineOf(d->ed, end);
-	if (!force && line == d->line && words == d->words)
+	if (!force && line == d->line && words == d->words && strcmp(d->viShown, vi_status(&d->vi)) == 0)
 		return;
 	d->line = line;
 	GetPort(&save);
@@ -328,6 +349,15 @@ static Doc *MakeDoc(void)
 	if (d->ed == NULL || d->vbar == NULL || d->undoBuf == NULL)
 		goto nomem;
 	undo_init(&d->undo, d->undoBuf, TOPICA_UNDO_BYTES);
+	if (gViReg.buf == NULL) {
+		gViReg.buf = NewPtr(kViRegister);
+		gViReg.cap = gViReg.buf != NULL ? kViRegister : 0;
+		strcpy(gAppliedFont, gPrefs.font);
+		gAppliedSize = gPrefs.size;
+	}
+	vi_init(&d->vi, &gViReg);
+	d->vi.on = gPrefs.vi;
+	d->vi.jk = gPrefs.viJk;
 	gDocs[slot] = d;
 	return d;
 nomem:
@@ -601,14 +631,22 @@ void DocApplySettings(void)
 {
 	short i;
 
+	Boolean font = strcmp(gAppliedFont, gPrefs.font) != 0 || gAppliedSize != gPrefs.size;
+
+	strcpy(gAppliedFont, gPrefs.font);
+	gAppliedSize = gPrefs.size;
 	for (i = 0; i < TOPICA_MAX_DOCS; i++) {
 		Doc *d = gDocs[i];
 		if (d == NULL)
 			continue;
 		SetPort(d->w);
-		EdSetFont(d->ed, SettingsFontNumber(), gPrefs.size);
-		TouchAll(d);
-		Resized(d);
+		ViSettings(d);
+		if (font) {
+			EdSetFont(d->ed, SettingsFontNumber(), gPrefs.size);
+			TouchAll(d);
+			Resized(d);
+		}
+		UpdateStatus(d, true);
 	}
 }
 
@@ -878,13 +916,16 @@ void DocUndo(Doc *d, Boolean redo)
 	UndoApply a;
 
 	SetPort(d->w);
-	if (!undo_step(&d->undo, redo, &a))
-		return;
-	if (!EdReplace(d->ed, a.pos, a.pos + a.removeLen, a.insert, a.insertLen)) {
-		SysBeep(10);
-		return;
-	}
-	Touch(d, a.pos, a.pos + a.removeLen, a.insertLen);
+	do {
+		/* a group (a vi change) undoes as one */
+		if (!undo_step(&d->undo, redo, &a))
+			return;
+		if (!EdReplace(d->ed, a.pos, a.pos + a.removeLen, a.insert, a.insertLen)) {
+			SysBeep(10);
+			return;
+		}
+		Touch(d, a.pos, a.pos + a.removeLen, a.insertLen);
+	} while (a.more);
 	EdSetSelection(d->ed, a.selStart, a.selEnd);
 	EdShowSelection(d->ed);
 	SyncScrollBar(d);
@@ -1018,9 +1059,164 @@ void DocClick(Doc *d, EventRecord *e)
 	ViewRect(d, &v);
 	if (PtInRect(p, &v)) {
 		EdClick(d->ed, p, (e->modifiers & shiftKey) != 0);
+		ViClicked(d);
 		SyncScrollBar(d);
 		UpdateStatus(d, false);
 	}
+}
+
+/* ---- vi ---- */
+
+static void ViUnlock(Doc *d)
+{
+	if (d->viText != NULL) {
+		EdUnlockText(d->ed);
+		d->viText = NULL;
+	}
+}
+
+static const char *ViText(void *ctx, long *n)
+{
+	Doc *d = (Doc *) ctx;
+
+	if (d->viText == NULL)
+		d->viText = EdLockText(d->ed);
+	*n = EdLength(d->ed);
+	return d->viText;
+}
+
+static void ViGetSel(void *ctx, long *s, long *e)
+{
+	EdGetSelection(((Doc *) ctx)->ed, s, e);
+}
+
+static void ViSetSel(void *ctx, long s, long e)
+{
+	EdSetSelection(((Doc *) ctx)->ed, s, e);
+}
+
+static int ViReplace(void *ctx, int kind, long s, long e, const char *ins, long len)
+{
+	Doc *d = (Doc *) ctx;
+	char buf[256];
+
+	/* TextEdit grows the text: it can't be locked, and ins may be in it */
+	if (ins >= d->viText && d->viText != NULL && ins < d->viText + EdLength(d->ed)) {
+		if (len > (long) sizeof(buf))
+			return 0;
+		memcpy(buf, ins, (size_t) len);
+		ins = buf;
+	}
+	ViUnlock(d);
+	return DocReplace(d, kind == VI_TYPE ? kUndoTyping : kind == VI_DELETE ? kUndoDelete : kUndoChange,
+		s, e, ins, len);
+}
+
+static long ViVertical(void *ctx, long pos, int lines, long *goal)
+{
+	return EdVertical(((Doc *) ctx)->ed, pos, lines, goal);
+}
+
+static void ViUndo(void *ctx, int redo)
+{
+	Doc *d = (Doc *) ctx;
+
+	ViUnlock(d);
+	DocUndo(d, (Boolean) redo);
+}
+
+static void ViGroup(void *ctx, int begin)
+{
+	undo_group(&((Doc *) ctx)->undo, begin);
+}
+
+static void ViFind(void *ctx, int how)
+{
+	Doc *d = (Doc *) ctx;
+
+	ViUnlock(d);
+	if (how == VI_FIND_ASK)
+		FindDialog(d);
+	else
+		FindAgain(d);
+	SetPort(d->w);
+}
+
+static void ViBeep(void *ctx)
+{
+	(void) ctx;
+	SysBeep(1);
+}
+
+static const ViHost kViHost = {
+	NULL, ViText, ViGetSel, ViSetSel, ViReplace, ViVertical, ViUndo, ViGroup, ViFind, ViBeep
+};
+
+/* A key for vi: 1 when it used it */
+static Boolean ViKey(Doc *d, char c)
+{
+	ViHost h = kViHost;
+	int k = (unsigned char) c;
+	Boolean used;
+
+	if (!d->vi.on)
+		return false;
+	if (k == 0x03)
+		k = VI_RETURN;                  /* Enter */
+	if (d->vi.mode != VI_INSERT) {
+		/* the arrow keys move as h j k l; Home, End and the page keys scroll */
+		switch (k) {
+		case 0x1C: k = 'h'; break;
+		case 0x1D: k = 'l'; break;
+		case 0x1E: k = 'k'; break;
+		case 0x1F: k = 'j'; break;
+		case 0x01: case 0x04: case 0x0B: case 0x0C:
+			return false;
+		}
+	}
+	h.ctx = d;
+	used = vi_key(&d->vi, &h, k, TickCount()) != 0;
+	ViUnlock(d);
+	if (used) {
+		SetPort(d->w);
+		EdShowSelection(d->ed);
+	}
+	return used;
+}
+
+void DocViEscape(Doc *d)
+{
+	SetPort(d->w);
+	if (ViKey(d, VI_ESC)) {
+		SyncScrollBar(d);
+		UpdateStatus(d, false);
+	}
+}
+
+Boolean DocViOn(Doc *d)
+{
+	return d->vi.on;
+}
+
+static void ViClicked(Doc *d)
+{
+	ViHost h = kViHost;
+
+	if (!d->vi.on)
+		return;
+	h.ctx = d;
+	vi_clicked(&d->vi, &h);
+	ViUnlock(d);
+}
+
+static void ViSettings(Doc *d)
+{
+	Boolean was = d->vi.on;
+
+	d->vi.on = gPrefs.vi;
+	d->vi.jk = gPrefs.viJk;
+	if (d->vi.on && !was)
+		ViClicked(d);                   /* start in normal mode */
 }
 
 void DocKey(Doc *d, EventRecord *e)
@@ -1030,6 +1226,11 @@ void DocKey(Doc *d, EventRecord *e)
 
 	SetPort(d->w);
 	ObscureCursor();
+	if (ViKey(d, c)) {
+		SyncScrollBar(d);
+		UpdateStatus(d, false);
+		return;
+	}
 	EdGetSelection(d->ed, &s, &en);
 	len = EdLength(d->ed);
 	if (EdNavigate(d->ed, c, e->modifiers)) {

@@ -17,7 +17,8 @@ enum {
 	kUndoClear,
 	kUndoPostInfo,
 	kUndoInsert,        /* an Insert menu item */
-	kUndoReplace,       /* Find/Replace, vi */
+	kUndoReplace,       /* Find/Replace */
+	kUndoChange,        /* a vi command */
 	kUndoKinds
 };
 

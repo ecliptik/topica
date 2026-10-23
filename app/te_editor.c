@@ -330,6 +330,24 @@ void EdShowSelection(Editor *ed)
 	TESelView(ed->te);
 }
 
+long EdVertical(Editor *ed, long pos, int lines, long *goal)
+{
+	TEPtr t;
+	long line = EdLineOf(ed, pos) + lines;
+	Point p;
+
+	if (*goal < 0)
+		*goal = LoWord(TEGetPoint((short) pos, ed->te));
+	t = *ed->te;
+	if (line > t->nLines - 1)
+		line = t->nLines - 1;
+	if (line < 0)
+		line = 0;
+	p.h = (short) *goal;
+	p.v = (short) (t->destRect.top + line * (long) ed->height + ed->height / 2);
+	return TEGetOffset(p, ed->te);
+}
+
 long EdLineOf(Editor *ed, long offset)
 {
 	TEPtr t = *ed->te;

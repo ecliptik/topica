@@ -40,6 +40,10 @@ void DocGrow(Doc *d, Point where);
 void DocZoom(Doc *d, Point where, short part);
 void DocAdjustCursor(Doc *d, Point where);
 
+/* vi mode: Command-period is Escape */
+Boolean DocViOn(Doc *d);
+void DocViEscape(Doc *d);
+
 /* The Edit menu */
 enum { kEdCut, kEdCopy, kEdPaste, kEdClear, kEdSelectAll };
 void DocEdit(Doc *d, short cmd);

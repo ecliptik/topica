@@ -56,6 +56,7 @@ set(TOPICA_SOURCES
     core/mdpage.c
     core/layout.c
     core/mdhtml.c
+    core/vi.c
 )
 
 add_application(Topica CREATOR "TPCA" ${TOPICA_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/topica.r)

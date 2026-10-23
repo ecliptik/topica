@@ -527,20 +527,20 @@ static void Yank(Vi *v, const Buf *b, long s, long e, int lines)
 {
 	long len = e - s;
 
-	if (len + 1 > v->regCap)
-		len = v->regCap - 1;
+	if (len + 1 > v->reg->cap)
+		len = v->reg->cap - 1;
 	if (len < 0)
 		len = 0;
-	memcpy(v->reg, b->t + s, (size_t) len);
-	if (lines && (len == 0 || !IsEol(v->reg[len - 1])))
-		v->reg[len++] = '\r';       /* the last line, which had no line end */
-	if (lines && len > 0 && IsEol(v->reg[0]) && s > 0 && e >= b->n) {
+	memcpy(v->reg->buf, b->t + s, (size_t) len);
+	if (lines && (len == 0 || !IsEol(v->reg->buf[len - 1])))
+		v->reg->buf[len++] = '\r';  /* the last line, which had no line end */
+	if (lines && len > 0 && IsEol(v->reg->buf[0]) && s > 0 && e >= b->n) {
 		/* the last line, taken with the line end before it */
 		len--;
-		memmove(v->reg, v->reg + 1, (size_t) len);
+		memmove(v->reg->buf, v->reg->buf + 1, (size_t) len);
 	}
-	v->regLen = len;
-	v->regLines = lines;
+	v->reg->len = len;
+	v->reg->lines = lines;
 }
 
 /* The change the user typed is complete: . will repeat it */
@@ -652,7 +652,7 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	char *ins;
 	int ok;
 
-	if (v->regLen == 0) {
+	if (v->reg->len == 0) {
 		Beep(h);
 		return;
 	}
@@ -660,7 +660,7 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	pos = Caret(h);
 	if (count < 1)
 		count = 1;
-	if (v->regLines) {
+	if (v->reg->lines) {
 		if (after) {
 			at = LineEnd(&b, pos);
 			if (at < b.n)
@@ -674,9 +674,9 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	Group(v, h, 1);
 	for (i = 0, ok = 1; ok && i < count; i++) {
 		Load(&b, h);
-		ins = v->reg;
-		len = v->regLen;
-		if (v->regLines && after && at >= b.n && (b.n == 0 || !IsEol(b.t[b.n - 1]))) {
+		ins = v->reg->buf;
+		len = v->reg->len;
+		if (v->reg->lines && after && at >= b.n && (b.n == 0 || !IsEol(b.t[b.n - 1]))) {
 			/* after the last line, which has no line end: give it one */
 			ok = h->replace(h->ctx, VI_EDIT, at, at, "\r", 1);
 			at++;
@@ -685,7 +685,7 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 		} else {
 			ok = h->replace(h->ctx, VI_EDIT, at, at, ins, len);
 		}
-		if (ok && i == 0 && v->regLines)
+		if (ok && i == 0 && v->reg->lines)
 			pos = at;
 		at += len;
 	}
@@ -693,7 +693,7 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	if (!ok)
 		Beep(h);
 	Load(&b, h);
-	pos = v->regLines ? FirstBlank(&b, pos) : Clamp(&b, at - 1);
+	pos = v->reg->lines ? FirstBlank(&b, pos) : Clamp(&b, at - 1);
 	Select(h, pos, pos);
 	Done(v);
 }
@@ -826,25 +826,37 @@ static void EndInsert(Vi *v, const ViHost *h)
 		Done(v);
 }
 
-void vi_init(Vi *v, char *reg, long cap)
+void vi_init(Vi *v, ViReg *reg)
 {
 	memset(v, 0, sizeof(*v));
 	v->mode = VI_NORMAL;
 	v->goal = -1;
 	v->jAt = -1;
 	v->reg = reg;
-	v->regCap = cap;
 }
 
 void vi_clicked(Vi *v, const ViHost *h)
 {
+	long s, e;
+
+	v->goal = -1;
 	if (v->mode == VI_INSERT) {
 		v->insMoved = 1;            /* the insert goes on elsewhere */
 		v->recOk = 0;
-	} else {
-		ToNormal(v, h, Caret(h));
+		return;
 	}
-	v->goal = -1;
+	h->get_sel(h->ctx, &s, &e);
+	if (s == e) {
+		ToNormal(v, h, s);
+		return;
+	}
+	/* a mouse selection is a visual one */
+	v->op = 0;
+	v->pend = 0;
+	v->count = v->opCount = 0;
+	v->mode = VI_VISUAL;
+	v->anchor = s;
+	v->cur = e - 1;
 }
 
 const char *vi_status(const Vi *v)
