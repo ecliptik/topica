@@ -8,7 +8,7 @@ front matter, Markdown, and UTF-8 files a blog can use as they are.
 The name is Aristotle's *Topics*, his book on finding things to say: the
 *topoi*, the "places" a writer goes for material.
 
-> Topica is new and unfinished (0.4). See [TODO.md](TODO.md) for what's
+> Topica is new and unfinished (0.5). See [TODO.md](TODO.md) for what's
 > coming.
 
 ## What it does today
@@ -26,6 +26,11 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   you write; double-click to go to that place in the post.
 - **Print** (⌘P) prints that layout, and **Export HTML** writes the post
   as a web page of its own.
+- **Check Spelling** (⌘;) with suggestions, Skip All and Learn, leaving
+  code, addresses, Liquid and HTML alone. The dictionary is about 89,000
+  American words from [SCOWL](http://wordlist.aspell.net/).
+- **vi keys**, if you want them (Preferences): normal, insert and visual
+  modes, counts, operators and text objects, undo, and `.` to repeat.
 - **Undo and Redo** many steps (⌘Z, ⌘⇧Z): Typing, Delete, Cut, Paste,
   Clear, Post Info and Insert Image each undo as one step.
 - **Post Info** (⌘E) edits the front matter's title, description,
@@ -78,20 +83,24 @@ make -C tests test               # the portable core's tests, on the host
 ```
 
 Each build makes a MacBinary `.bin`, an 800K `.dsk` floppy image and a
-BinHex `.hqx`. `RETRO68` points at the toolchain. [docs/TESTING.md](docs/TESTING.md)
+BinHex `.hqx`. The first build downloads SCOWL's word lists (and checks
+them) to make the spelling dictionary, Topica Dictionary, which goes on the
+floppy beside Topica with SCOWL's copyright notice. `RETRO68` points at the toolchain. [docs/TESTING.md](docs/TESTING.md)
 covers the emulators.
 
 ## Layout
 
 - `core/`: portable C89 with no Toolbox calls: UTF-8 and Mac Roman, front
   matter, undo, post names and word counts, a Markdown scanner for styling
-  and headings, the post as page blocks, line breaking, and HTML. Tested
-  on the host.
+  and headings, the post as page blocks, line breaking, HTML, vi, and the
+  dictionary and spelling. Tested on the host.
 - `app/`: the Macintosh application. Every edit goes through one call
   (`EdReplace` in `app/editor.h`), with TextEdit behind it today.
 - `resources/`: menus, dialogs, alerts and icons (Rez).
-- `scripts/`, `tests/`, `tools/`: building, emulators, tests, icons.
+- `scripts/`, `tests/`, `tools/`: building, emulators, tests, icons, the
+  dictionary maker.
 
 ## Licence
 
-ISC. See [LICENSE](LICENSE).
+ISC. See [LICENSE](LICENSE). The dictionary is made from SCOWL, Copyright
+2000-2018 Kevin Atkinson and others, under its own permissive licence.

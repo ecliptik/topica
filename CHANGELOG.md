@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 (unreleased)
+
+vi keys and spelling.
+
+- vi keys (Edit › Preferences): normal, insert and visual modes, with
+  counts, motions, operators (d c y), text objects (iw, ip, i", i( ...),
+  x D C s S J r ~ p P, undo and redo, and . to repeat. j and k move by the
+  lines on the screen. Escape is the Esc key or ⌘.; jk can be too. The
+  status line shows INSERT and VISUAL. A vi change undoes as one step.
+- Edit › Check Spelling (⌘;): from the caret, the words the dictionary
+  doesn't know, in their line, with suggestions; Replace, Skip, Skip All,
+  and Learn, which keeps the word in Topica Words. Code, addresses, Liquid,
+  HTML, front matter (but the title and description), acronyms and words
+  with digits are left alone.
+- Topica Dictionary: about 89,000 American words from SCOWL, in the same
+  folder as Topica. Topica Lite reads it a block at a time.
+
 ## 0.4.0 (unreleased)
 
 The web preview.

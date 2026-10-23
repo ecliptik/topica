@@ -22,6 +22,12 @@ Post > Show Preview (Command-R) shows the post laid out like its web page, with 
 Printing and HTML
 File > Print (Command-P) prints the post as the preview shows it. File > Export HTML saves it as a web page you can open in a browser.
 
+Spelling
+Edit > Check Spelling (Command-;) goes through the post from the caret and stops at each word it doesn't know, with suggestions. Learn keeps a word in Topica Words, in the Preferences folder (System 7) or the System Folder. The dictionary is the file Topica Dictionary, in the same folder as Topica; it is made from SCOWL, by Kevin Atkinson and others (see Dictionary Licence).
+
+vi keys
+Edit > Preferences can turn on vi keys: normal, insert and visual modes, as in vi. Escape is the Esc key, or Command-period on keyboards without one; "jk leaves insert mode" makes typing j then k quickly do it too. The status line shows INSERT and VISUAL.
+
 Undo and Redo
 Command-Z undoes, many steps back. Command-Shift-Z redoes.
 

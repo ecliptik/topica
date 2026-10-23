@@ -39,12 +39,14 @@
 
 ## vi mode and spelling
 
-- [ ] vi's normal, insert and visual modes over the editor interface;
+- [x] vi's normal, insert and visual modes over the editor interface;
       Escape is ⌘. or the Esc key on keyboards that have one
-- [ ] Check Spelling with a dictionary on disk (front-coded, indexed),
+- [x] Check Spelling with a dictionary on disk (front-coded, indexed),
       suggestions, a user dictionary; code, URLs and front matter keys
       skipped
 - [ ] Word Services on System 7
+- [ ] Faster suggestions on a 68000 (a second for most words)
+- [ ] vi: :w and :q, registers, marks, a block cursor in normal mode
 
 ## Publish
 

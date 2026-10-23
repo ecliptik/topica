@@ -10,6 +10,12 @@ They build `core/` as C89 with `-Werror`, AddressSanitizer and UBSan, and
 check the UTF-8 round trip, front matter reading and writing, undo and
 redo, post names, and the Markdown scanner (with random text, for ASan).
 
+`make -C tests vi-oracle` runs the vi cases through vim itself and through
+`core/vi.c`, and compares the text and the cursor (it needs vim). The host
+tests keep vim's answers. `tests/spell_run "build/Topica Dictionary"
+post.md` checks a post's spelling on the host, as Topica Lite reads the
+dictionary.
+
 ## Emulators
 
 The scripts expect a classic Mac emulator set-up in `~/emulators` (set
@@ -59,6 +65,12 @@ file beside the application.
 - Print and Page Setup: on System 7 the job reaches PrintMonitor. In Snow
   the ImageWriter driver prints the page, then waits for good in
   `PrPicFile` for a printer that isn't there: stop Snow.
+- vi keys: turn them on in Preferences; motions, dd, cw and typing,
+  ⌘. (or Esc), u undoing a change in one step, ., V and d, p; the status
+  line's INSERT.
+- Check Spelling on "Spelling": the planted slips and nothing else,
+  Replace, Skip All, Learn (Topica Words), with the dictionary in memory
+  (Topica) and read a block at a time (Topica Lite).
 - Opening a UTF-8 post with characters Mac Roman lacks, and saving it.
 - Saving to an AppleShare volume, and a full or locked disk.
 - Topica Lite on a 512K Mac.

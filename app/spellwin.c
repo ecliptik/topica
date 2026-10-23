@@ -247,8 +247,13 @@ static Boolean Load(void)
 	}
 	commonLen = (long) Get32(head + 8);
 	mainLen = (long) Get32(head + 12);
-	/* all the words in memory when there's plenty of it; else a block at a time */
+	/* all the words in memory when there's plenty of it; else a block at a
+	   time, as Topica Lite always does */
+#ifdef TOPICA_LITE
+	whole = false;
+#else
 	whole = MaxBlock() > mainLen + 96 * 1024L;
+#endif
 	if (!OpenSection(ref, 16, commonLen, &gCommon, true) || !OpenSection(ref, 16 + commonLen, mainLen, &gMain, whole)) {
 		FileClose(ref);
 		InitCursor();
