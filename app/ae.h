@@ -12,7 +12,8 @@
 
 /* 1 when the Apple Event Manager is there and the handlers are in.
    quit returns 0 when the writer cancelled. */
-Boolean AppleEventsInit(Boolean (*quit)(void), void (*openApp)(void), void (*openFile)(const FileRef *f));
+Boolean AppleEventsInit(Boolean (*quit)(void), void (*openApp)(void), void (*openFile)(const FileRef *f),
+		void (*printFile)(const FileRef *f));
 void AppleEventsHandle(EventRecord *e);
 
 #endif

@@ -53,6 +53,29 @@ Boolean HasColorQD(void)
 	return has;
 }
 
+Boolean ColorScreen(void)
+{
+	static short color = -1;
+
+	if (color < 0) {
+		color = 0;
+		if (HasColorQD()) {
+			GDHandle gd = GetMainDevice();
+			color = gd != NULL && (**(**gd).gdPMap).pixelSize >= 4;
+		}
+	}
+	return color;
+}
+
+Boolean HasGWorlds(void)
+{
+	static short has = -1;
+
+	if (has < 0)
+		has = HasColorQD() && TrapExists(0xAB1D, kToolboxTrapType);   /* _QDExtensions */
+	return has;
+}
+
 Boolean HasWaitNextEvent(void)
 {
 	static short has = -1;

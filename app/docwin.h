@@ -65,6 +65,12 @@ void DocIdleAll(void);
 
 /* For the Post menu's dialogs */
 Editor *DocEditor(Doc *d);
+WindowPtr DocWindow(Doc *d);
+/* Goes up with every change to the text: the preview compares it */
+unsigned long DocChanges(Doc *d);
+/* The text changed since the last call: [*from, *to) now, and what
+   followed it moved by *delta. 0 when nothing did. */
+Boolean DocTakeEdits(Doc *d, long *from, long *to, long *delta);
 /* Replaces [start, end) with text as one undoable change; 0 (after an
    alert) when the post would be too long */
 Boolean DocReplace(Doc *d, int kind, long start, long end, const char *text, long len);

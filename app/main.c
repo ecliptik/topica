@@ -24,15 +24,18 @@
 #include "findwin.h"
 #include "headings.h"
 #include "postinfo.h"
+#include "preview.h"
+#include "print.h"
 #include "settings.h"
 #include "util.h"
 
 enum { kAppleMenu = 128, kFileMenu = 129, kEditMenu = 130, kPostMenu = 131 };
 enum { kAboutItem = 1 };
-enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kRevertItem = 7, kQuitItem = 9 };
+enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kExportItem = 7, kRevertItem = 8,
+	kPageSetupItem = 10, kPrintItem = 11, kQuitItem = 13 };
 enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
 	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kPrefsItem = 15 };
-enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6 };
+enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6, kPreviewItem = 7 };
 /* osEvt's suspend/resume (Inside Macintosh VI) */
 enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
 
@@ -82,21 +85,33 @@ static Boolean IsDA(WindowPtr w)
 	return w != NULL && ((WindowPeek) w)->windowKind < 0;
 }
 
+/* The post the File and Post menus act on: the front one, or the one the
+   preview shows when it's in front */
+static Doc *Target(void)
+{
+	Doc *d = DocFront();
+
+	return d != NULL ? d : PreviewIsFront() ? PreviewDoc() : NULL;
+}
+
 /* What the menus offer depends on the front window */
 static void AdjustMenus(void)
 {
 	WindowPtr front = FrontWindow();
-	Doc *d = DocFront();
+	Doc *d = DocFront(), *target = Target();
 	Boolean da = IsDA(front);
 	MenuHandle file = GetMenuHandle(kFileMenu), edit = GetMenuHandle(kEditMenu), post = GetMenuHandle(kPostMenu);
 	Boolean sel = d != NULL && DocHasSelection(d);
 
 	Enable(file, kNewItem, DocCount() < DocMaxCount());
 	Enable(file, kOpenItem, DocCount() < DocMaxCount());
-	Enable(file, kCloseItem, d != NULL || da);
+	Enable(file, kCloseItem, d != NULL || da || PreviewIsFront());
 	Enable(file, kSaveItem, d != NULL && (DocIsDirty(d) || !DocHasFile(d)));
 	Enable(file, kSaveAsItem, d != NULL);
+	Enable(file, kExportItem, target != NULL);
 	Enable(file, kRevertItem, d != NULL && DocHasFile(d) && DocIsDirty(d));
+	Enable(file, kPageSetupItem, true);
+	Enable(file, kPrintItem, target != NULL);
 	if (d != NULL) {
 		SetUndoItem(edit, kUndoItem, DocUndoKind(d, false), false);
 		SetUndoItem(edit, kRedoItem, DocUndoKind(d, true), true);
@@ -113,10 +128,15 @@ static void AdjustMenus(void)
 	Enable(edit, kFindItem, d != NULL);
 	Enable(edit, kFindAgainItem, d != NULL && FindHasPattern());
 	Enable(edit, kReplaceAgainItem, d != NULL && FindHasPattern());
+	Enable(post, kPostInfoItem, d != NULL);
+	Enable(post, kInsertImageItem, d != NULL);
+	Enable(post, kInsertLinkItem, d != NULL);
 	Enable(post, kFormattingItem, d != NULL && DocCanStyle(d));
 	SetMenuItemText(post, kFormattingItem, gPrefs.format ? "\pHide Formatting" : "\pShow Formatting");
+	SetMenuItemText(post, kPreviewItem, PreviewIsFront() ? "\pHide Preview" : "\pShow Preview");
+	Enable(post, kPreviewItem, target != NULL);
 	/* whole menus */
-	if (EnableMenu(post, d != NULL) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
+	if (EnableMenu(post, target != NULL) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
 		DrawMenuBar();
 }
 
@@ -149,6 +169,8 @@ static void DoClose(void)
 
 	if (IsDA(w))
 		CloseDeskAcc(((WindowPeek) w)->windowKind);
+	else if (IsPreview(w))
+		PreviewClose();
 	else if (d != NULL)
 		(void) DocClose(d, false);
 }
@@ -188,7 +210,10 @@ static void DoMenu(long choice)
 		case kCloseItem: DoClose(); break;
 		case kSaveItem: if (d != NULL) (void) DocSave(d); break;
 		case kSaveAsItem: if (d != NULL) (void) DocSaveAs(d); break;
+		case kExportItem: if (Target() != NULL) ExportHTML(Target()); break;
 		case kRevertItem: if (d != NULL) DocRevert(d); break;
+		case kPageSetupItem: PrintPageSetup(); break;
+		case kPrintItem: if (Target() != NULL) PrintDoc(Target()); break;
 		case kQuitItem: (void) DoQuit(); break;
 		}
 		break;
@@ -220,6 +245,13 @@ static void DoMenu(long choice)
 		break;
 	}
 	case kPostMenu:
+		if (item == kPreviewItem) {
+			if (PreviewIsFront())
+				PreviewClose();
+			else if (d != NULL)
+				PreviewShow(d);
+			break;
+		}
 		if (d == NULL)
 			break;
 		DocSealUndo(d);
@@ -266,21 +298,31 @@ static void DoMouseDown(EventRecord *e)
 	case inGrow:
 		if (d != NULL)
 			DocGrow(d, e->where);
+		else if (IsPreview(w))
+			PreviewGrow(e->where);
 		break;
 	case inZoomIn:
 	case inZoomOut:
 		if (d != NULL)
 			DocZoom(d, e->where, part);
+		else if (IsPreview(w))
+			PreviewZoom(e->where, part);
 		break;
 	case inGoAway:
-		if (d != NULL && TrackGoAway(w, e->where))
+		if (!TrackGoAway(w, e->where))
+			break;
+		if (d != NULL)
 			(void) DocClose(d, false);
+		else if (IsPreview(w))
+			PreviewClose();
 		break;
 	case inContent:
 		if (w != FrontWindow())
 			SelectWindow(w);
 		else if (d != NULL)
 			DocClick(d, e);
+		else if (IsPreview(w))
+			PreviewClick(e);
 		break;
 	}
 }
@@ -304,6 +346,8 @@ static void DoKey(EventRecord *e)
 	}
 	if (d != NULL)
 		DocKey(d, e);
+	else if (PreviewIsFront())
+		PreviewKey(e);
 }
 
 static void Update(WindowPtr w)
@@ -312,10 +356,25 @@ static void Update(WindowPtr w)
 
 	if (d != NULL) {
 		DocUpdate(d);
+	} else if (IsPreview(w)) {
+		PreviewUpdate();
 	} else {
 		BeginUpdate(w);
 		EndUpdate(w);
 	}
+}
+
+/* Prints a post, closing it after unless it was already open */
+static void PrintFileEvent(const FileRef *f)
+{
+	short before = DocCount();
+	Doc *d = DocOpen(f);
+
+	if (d == NULL)
+		return;
+	PrintDoc(d);
+	if (DocCount() > before)
+		(void) DocClose(d, false);
 }
 
 /* The files the Finder asked us to open (System 6, and System 7 without
@@ -333,7 +392,9 @@ static void OpenFinderFiles(void)
 		memset(&f, 0, sizeof(f));       /* dirID 0: vRefNum is a working directory */
 		f.vRefNum = af.vRefNum;
 		memcpy(f.name, af.fName, (size_t) (af.fName[0] > 63 ? 63 : af.fName[0]) + 1);
-		if (DocOpen(&f) != NULL)
+		if (message == appPrint)
+			PrintFileEvent(&f);
+		else if (DocOpen(&f) != NULL)
 			opened = true;
 		ClrAppFiles(i);
 	}
@@ -341,7 +402,7 @@ static void OpenFinderFiles(void)
 	if (!opened && message == appOpen && !gHaveAE && DocCount() == 0)
 		(void) DocNew(true);
 	if (message == appPrint)
-		gQuit = true;                   /* nothing to print with yet */
+		gQuit = true;                   /* the Finder's Print quits when done */
 }
 
 static void OpenAppEvent(void)
@@ -374,7 +435,7 @@ static void Setup(void)
 	DrawMenuBar();
 	gUpdateHook = Update;
 	SettingsLoad();
-	gHaveAE = AppleEventsInit(DoQuit, OpenAppEvent, OpenFileEvent);
+	gHaveAE = AppleEventsInit(DoQuit, OpenAppEvent, OpenFileEvent, PrintFileEvent);
 }
 
 /* Posts a crash left unsaved come back first, before anything else opens */
@@ -424,6 +485,10 @@ int main(void)
 				Doc *d = DocFromWindow((WindowPtr) e.message);
 				if (d != NULL)
 					DocActivate(d, (e.modifiers & activeFlag) != 0);
+				else if (IsPreview((WindowPtr) e.message))
+					PreviewActivate((e.modifiers & activeFlag) != 0);
+				if (e.modifiers & activeFlag)
+					AdjustMenus();      /* whole menus dim or not with the window */
 				break;
 			}
 			case kHighLevelEvent:
@@ -434,11 +499,14 @@ int main(void)
 					gInBackground = (e.message & kResumeFlag) == 0;
 					if (front != NULL)
 						DocActivate(front, !gInBackground);
+					else if (PreviewIsFront())
+						PreviewActivate(!gInBackground);
 				}
 				break;
 			}
 		}
 		DocIdleAll();
+		PreviewIdle();
 		front = DocFront();
 		if (front != NULL && !gInBackground) {
 			DocIdle(front);

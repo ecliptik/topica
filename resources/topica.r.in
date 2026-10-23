@@ -21,7 +21,7 @@ resource 'MENU' (128, "Apple") {
 };
 
 resource 'MENU' (129, "File") {
-	129, textMenuProc, 0x17B, enabled, "File",
+	129, textMenuProc, 0x16FB, enabled, "File",
 	{
 		"New Post", noIcon, "N", noMark, plain;
 		"Open\311", noIcon, "O", noMark, plain;
@@ -29,7 +29,11 @@ resource 'MENU' (129, "File") {
 		"Close", noIcon, "W", noMark, plain;
 		"Save", noIcon, "S", noMark, plain;
 		"Save As\311", noIcon, noKey, noMark, plain;
+		"Export HTML\311", noIcon, noKey, noMark, plain;
 		"Revert", noIcon, noKey, noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Page Setup\311", noIcon, noKey, noMark, plain;
+		"Print\311", noIcon, "P", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Quit", noIcon, "Q", noMark, plain
 	}
@@ -58,14 +62,15 @@ resource 'MENU' (130, "Edit") {
 };
 
 resource 'MENU' (131, "Post") {
-	131, textMenuProc, 0x2D, enabled, "Post",
+	131, textMenuProc, 0x6D, enabled, "Post",
 	{
 		"Post Info\311", noIcon, "E", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Insert Image\311", noIcon, noKey, noMark, plain;
 		"Insert Link\311", noIcon, "K", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
-		"Hide Formatting", noIcon, noKey, noMark, plain
+		"Hide Formatting", noIcon, noKey, noMark, plain;
+		"Show Preview", noIcon, "R", noMark, plain
 	}
 };
 

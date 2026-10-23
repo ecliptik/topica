@@ -36,6 +36,8 @@ void CStr(char *out, const unsigned char *p);
 /* System facts, read once */
 Boolean HasWaitNextEvent(void);
 Boolean HasColorQD(void);
+Boolean ColorScreen(void);          /* the main screen shows 16 colors or more */
+Boolean HasGWorlds(void);           /* 32-bit QuickDraw's offscreen worlds */
 Boolean IsSystem7(void);
 
 /* A modal dialog from a DLOG: a plain box on System 6, movable on 7 */

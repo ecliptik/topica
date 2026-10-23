@@ -49,22 +49,6 @@ static Boolean HasStyledTE(void)
 	return NGetTrapAddress(_TEStyleNew, kToolboxTrapType) != NGetTrapAddress(_Unimplemented, kToolboxTrapType);
 }
 
-/* Colors only on a color screen; each is dark enough to come out black if
-   the screen goes to black and white */
-static Boolean ColorScreen(void)
-{
-	static short color = -1;
-
-	if (color < 0) {
-		color = 0;
-		if (HasColorQD()) {
-			GDHandle gd = GetMainDevice();
-			color = gd != NULL && (**(**gd).gdPMap).pixelSize >= 4;
-		}
-	}
-	return color;
-}
-
 /* Fixes the line height from the base font: TextEdit's own fields for plain
    TextEdit, and -1 there would mean a height per line for styled */
 static void Metrics(Editor *ed)
@@ -408,6 +392,8 @@ Handle EdClipboard(long *len)
 
 /* ---- styles ---- */
 
+/* Colors only on a color screen (util's ColorScreen); each is dark enough
+   to come out black if the screen goes to black and white */
 static const RGBColor kBlack = { 0, 0, 0 };
 static const RGBColor kMarkColor = { 0x6000, 0x6000, 0x6000 };
 static const RGBColor kCodeColor = { 0x0000, 0x6000, 0x0000 };

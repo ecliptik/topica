@@ -42,6 +42,9 @@ set(TOPICA_SOURCES
     app/findwin.c
     app/settings.c
     app/headings.c
+    app/page.c
+    app/preview.c
+    app/print.c
     core/textconv.c
     core/frontmatter.c
     core/undo.c

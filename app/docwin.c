@@ -27,6 +27,7 @@
 #include "../core/undo.h"
 #include "docwin.h"
 #include "postinfo.h"
+#include "preview.h"
 #include "settings.h"
 #include "util.h"
 
@@ -67,6 +68,9 @@ struct Doc {
 	long styleFrom, styleTo;
 	unsigned long styleAt;              /* not before this tick */
 	unsigned long blocks;               /* md_blocks when last restyled */
+	unsigned long changes;              /* counts every change, for the preview */
+	Boolean editDue;                    /* [editFrom, editTo) changed since the preview looked, */
+	long editFrom, editTo, editDelta;   /* moving what follows by editDelta */
 };
 
 static void Resized(Doc *d);
@@ -104,6 +108,28 @@ Doc *DocFromWindow(WindowPtr w)
 Doc *DocFront(void)
 {
 	return DocFromWindow(FrontWindow());
+}
+
+WindowPtr DocWindow(Doc *d)
+{
+	return d->w;
+}
+
+unsigned long DocChanges(Doc *d)
+{
+	return d->changes;
+}
+
+Boolean DocTakeEdits(Doc *d, long *from, long *to, long *delta)
+{
+	Boolean due = d->editDue;
+
+	*from = d->editFrom;
+	*to = d->editTo;
+	*delta = d->editDelta;
+	d->editDue = false;
+	d->editDelta = 0;
+	return due;
 }
 
 Editor *DocEditor(Doc *d)
@@ -218,6 +244,7 @@ static void UpdateStatus(Doc *d, Boolean force)
 /* After any change: the scroll bar, and the words soon */
 static void Changed(Doc *d)
 {
+	d->changes++;
 	d->dirty = true;
 	d->recDue = true;
 	d->changedAt = TickCount();
@@ -319,24 +346,35 @@ nomem:
 
 /* ---- styles ---- */
 
+/* Adds an edit (at start, oldEnd - start characters became newLen) to a
+   range of changed text, [*from, *to) in the text as it was before it;
+   due: there was a range already */
+static void Merge(Boolean due, long *from, long *to, long start, long oldEnd, long newLen)
+{
+	long delta = newLen - (oldEnd - start), f = start, t = start + newLen, a, b;
+
+	if (due) {
+		a = *from >= oldEnd ? *from + delta : *from > start ? start : *from;
+		b = *to >= oldEnd ? *to + delta : *to > start ? start : *to;
+		if (a < f)
+			f = a;
+		if (b > t)
+			t = b;
+	}
+	*from = f;
+	*to = t;
+}
+
 /* An edit replaced [start, oldEnd) with newLen characters: restyle there,
-   along with what was waiting */
+   along with what was waiting, and tell the preview */
 static void Touch(Doc *d, long start, long oldEnd, long newLen)
 {
-	long delta = newLen - (oldEnd - start), from = start, to = start + newLen, f, t;
-
-	if (d->styleDue) {
-		f = d->styleFrom >= oldEnd ? d->styleFrom + delta : d->styleFrom > start ? start : d->styleFrom;
-		t = d->styleTo >= oldEnd ? d->styleTo + delta : d->styleTo > start ? start : d->styleTo;
-		if (f < from)
-			from = f;
-		if (t > to)
-			to = t;
-	}
-	d->styleFrom = from;
-	d->styleTo = to;
+	Merge(d->styleDue, &d->styleFrom, &d->styleTo, start, oldEnd, newLen);
 	d->styleDue = true;
 	d->styleAt = TickCount() + kStylePause;
+	Merge(d->editDue, &d->editFrom, &d->editTo, start, oldEnd, newLen);
+	d->editDelta += newLen - (oldEnd - start);
+	d->editDue = true;
 }
 
 static void TouchAll(Doc *d)
@@ -614,6 +652,11 @@ static Boolean Load(Doc *d, const FileRef *f)
 	DisposePtr(text);
 	undo_clear(&d->undo);
 	d->dirty = false;
+	d->changes++;
+	d->editDue = true;                  /* all of it, for the preview */
+	d->editFrom = 0;
+	d->editTo = n;
+	d->editDelta = 0;
 	InitCursor();
 	return true;
 }
@@ -771,6 +814,7 @@ Boolean DocClose(Doc *d, Boolean quitting)
 		}
 	}
 	DiscardRecovery(d);
+	PreviewForget(d);
 	for (i = 0; i < TOPICA_MAX_DOCS; i++)
 		if (gDocs[i] == d)
 			gDocs[i] = NULL;
