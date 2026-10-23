@@ -23,8 +23,9 @@ int find_is_match(const char *text, long n, const char *pat, long plen, long at,
 long find_replace_all(const char *text, long n, const char *pat, long plen, const char *rep, long rlen,
 	int flags, char *out, long cap, long *count);
 
-/* Mac Roman lowercase, and whether a character is part of a word */
+/* Mac Roman lowercase and capitals, and whether a character is part of a word */
 unsigned char find_lower(unsigned char c);
+unsigned char find_upper(unsigned char c);
 int find_is_word_char(unsigned char c);
 
 #endif

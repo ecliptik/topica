@@ -20,6 +20,7 @@ screenshots/
 tests/test_core
 tests/vi_run
 tests/__pycache__/
+tests/spell_run
 tests/*.dSYM
 __pycache__/
 

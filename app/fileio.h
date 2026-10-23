@@ -45,6 +45,16 @@ OSErr FilePrefsFolder(const char *name, FileRef *f);
 /* A folder inside the System Folder (made if missing), as a FileRef
    whose name is empty: for recovery copies */
 OSErr FileSystemSubfolder(const char *folder, FileRef *dir);
+/* The application's folder: remembered at launch, before Standard File
+   can change the default one */
+void FileRememberAppFolder(void);
+void FileBesideApp(const char *name, FileRef *f);
+
+/* A file read a part at a time (the spelling dictionary) */
+OSErr FileOpenRead(const FileRef *f, short *ref);
+OSErr FileReadAt(short ref, long offset, void *buf, long len, long *got);
+void FileClose(short ref);
+
 /* The index-th file (1-based) in a folder; fnfErr past the last */
 OSErr FileIndexed(const FileRef *dir, short index, FileRef *f);
 

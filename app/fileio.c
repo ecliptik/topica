@@ -253,6 +253,39 @@ OSErr FileRead(const FileRef *f, Ptr *data, long *len)
 	return err != noErr ? err : cerr;
 }
 
+static FileRef gAppFolder;
+
+void FileRememberAppFolder(void)
+{
+	memset(&gAppFolder, 0, sizeof(gAppFolder));
+	(void) GetVol(NULL, &gAppFolder.vRefNum);   /* at launch: the application's folder */
+}
+
+void FileBesideApp(const char *name, FileRef *f)
+{
+	FileRefSibling(&gAppFolder, name, f);
+}
+
+OSErr FileOpenRead(const FileRef *f, short *ref)
+{
+	return OpenFile(f, fsRdPerm, ref);
+}
+
+OSErr FileReadAt(short ref, long offset, void *buf, long len, long *got)
+{
+	OSErr err = SetFPos(ref, fsFromStart, offset);
+
+	*got = len;
+	if (err == noErr)
+		err = FSRead(ref, got, buf);
+	return err == eofErr ? noErr : err;
+}
+
+void FileClose(short ref)
+{
+	(void) FSClose(ref);
+}
+
 static OSErr WriteNew(const FileRef *f, const char *data, long len, OSType type, OSType creator)
 {
 	short ref;

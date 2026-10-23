@@ -54,6 +54,14 @@ snow)
     hdel ":Formatting" 2>/dev/null || true
     hcopy -r "$fixtures/formatting.md" ":Formatting"
     hattrib -t TEXT -c TPCA ":Formatting"
+    hdel ":Spelling" 2>/dev/null || true
+    hcopy -r "$fixtures/spelling.md" ":Spelling"
+    hattrib -t TEXT -c TPCA ":Spelling"
+    if [ -f "$here/build/Topica Dictionary" ]; then
+        hdel ":Topica Dictionary" 2>/dev/null || true
+        hcopy -r "$here/build/Topica Dictionary" ":Topica Dictionary"
+        hattrib -t TDIC -c TPCA ":Topica Dictionary"
+    fi
     humount >/dev/null
     echo "deploy: Topica ($preset) is on $img"
     if [ $launch = 1 ]; then
@@ -66,6 +74,8 @@ basilisk)
     python3 "$EMU/basilisk/macbin_to_extfs.py" "$bin" "$EMU/unix/Topica" Topica >/dev/null
     cp "$fixtures/round-trip.md" "$EMU/unix/Topica/round-trip.md"
     cp "$fixtures/formatting.md" "$EMU/unix/Topica/formatting.md"
+    cp "$fixtures/spelling.md" "$EMU/unix/Topica/spelling.md"
+    [ -f "$here/build/Topica Dictionary" ] && cp "$here/build/Topica Dictionary" "$EMU/unix/Topica/Topica Dictionary"
     echo "deploy: Topica ($preset) is in $EMU/unix/Topica (the Unix disk in Basilisk II)"
     if [ $launch = 1 ]; then
         prefs="$here/diskimages/basilisk_prefs"

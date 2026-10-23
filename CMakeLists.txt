@@ -45,6 +45,7 @@ set(TOPICA_SOURCES
     app/page.c
     app/preview.c
     app/print.c
+    app/spellwin.c
     core/textconv.c
     core/frontmatter.c
     core/undo.c
@@ -57,6 +58,8 @@ set(TOPICA_SOURCES
     core/layout.c
     core/mdhtml.c
     core/vi.c
+    core/dict.c
+    core/spell.c
 )
 
 add_application(Topica CREATOR "TPCA" ${TOPICA_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/topica.r)

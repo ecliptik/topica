@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../core/dict.h"
 #include "../core/find.h"
 #include "../core/frontmatter.h"
 #include "../core/layout.h"
@@ -11,6 +12,7 @@
 #include "../core/mdscan.h"
 #include "../core/prefs.h"
 #include "../core/recovery.h"
+#include "../core/spell.h"
 #include "../core/post.h"
 #include "../core/textconv.h"
 #include "../core/undo.h"
@@ -1461,6 +1463,224 @@ static void TestVi(void)
 	}
 }
 
+/* ---- dict and spell ---- */
+
+/* A section, as tools/mkdict.py makes one, from sorted words */
+static long MakeDict(const char *const *words, int count, int block, unsigned char *out)
+{
+	unsigned char index[2048], data[8192];
+	long ilen = 0, dlen = 0, bstart = 0, n;
+	const char *prev = "";
+	int i, nb = 0, inblock = 0;
+
+	for (i = 0; i < count; i++) {
+		const char *w = words[i];
+		int shared = 0, len = (int) strlen(w);
+		if (inblock == 0) {
+			bstart = dlen;
+			prev = "";
+			index[ilen] = (unsigned char) (bstart >> 24);
+			index[ilen + 1] = (unsigned char) (bstart >> 16);
+			index[ilen + 2] = (unsigned char) (bstart >> 8);
+			index[ilen + 3] = (unsigned char) bstart;
+			index[ilen + 6] = (unsigned char) len;
+			memcpy(index + ilen + 7, w, (size_t) len);
+		}
+		while (prev[shared] && w[shared] && prev[shared] == w[shared])
+			shared++;
+		data[dlen++] = (unsigned char) shared;
+		data[dlen++] = (unsigned char) (len - shared);
+		memcpy(data + dlen, w + shared, (size_t) (len - shared));
+		dlen += len - shared;
+		prev = w;
+		inblock++;
+		if (dlen - bstart >= block || i == count - 1) {
+			index[ilen + 4] = (unsigned char) ((dlen - bstart) >> 8);
+			index[ilen + 5] = (unsigned char) (dlen - bstart);
+			ilen += 7 + index[ilen + 6];
+			nb++;
+			inblock = 0;
+		}
+	}
+	memcpy(out, "TPDC\0\1", 6);
+	out[6] = (unsigned char) (nb >> 8);
+	out[7] = (unsigned char) nb;
+	n = count;
+	out[8] = 0; out[9] = 0; out[10] = (unsigned char) (n >> 8); out[11] = (unsigned char) n;
+	out[12] = 0; out[13] = 0; out[14] = (unsigned char) (ilen >> 8); out[15] = (unsigned char) ilen;
+	memcpy(out + 16, index, (size_t) ilen);
+	memcpy(out + 16 + ilen, data, (size_t) dlen);
+	return 16 + ilen + dlen;
+}
+
+static const unsigned char *gFile;
+static int gReads;
+
+static long ReadFile(void *ctx, long offset, unsigned char *buf, long len)
+{
+	(void) ctx;
+	gReads++;
+	memcpy(buf, gFile + offset, (size_t) len);
+	return len;
+}
+
+/* A dictionary from words, all in memory or read through a small cache */
+static void OpenDict(Dict *d, const char *const *words, int count, unsigned char *file, long *entries,
+		int reader, unsigned char *cache, long *cached, unsigned long *used)
+{
+	long blocks, nw, ilen;
+
+	(void) MakeDict(words, count, 24, file);
+	CHECK(dict_header(file, &blocks, &nw, &ilen));
+	CHECK(dict_init(d, file + DICT_HEADER, ilen, blocks, nw, entries));
+	if (reader) {
+		gFile = file;
+		dict_reader(d, ReadFile, NULL, DICT_HEADER + ilen, cache, 2, cached, used);
+	} else {
+		dict_data(d, file + DICT_HEADER + ilen);
+	}
+}
+
+static int UserWords(void *ctx, const char *w, int len)
+{
+	(void) ctx;
+	return len == 6 && memcmp(w, "Topica", 6) == 0;
+}
+
+static void TestSpell(void)
+{
+	static const char *const kCommon[] = { "a", "and", "is", "it's", "the", "word" };
+	static const char *const kMain[] = {
+		"Apple", "Paris", "a", "and", "apple", "cat", "cats", "dog", "don't", "is", "it's", "quick",
+		"the", "they", "word", "words", "world", "writer", "writers"
+	};
+	static const char *const kAll[] = {
+		"Apple", "Paris", "a", "and", "apple", "cat", "cats", "dog", "don't", "is", "it's", "quick",
+		"the", "they", "word", "words", "world", "writer", "writers"
+	};
+	unsigned char f1[4096], f2[4096], cache[2 * 64];
+	long e1[64], e2[64], cached[2];
+	unsigned long used[2];
+	char sug[8][DICT_WORD];
+	Dict common, all;
+	Speller sp;
+	int i, n, len;
+
+	/* every word found, at the start, inside and at the end of blocks */
+	OpenDict(&all, kAll, (int) (sizeof(kAll) / sizeof(kAll[0])), f2, e2, 0, NULL, NULL, NULL);
+	CHECK(all.blocks > 3);
+	for (i = 0; i < (int) (sizeof(kAll) / sizeof(kAll[0])); i++)
+		CHECK(dict_has(&all, kAll[i], (int) strlen(kAll[i])));
+	CHECK(!dict_has(&all, "", 0));
+	CHECK(!dict_has(&all, "Aardvark", 8));
+	CHECK(!dict_has(&all, "zebra", 5));
+	CHECK(!dict_has(&all, "wor", 3));
+	CHECK(!dict_has(&all, "worlds", 6));
+	CHECK(!dict_has(&all, "Cat", 3));
+
+	/* from the file a block at a time: the cache keeps two */
+	gReads = 0;
+	OpenDict(&all, kAll, (int) (sizeof(kAll) / sizeof(kAll[0])), f2, e2, 1, cache, cached, used);
+	CHECK(all.maxBlock <= 64);
+	CHECK(dict_has(&all, "writer", 6) && dict_has(&all, "writers", 7));
+	CHECK(gReads == 1);
+	CHECK(dict_has(&all, "Apple", 5) && dict_has(&all, "writer", 6));
+	CHECK(gReads == 2);
+	for (i = 0; i < (int) (sizeof(kAll) / sizeof(kAll[0])); i++)
+		CHECK(dict_has(&all, kAll[i], (int) strlen(kAll[i])));
+	CHECK(!dict_has(&all, "zebra", 5));
+
+	/* a damaged index */
+	{
+		Dict bad;
+		long blocks, nw, ilen;
+		CHECK(dict_header(f2, &blocks, &nw, &ilen));
+		CHECK(!dict_init(&bad, f2 + DICT_HEADER, ilen - 1, blocks, nw, e1));
+		f1[0] = 'X';
+		CHECK(!dict_header(f1, &blocks, &nw, &ilen));
+	}
+
+	OpenDict(&common, kCommon, (int) (sizeof(kCommon) / sizeof(kCommon[0])), f1, e1, 0, NULL, NULL, NULL);
+	OpenDict(&all, kMain, (int) (sizeof(kMain) / sizeof(kMain[0])), f2, e2, 0, NULL, NULL, NULL);
+	sp.common = &common;
+	sp.main = &all;
+	sp.user = UserWords;
+	sp.ctx = NULL;
+	CHECK(sp_correct(&sp, "word", 4));
+	CHECK(sp_correct(&sp, "Word", 4));          /* a sentence's start */
+	CHECK(sp_correct(&sp, "WORD", 4));
+	CHECK(!sp_correct(&sp, "wOrd", 4));
+	CHECK(sp_correct(&sp, "Paris", 5));
+	CHECK(!sp_correct(&sp, "paris", 5));        /* a proper noun needs its capital */
+	CHECK(sp_correct(&sp, "PARIS", 5));
+	CHECK(sp_correct(&sp, "cat's", 5));
+	CHECK(sp_correct(&sp, "cat\xD5s", 5));      /* a curly apostrophe */
+	CHECK(sp_correct(&sp, "writers'", 8));
+	CHECK(sp_correct(&sp, "don\xD5t", 5));
+	CHECK(sp_correct(&sp, "Topica", 6));        /* the writer's own */
+	CHECK(!sp_correct(&sp, "wrod", 4));
+	CHECK(!sp_correct(&sp, "teh", 3));
+
+	n = sp_suggest(&sp, "teh", 3, sug, 8);
+	CHECK(n >= 1);
+	CHECK_STR(sug[0], "the");
+	n = sp_suggest(&sp, "Teh", 3, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "The") == 0);
+	n = sp_suggest(&sp, "TEH", 3, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "THE") == 0);
+	n = sp_suggest(&sp, "wrod", 4, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "word") == 0);
+	n = sp_suggest(&sp, "wordd", 5, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "word") == 0);
+	n = sp_suggest(&sp, "wrld", 4, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "world") == 0);
+	n = sp_suggest(&sp, "paris", 5, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "Paris") == 0);
+	n = sp_suggest(&sp, "Pariss", 6, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "Paris") == 0);
+	n = sp_suggest(&sp, "dont", 4, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[0], "don't") == 0);
+	n = sp_suggest(&sp, "thequick", 8, sug, 8);
+	CHECK(n >= 1 && strcmp(sug[n - 1], "the quick") == 0);
+	CHECK(sp_suggest(&sp, "zzzzzz", 6, sug, 8) == 0);
+	n = sp_suggest(&sp, "cta", 3, sug, 1);
+	CHECK(n == 1 && strcmp(sug[0], "cat") == 0);
+
+	/* which words get checked */
+	{
+		static const char kPost[] =
+			"---\ntitle: A wrod title\nlayout: psot\ntags: [abc]\n---\n"
+			"Some wrod in `cod` and [lnk](http://exampel.com/pth). HTML and CSS, iPhone, x86 and\n"
+			"see exampel.com or me@exampel.com, a_b, &amp; {% incld %} <spn>txt</spn> don\xD5t.\n";
+		static const char *const kWant[] = {
+			"wrod", "title", "Some", "wrod", "in", "and", "lnk", "and", "and", "see", "or", "txt", "don\xD5t", NULL
+		};
+		unsigned char cls[512];
+		MdState st;
+		long n2 = (long) strlen(kPost), at = 0;
+		int k = 0;
+		md_begin(&st);
+		md_classify(&st, kPost, n2, n2, cls);
+		sp_prepare(kPost, n2, cls);
+		while ((at = sp_next(kPost, n2, at, cls, &len)) >= 0) {
+			char w[64];
+			memcpy(w, kPost + at, (size_t) len);
+			w[len] = '\0';
+			if (kWant[k] == NULL) {
+				CheckStr(w, "(no more)", __LINE__);
+				break;
+			}
+			CheckStr(w, kWant[k], __LINE__);
+			k++;
+			at += len;
+		}
+		CHECK(kWant[k] == NULL);
+		/* from the middle of a word: that word */
+		at = sp_next(kPost, n2, (long) (strstr(kPost, "Some") - kPost) + 2, cls, &len);
+		CHECK(at == strstr(kPost, "Some") - kPost && len == 4);
+	}
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -1476,6 +1696,7 @@ int main(void)
 	TestLayout();
 	TestMdhtml();
 	TestVi();
+	TestSpell();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

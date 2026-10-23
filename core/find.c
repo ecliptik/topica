@@ -28,6 +28,20 @@ unsigned char find_lower(unsigned char c)
 	return c;
 }
 
+unsigned char find_upper(unsigned char c)
+{
+	int i;
+
+	if (c >= 'a' && c <= 'z')
+		return (unsigned char) (c - 32);
+	if (c < 0x80)
+		return c;
+	for (i = 0; kLower[i] != 0; i++)
+		if (kLower[i] == c)
+			return kUpper[i];
+	return c;
+}
+
 int find_is_word_char(unsigned char c)
 {
 	int i;

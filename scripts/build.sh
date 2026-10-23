@@ -59,8 +59,31 @@ with open(path, 'r+b') as f:
     f.write(bytes(h))
 EOF
 
-# An 800K floppy with the application (from the MacBinary, keeping its flags)
-# and the About file.
+# The spelling dictionary, from SCOWL's word lists (fetched once, checked
+# against the release's SHA-256); without it, Topica can't check spelling.
+scowl_version=2020.12.07
+scowl_sha256=5587667caa20c4891390c2d42dbb4d5c4c3f41bee77af1457ece3ba23fb859cc
+scowl="$here/build/scowl"
+dict="$here/build/Topica Dictionary"
+if [ ! -f "$dict" ] || [ "$here/tools/mkdict.py" -nt "$dict" ]; then
+    if [ ! -d "$scowl/scowl-$scowl_version/final" ]; then
+        mkdir -p "$scowl"
+        if curl -fsSL -o "$scowl/scowl.tar.gz" \
+                "https://downloads.sourceforge.net/project/wordlist/SCOWL/$scowl_version/scowl-$scowl_version.tar.gz" \
+                && echo "$scowl_sha256  $scowl/scowl.tar.gz" | sha256sum -c --quiet -; then
+            tar -xzf "$scowl/scowl.tar.gz" -C "$scowl"
+        else
+            echo "build.sh: couldn't fetch SCOWL $scowl_version: no spelling dictionary" >&2
+        fi
+    fi
+    if [ -d "$scowl/scowl-$scowl_version/final" ]; then
+        python3 "$here/tools/mkdict.py" "$scowl/scowl-$scowl_version/final" "$dict"
+        cp "$scowl/scowl-$scowl_version/Copyright" "$here/build/Dictionary Licence"
+    fi
+fi
+
+# An 800K floppy with the application (from the MacBinary, keeping its flags),
+# the dictionary and the About file.
 name="Topica-$preset-$display"
 dsk="$build/$name.dsk"
 rm -f "$dsk"
@@ -68,6 +91,13 @@ dd if=/dev/zero of="$dsk" bs=1024 count=800 status=none
 hformat -l "Topica" "$dsk" >/dev/null
 hmount "$dsk" >/dev/null
 hcopy -m "$build/Topica.bin" ":Topica"
+if [ -f "$dict" ]; then
+    hcopy -r "$dict" ":Topica Dictionary"
+    hattrib -t TDIC -c TPCA ":Topica Dictionary"
+    tr '\n' '\r' < "$here/build/Dictionary Licence" > "$build/Dictionary Licence"
+    hcopy -r "$build/Dictionary Licence" ":Dictionary Licence"
+    hattrib -t ttro -c ttxt ":Dictionary Licence"
+fi
 if [ -f "$here/docs/About Topica" ]; then
     sed "s/@VERSION@/$display/" "$here/docs/About Topica" | tr '\n' '\r' > "$build/About Topica"
     hcopy -r "$build/About Topica" ":About Topica"

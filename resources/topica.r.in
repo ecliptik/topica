@@ -41,7 +41,7 @@ resource 'MENU' (129, "File") {
 
 /* Redo is Command-Shift-Z, which a menu can't show: main.c handles it. */
 resource 'MENU' (130, "Edit") {
-	130, textMenuProc, 0x5D7B, enabled, "Edit",
+	130, textMenuProc, 0xBD7B, enabled, "Edit",
 	{
 		"Undo", noIcon, "Z", noMark, plain;
 		"Redo", noIcon, noKey, noMark, plain;
@@ -56,6 +56,7 @@ resource 'MENU' (130, "Edit") {
 		"Find\311", noIcon, "F", noMark, plain;
 		"Find Again", noIcon, "G", noMark, plain;
 		"Replace & Find Again", noIcon, "=", noMark, plain;
+		"Check Spelling\311", noIcon, ";", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Preferences\311", noIcon, noKey, noMark, plain
 	}
@@ -284,6 +285,28 @@ resource 'DITL' (143, "Preferences", purgeable) {
 		{ 230, 14, 246, 96 }, StaticText { disabled, "Keys:" };
 		{ 228, 100, 246, 160 }, CheckBox { enabled, "vi" };
 		{ 228, 164, 246, 406 }, CheckBox { enabled, "jk leaves insert mode" };
+	}
+};
+
+/* Placed along the bottom of the screen, below the word it asks about */
+resource 'DLOG' (145, "Check Spelling", purgeable) {
+	{ 0, 0, 178, 470 }, dBoxProc, invisible, noGoAway, 0x0, 145, "Check Spelling", noAutoCenter
+};
+
+resource 'DITL' (145, "Check Spelling", purgeable) {
+	{
+		{ 36, 330, 56, 458 }, Button { enabled, "Replace" };
+		{ 148, 330, 168, 458 }, Button { enabled, "Done" };
+		{ 32, 326, 60, 462 }, UserItem { disabled };
+		{ 66, 330, 86, 458 }, Button { enabled, "Skip" };
+		{ 92, 330, 112, 458 }, Button { enabled, "Skip All" };
+		{ 118, 330, 138, 458 }, Button { enabled, "Learn" };
+		{ 10, 12, 26, 96 }, StaticText { disabled, "Not known:" };
+		{ 10, 96, 26, 458 }, StaticText { disabled, "" };
+		{ 38, 12, 54, 96 }, StaticText { disabled, "Change to:" };
+		{ 38, 100, 54, 312 }, EditText { enabled, "" };
+		{ 64, 96, 168, 312 }, UserItem { enabled };
+		{ 64, 12, 80, 92 }, StaticText { disabled, "Suggested:" };
 	}
 };
 

@@ -26,7 +26,8 @@ enum {
 	kImageDialog = 141,
 	kFindDialog = 142,
 	kPrefsDialog = 143,
-	kLinkDialog = 144
+	kLinkDialog = 144,
+	kSpellDialog = 145
 };
 
 /* C string to Pascal string (cut at 255) and back */

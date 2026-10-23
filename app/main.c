@@ -27,6 +27,7 @@
 #include "preview.h"
 #include "print.h"
 #include "settings.h"
+#include "spellwin.h"
 #include "util.h"
 
 enum { kAppleMenu = 128, kFileMenu = 129, kEditMenu = 130, kPostMenu = 131 };
@@ -34,7 +35,7 @@ enum { kAboutItem = 1 };
 enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kExportItem = 7, kRevertItem = 8,
 	kPageSetupItem = 10, kPrintItem = 11, kQuitItem = 13 };
 enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
-	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kPrefsItem = 15 };
+	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kSpellItem = 14, kPrefsItem = 16 };
 enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6, kPreviewItem = 7 };
 /* osEvt's suspend/resume (Inside Macintosh VI) */
 enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
@@ -128,6 +129,7 @@ static void AdjustMenus(void)
 	Enable(edit, kFindItem, d != NULL);
 	Enable(edit, kFindAgainItem, d != NULL && FindHasPattern());
 	Enable(edit, kReplaceAgainItem, d != NULL && FindHasPattern());
+	Enable(edit, kSpellItem, d != NULL);
 	Enable(post, kPostInfoItem, d != NULL);
 	Enable(post, kInsertImageItem, d != NULL);
 	Enable(post, kInsertLinkItem, d != NULL);
@@ -241,6 +243,7 @@ static void DoMenu(long choice)
 		case kFindItem: FindDialog(d); break;
 		case kFindAgainItem: FindAgain(d); break;
 		case kReplaceAgainItem: ReplaceAndFindAgain(d); break;
+		case kSpellItem: SpellCheck(d); break;
 		}
 		break;
 	}
@@ -431,6 +434,7 @@ static void Setup(void)
 	TEInit();
 	InitDialogs(NULL);
 	InitCursor();
+	FileRememberAppFolder();            /* before Standard File can change the default folder */
 	MaxApplZone();
 	MoreMasters();
 	MoreMasters();
