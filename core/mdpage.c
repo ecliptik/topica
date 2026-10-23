@@ -10,15 +10,8 @@
 #define kMissing ((char) 0xD7)
 #define kMiddleDot ((char) 0xE1)
 
-static int IsSpace(char c)
-{
-	return c == ' ' || c == '\t';
-}
-
-static int IsEol(char c)
-{
-	return c == '\r' || c == '\n';
-}
+#define IsSpace(c) ((c) == ' ' || (c) == '\t')
+#define IsEol(c) ((c) == '\r' || (c) == '\n')
 
 static int IsAlpha(char c)
 {
@@ -98,12 +91,12 @@ static int StartsWith(const char *t, long p, long le, const char *s)
 	return p + k <= le && memcmp(t + p, s, (size_t) k) == 0;
 }
 
-/* The ] for the [ at p, or -1 */
+/* The ] for the [ at p, or -1: on the same line, before le */
 static long Close(const char *t, long p, long le, char open, char close)
 {
 	int depth = 0;
 
-	for (; p < le; p++) {
+	for (; p < le && !IsEol(t[p]); p++) {
 		if (t[p] == '\\')
 			p++;
 		else if (t[p] == open)
@@ -421,7 +414,7 @@ int mp_next(MpScan *p, MpBlock *b)
 			else
 				p->depth = 0;
 			Gather(p, b, quote, ParaMore);
-			if (b->end == p->s.pos && NextLine(t, p->n, ls) == b->end && ImageLine(t, cs, le))
+			if (t[b->at] == '!' && NextLine(t, p->n, ls) == b->end && ImageLine(t, cs, le))
 				b->kind = MP_IMAGE;
 		}
 		p->blank = 0;
@@ -438,17 +431,19 @@ typedef struct {
 	char last;                  /* the last character put */
 } Sink;
 
-static void Put(Sink *k, char c, int style)
-{
-	if (k->len < k->cap) {
-		if (k->out != NULL)
-			k->out[k->len] = c;
-		if (k->sty != NULL)
-			k->sty[k->len] = (unsigned char) style;
-	}
-	k->last = c;
-	k->len++;
-}
+/* Puts one character (c is read once) */
+#define Put(k, c, style) do { \
+	Sink *k_ = (k); \
+	char c_ = (c); \
+	if (k_->len < k_->cap) { \
+		if (k_->out != NULL) \
+			k_->out[k_->len] = c_; \
+		if (k_->sty != NULL) \
+			k_->sty[k_->len] = (unsigned char) (style); \
+	} \
+	k_->last = c_; \
+	k_->len++; \
+} while (0)
 
 static void PutStr(Sink *k, const char *s, int style)
 {
@@ -525,20 +520,8 @@ static long Entity(const char *t, long p, long le, char *c)
 	return e + 1 - p;
 }
 
-static int StyleOf(int cls)
-{
-	int s = 0;
-
-	if (cls & MD_BOLD)
-		s |= MS_BOLD;
-	if (cls & MD_ITALIC)
-		s |= MS_ITALIC;
-	if (cls & MD_CODE)
-		s |= MS_CODE;
-	if (cls & MD_LINK)
-		s |= MS_LINK;
-	return s;
-}
+#define StyleOf(cls) (((cls) & (MD_BOLD | MD_ITALIC)) | ((cls) & MD_CODE ? MS_CODE : 0) \
+	| ((cls) & MD_LINK ? MS_LINK : 0))
 
 /* One line's inline text [cs, le); c is the line's classes, c[0] for cs */
 static void Inline(Sink *k, const char *t, long cs, long le, const unsigned char *c, MpLinkFn fn, void *ctx)
@@ -734,12 +717,12 @@ static long Destination(const char *t, long p, long le, long *len)
 
 	p = SkipSpace(t, p, le);
 	if (p < le && t[p] == '<') {
-		for (q = p + 1; q < le && t[q] != '>'; q++)
+		for (q = p + 1; q < le && t[q] != '>' && !IsEol(t[q]); q++)
 			;
 		*len = q - p - 1;
 		return p + 1;
 	}
-	for (q = p; q < le && !IsSpace(t[q]); q++) {
+	for (q = p; q < le && !IsSpace(t[q]) && !IsEol(t[q]); q++) {
 		if (t[q] == '(')
 			depth++;
 		else if (t[q] == ')' && depth-- == 0)
@@ -784,14 +767,14 @@ static long Lookup(const char *t, long n, const char *name, long len, long *dlen
 
 long mp_link_url(const char *text, long n, long at, char *url, long cap)
 {
-	long le = LineEnd(text, n, at), j, k, d, len = 0;
+	long le = n, j, k, d, len = 0;     /* Close and Destination stop at the line's end */
 
 	if (cap > 0)
 		url[0] = 0;
-	if (at >= le)
+	if (at >= le || IsEol(text[at]))
 		return 0;
 	if (text[at] == '<') {
-		for (j = at + 1; j < le && text[j] != '>'; j++)
+		for (j = at + 1; j < le && text[j] != '>' && !IsEol(text[j]); j++)
 			;
 		Copy(url, cap, text + at + 1, j - at - 1);
 		return j - at - 1;
@@ -824,11 +807,11 @@ long mp_link_url(const char *text, long n, long at, char *url, long cap)
 
 long mp_link_text(const char *text, long n, long at, char *out, long cap)
 {
-	long le = LineEnd(text, n, at), j, i, len = 0;
+	long le = n, j, i, len = 0;        /* Close stops at the line's end */
 
 	if (cap > 0)
 		out[0] = 0;
-	if (at >= le)
+	if (at >= le || IsEol(text[at]))
 		return 0;
 	if (text[at] == '<')
 		return mp_link_url(text, n, at, out, cap);

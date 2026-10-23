@@ -13,23 +13,12 @@ enum {
 	kFenceDelim = MD_LINE_FENCE, kCode = MD_LINE_CODE
 };
 
-static int IsSpace(char c)
-{
-	return c == ' ' || c == '\t';
-}
-
-static int IsEol(char c)
-{
-	return c == '\r' || c == '\n';
-}
+#define IsSpace(c) ((c) == ' ' || (c) == '\t')
+#define IsEol(c) ((c) == '\r' || (c) == '\n')
 
 /* Letters and digits, Mac Roman's accented letters among them */
-static int IsAlnum(char c)
-{
-	unsigned char u = (unsigned char) c;
-
-	return (u >= 'a' && u <= 'z') || (u >= 'A' && u <= 'Z') || (u >= '0' && u <= '9') || u >= 0x80;
-}
+#define IsAlnum(c) (((c) >= 'a' && (c) <= 'z') || ((c) >= 'A' && (c) <= 'Z') || ((c) >= '0' && (c) <= '9') \
+	|| (unsigned char) (c) >= 0x80)
 
 static int IsPunct(char c)
 {

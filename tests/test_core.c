@@ -924,6 +924,8 @@ static void TestLayout(void)
 	Broken(&code, "  if (x)\r    y;", NULL, 40, "  if (x)|    y;", __LINE__);
 	Broken(&code, "  a b c d", NULL, 5, "  a b| c d", __LINE__);
 	Broken(&para, "", NULL, 5, "", __LINE__);
+	Broken(&para, "aacc", "..cc", 2, "aa|cc", __LINE__);
+	Broken(&para, "aa cccc", "...cccc", 4, "aa|cccc", __LINE__);
 }
 
 /* ---- mdhtml ---- */
