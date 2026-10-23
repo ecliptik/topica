@@ -12,7 +12,9 @@ Publish.
   and remembers the bridge's address and key. A blog that keeps posts in
   a folder for each year (`_posts/2026/2026-10-23-title.md`) works too:
   publish one there, and the next post is suggested there. The post goes as UTF-8 with
-  LF line ends, whatever the Preferences say for saving.
+  LF line ends, whatever the Preferences say for saving. The key shows
+  as bullets. When the bridge can't be reached, Topica says whether it
+  refused, didn't answer, or the Mac got no address from the gateway.
 - MacTCP on the Plus and System 7. A `--talkip` build of Topica Lite
   carries [talkip](https://github.com/ecliptik/talkip), TCP/IP over
   LocalTalk, for a 512K Mac that has no room for MacTCP.

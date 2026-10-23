@@ -10,8 +10,9 @@
 
 #include <MacTypes.h>
 
-/* Results are MacTCP's (app/mactcp.h: talkip's are the same), or our own */
-enum { netNoNetwork = -30101 };
+/* Results are MacTCP's (app/mactcp.h: talkip's are the same), or our own:
+   no network at all, or (talkip) no address from the MacIP gateway */
+enum { netNoNetwork = -30101, netNoAddress = -30102 };
 
 /* Connects to ip:port, giving up after timeoutSecs */
 OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs);

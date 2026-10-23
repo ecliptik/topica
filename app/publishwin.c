@@ -25,6 +25,9 @@ enum {
 
 enum { kHeadCap = 600, kReplyCap = 1024, kTimeout = 20 };
 
+/* The key as typed: its field shows a bullet for each character */
+static char gKey[64];
+
 static void Value(Doc *d, const char *key, char *out, long cap)
 {
 	Editor *ed = DocEditor(d);
@@ -64,6 +67,9 @@ static void SuggestPath(Doc *d, Boolean draft, char *out, int cap)
 static void Problem(OSErr err, const char *bridge, char *out)
 {
 	switch (err) {
+	case netNoAddress:
+		strcpy(out, "Topica couldn\xD5t get an address from the MacIP gateway. Check that the gateway is running.");
+		break;
 	case netNoNetwork:
 #ifdef TOPICA_TALKIP
 		strcpy(out, "Topica can\xD5t reach the network: AppleTalk is off, or there\xD5s no MacIP gateway on it.");
@@ -75,9 +81,13 @@ static void Problem(OSErr err, const char *bridge, char *out)
 		strcpy(out, "There isn\xD5t enough memory to publish the post. Close a window and try again.");
 		break;
 	case openFailed:
+		sprintf(out, "The bridge at %s refused the connection. Check its address and port, and that it\xD5s running.",
+				bridge);
+		break;
 	case commandTimeout:
 	case connectionTerminated:
-		sprintf(out, "Topica couldn\xD5t reach the bridge at %s. Check its address, and that it\xD5s running.", bridge);
+		sprintf(out, "Nothing answered at %s. Check the bridge\xD5s address, that it\xD5s running, and that no "
+				"firewall between this Mac and the bridge blocks its port.", bridge);
 		break;
 	default:
 		sprintf(out, "The connection to the bridge at %s failed (error %d).", bridge, err);
@@ -170,6 +180,52 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	ShowNote(line);
 }
 
+static void ShowKey(DialogPtr dlg)
+{
+	char dots[sizeof(gKey)];
+	short n = (short) strlen(gKey);
+
+	memset(dots, 0xA5, (size_t) n);         /* a bullet, in Mac Roman */
+	dots[n] = '\0';
+	SetItemText(dlg, kKeyField, dots);
+	SelectDialogItemText(dlg, kKeyField, n, n);
+}
+
+/* Typing in the Key field changes gKey and shows bullets; the rest is StandardFilter's */
+static pascal Boolean PublishFilter(DialogPtr d, EventRecord *e, short *item)
+{
+	if ((e->what == keyDown || e->what == autoKey) && ((DialogPeek) d)->editField == kKeyField - 1) {
+		char c = (char) (e->message & charCodeMask);
+		TEHandle te = ((DialogPeek) d)->textH;
+		size_t n = strlen(gKey);
+
+		if (e->modifiers & cmdKey) {
+			if (c != '.') {                 /* no copying, cutting or pasting a hidden key */
+				SysBeep(10);
+				e->what = nullEvent;
+				return false;
+			}
+		} else if (c != '\r' && c != 0x03 && c != 0x1B && c != '\t') {
+			if (n > 0 && (**te).selStart == 0 && (**te).selEnd >= (short) n) {
+				gKey[0] = '\0';             /* all of it selected: typing replaces it */
+				if (c == 0x08)
+					c = 0;
+			}
+			n = strlen(gKey);
+			if (c == 0x08 && n > 0)
+				gKey[n - 1] = '\0';
+			else if (c >= 0x20 && c < 0x7F && n < sizeof(gKey) - 1)
+				gKey[n] = c, gKey[n + 1] = '\0';
+			else if (c != 0)
+				SysBeep(10);
+			ShowKey(d);
+			e->what = nullEvent;
+			return false;
+		}
+	}
+	return StandardFilter(d, e, item);
+}
+
 void PublishPost(Doc *d)
 {
 	DialogPtr dlg;
@@ -198,7 +254,8 @@ void PublishPost(Doc *d)
 	SuggestPath(d, false, path, sizeof(path));
 	SetItemText(dlg, kPathField, path);
 	SetItemText(dlg, kBridgeField, gPrefs.bridge);
-	SetItemText(dlg, kKeyField, gPrefs.bridgeKey);
+	strcpy(gKey, gPrefs.bridgeKey);
+	ShowKey(dlg);
 	if (hugo)
 		HiliteControl(ItemControl(dlg, kDraftBox), 255);    /* a Hugo draft says so in its front matter */
 	OutlineDefault(dlg, kOutline);
@@ -206,7 +263,7 @@ void PublishPost(Doc *d)
 	SelectDialogItemText(dlg, gPrefs.bridge[0] == '\0' ? kBridgeField : kPathField, 0, 32767);
 	InitCursor();
 	for (;;) {
-		ModalDialog((ModalFilterUPP) StandardFilter, &item);
+		ModalDialog((ModalFilterUPP) PublishFilter, &item);
 		if (item == kCancel)
 			break;
 		if (item == kDraftBox) {
@@ -221,7 +278,7 @@ void PublishPost(Doc *d)
 			continue;
 		GetItemText(dlg, kPathField, path, sizeof(path));
 		GetItemText(dlg, kBridgeField, bridge, sizeof(bridge));
-		GetItemText(dlg, kKeyField, key, sizeof(key));
+		strcpy(key, gKey);
 		if (!pub_address(bridge, &ip, &port)) {
 			ShowNote("The bridge\xD5s address is its IP address and port, like 192.0.2.10:8023.");
 			SelectDialogItemText(dlg, kBridgeField, 0, 32767);

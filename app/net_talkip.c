@@ -55,8 +55,11 @@ OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
 	}
 	(void) timeoutSecs;             /* talkip's own: 20 s for a lease, 30 s to connect */
 	err = _TCPActiveOpen(&pb, gStream, ip, port, &localIP, &localPort, NULL, NULL, false);
-	if (err != noErr)
+	if (err != noErr) {
 		NetClose();
+		if (talkip_local_ip() == 0)
+			err = netNoAddress;     /* the gateway never leased one */
+	}
 	return err;
 }
 
