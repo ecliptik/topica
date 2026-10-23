@@ -26,6 +26,9 @@ Boolean DocSaveAs(Doc *d);
 void DocRevert(Doc *d);
 
 Doc *DocFromWindow(WindowPtr w);   /* NULL if it isn't a document window */
+long DocId(Doc *d);                 /* a number for Apple events, unique while Topica runs */
+Doc *DocFromId(long id);            /* NULL when there's none */
+Doc *DocNth(short n);               /* the nth post window from the front, 1-based */
 Doc *DocFront(void);               /* the front document window, or NULL */
 short DocCount(void);
 short DocMaxCount(void);
@@ -58,6 +61,9 @@ void DocSealUndo(Doc *d);
 void DocTextRect(Doc *d, Rect *r);
 /* Edits between begin and end undo as one (a drag that moves text) */
 void DocGroupEdits(Doc *d, Boolean begin);
+/* The edits between begin and end undo with the last one, if it was a kind
+   edit (a checker's corrections) */
+void DocJoinEdits(Doc *d, short kind, Boolean begin);
 
 /* Opens the recovery copies a crash left behind; how many */
 short DocRecoverAll(void);

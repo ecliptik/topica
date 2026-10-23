@@ -16,7 +16,8 @@ menu 130
 2: Puts back what Undo took out (Command-Shift-Z).
 13: Replaces the found text, then finds the next.
 14: Checks spelling from the insertion point, skipping code, links and front matter.
-16: The font, the kind of blog, how posts are saved, and vi keys.
+15: Checks the post with Excalibur or another Word Services checker. Hold Option to pick one.
+17: The font, the kind of blog, how posts are saved, and vi keys.
 
 menu 131
 1: The post's title, description, category, tags, layout and date.

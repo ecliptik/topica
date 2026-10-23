@@ -20,6 +20,7 @@ enum {
 	kUndoReplace,       /* Find/Replace */
 	kUndoChange,        /* a vi command */
 	kUndoDrag,          /* drag and drop */
+	kUndoSpelling,      /* a Word Services checker's correction */
 	kUndoKinds
 };
 
@@ -62,6 +63,9 @@ void undo_forget_saved(UndoStack *u);
 /* Steps recorded between begin (1) and end (0) undo and redo as one, as
    vi's changes do: an operator and the typing after it */
 void undo_group(UndoStack *u, int begin);
+/* The steps recorded from now until undo_group(u, 0) undo and redo with
+   the one before them: a spelling checker's corrections, sent one by one */
+void undo_join(UndoStack *u);
 
 /* Records a change before or after it is made: at pos, del (dlen bytes)
    was replaced by ins (ilen bytes). */

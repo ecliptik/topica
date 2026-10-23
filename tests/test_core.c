@@ -451,6 +451,33 @@ static void TestUndoSaved(void)
 	CHECK(u.lost && u.saved == -1);
 }
 
+/* A checker's corrections, joined: one undo and one redo take them all */
+static void TestUndoJoin(void)
+{
+	UndoStack u;
+	char buf[128];
+	UndoApply a;
+
+	undo_init(&u, buf, sizeof(buf));
+	undo_record(&u, kUndoSpelling, 0, "Inline", 6, "Online", 6);
+	undo_join(&u);
+	undo_record(&u, kUndoSpelling, 7, "b", 1, "bee", 3);
+	undo_group(&u, 0);
+	undo_seal(&u);
+	undo_record(&u, kUndoTyping, 10, "", 0, "x", 1);
+	CHECK(undo_step(&u, 0, &a) && a.kind == kUndoTyping && !a.more);
+	CHECK(undo_step(&u, 0, &a) && a.kind == kUndoSpelling && a.pos == 7 && a.more);
+	CHECK(undo_step(&u, 0, &a) && a.pos == 0 && !a.more);
+	CHECK(undo_step(&u, 1, &a) && a.pos == 0 && a.more);
+	CHECK(undo_step(&u, 1, &a) && a.pos == 7 && !a.more);
+	/* nothing before it: the first step stands alone */
+	undo_clear(&u);
+	undo_join(&u);
+	undo_record(&u, kUndoSpelling, 0, "a", 1, "b", 1);
+	undo_group(&u, 0);
+	CHECK(undo_step(&u, 0, &a) && !a.more);
+}
+
 static void TestUndo(void)
 {
 	UndoStack u;
@@ -641,7 +668,7 @@ static void TestFind(void)
 static void TestPrefs(void)
 {
 	TopicaPrefs p, q;
-	char buf[768];
+	char buf[1024];
 	long n;
 
 	prefs_default(&p);
@@ -651,12 +678,13 @@ static void TestPrefs(void)
 	{
 		const char *text = "publish-bridge: 10.0.2.2:8023\rpublish-key: a b:c\r# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
 			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\rvi: on\r"
-			"publish-year-folders: on\r";
+			"publish-year-folders: on\rspelling-checker: Disk:Apps:Excalibur 2.6\r";
 		prefs_read(&p, text, (long) strlen(text));
 	}
 	CHECK_STR(p.font, "Geneva");
 	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5 && !p.format);
 	CHECK(p.vi && !p.viJk && p.yearFolders);
+	CHECK_STR(p.wordService, "Disk:Apps:Excalibur 2.6");
 	CHECK_STR(p.imagePath, "/img/");
 	CHECK_STR(p.layout, "page");
 	CHECK_STR(p.bridge, "10.0.2.2:8023");
@@ -677,6 +705,7 @@ static void TestPrefs(void)
 	memset(p.layout, 'l', sizeof(p.layout) - 1);
 	memset(p.bridge, 'b', sizeof(p.bridge) - 1);
 	memset(p.bridgeKey, 'k', sizeof(p.bridgeKey) - 1);
+	memset(p.wordService, 'w', sizeof(p.wordService) - 1);
 	n = prefs_write(&p, '\r', buf, sizeof(buf));
 	CHECK(n > 0);
 	prefs_default(&q);
@@ -1987,6 +2016,7 @@ int main(void)
 	TestFrontmatterUpdate();
 	TestUndo();
 	TestUndoSaved();
+	TestUndoJoin();
 	TestPost();
 	TestFind();
 	TestPrefs();

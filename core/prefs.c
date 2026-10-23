@@ -98,12 +98,14 @@ void prefs_read(TopicaPrefs *p, const char *text, long n)
 			Copy(p->bridgeKey, sizeof(p->bridgeKey), text + vs, ve - vs);
 		else if (Is(text + ks, ke - ks, "publish-year-folders"))
 			p->yearFolders = Is(text + vs, ve - vs, "on");
+		else if (Is(text + ks, ke - ks, "spelling-checker"))
+			Copy(p->wordService, sizeof(p->wordService), text + vs, ve - vs);
 	}
 }
 
 long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 {
-	char buf[768];
+	char buf[1024];
 	long n;
 
 	n = sprintf(buf,
@@ -121,12 +123,14 @@ long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 		"vi-jk: %s%c"
 		"publish-bridge: %s%c"
 		"publish-key: %s%c"
-		"publish-year-folders: %s%c",
+		"publish-year-folders: %s%c"
+		"spelling-checker: %s%c",
 		eol, p->font, eol, p->size, eol, p->imagePath, eol, p->layout, eol,
 		p->profile == kProfileHugo ? "hugo" : "jekyll", eol,
 		p->utf8 ? "utf-8" : "mac-roman", eol, p->lf ? "lf" : "cr", eol, p->autosaveMinutes, eol,
 		p->format ? "on" : "off", eol, p->vi ? "on" : "off", eol, p->viJk ? "on" : "off", eol,
-		p->bridge, eol, p->bridgeKey, eol, p->yearFolders ? "on" : "off", eol);
+		p->bridge, eol, p->bridgeKey, eol, p->yearFolders ? "on" : "off", eol,
+		p->wordService, eol);
 	if (out != NULL) {
 		if (n > cap)
 			return -1;

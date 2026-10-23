@@ -28,7 +28,9 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   as a web page of its own.
 - **Check Spelling** (⌘;) with suggestions, Skip All and Learn, leaving
   code, addresses, Liquid and HTML alone. The dictionary is about 89,000
-  American words from [SCOWL](http://wordlist.aspell.net/).
+  American words from [SCOWL](http://wordlist.aspell.net/). On System 7,
+  **Check Spelling With** hands the post to a Word Services checker such
+  as Excalibur instead; its corrections undo as one step.
 - **vi keys**, if you want them (Preferences): normal, insert and visual
   modes, counts, operators and text objects, undo, and `.` to repeat.
 - **Publish** sends the post to a small bridge on your LAN

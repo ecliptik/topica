@@ -23,6 +23,7 @@ typedef struct {
 	char bridge[64];            /* Publish's bridge: "192.0.2.10:8023" */
 	char bridgeKey[64];         /* the key it asks for */
 	short yearFolders;          /* a post goes in a folder for its year: _posts/2026/ */
+	char wordService[160];      /* the Word Services checker: "Disk:Folder:Excalibur" */
 } TopicaPrefs;
 
 void prefs_default(TopicaPrefs *p);

@@ -51,7 +51,7 @@ void SettingsLoad(void)
 void SettingsSave(void)
 {
 	FileRef f;
-	char buf[512];
+	char buf[1024];
 	long n = prefs_write(&gPrefs, '\r', buf, sizeof(buf));
 	OSErr err;
 

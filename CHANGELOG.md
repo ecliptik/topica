@@ -21,6 +21,12 @@ Polish.
 - Balloon Help on System 7, short and only where it helps: the menu items
   whose names don't say it all, the Headings menu, and the Publish and
   Preferences fields. The text is in `resources/balloons.txt`.
+- Word Services on System 7: Edit › Check Spelling With hands the post to
+  a spelling checker that speaks it (Excalibur 2.6, for one), launching it
+  if need be. The checker's corrections arrive as undoable edits, and one
+  Undo takes back all of a check's. The item names the checker once you
+  have chosen it; hold Option to choose another. Not in Topica Lite, and
+  not shown on System 6.
 - Undoing (or redoing) back to the text as it was saved leaves the post
   unchanged: closing it doesn't ask to save.
 - Publish can be canceled while it connects or waits for the bridge:

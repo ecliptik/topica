@@ -29,6 +29,7 @@
 #include "print.h"
 #include "publishwin.h"
 #include "textdrag.h"
+#include "wordsvc.h"
 #include "settings.h"
 #include "spellwin.h"
 #include "util.h"
@@ -38,7 +39,7 @@ enum { kAboutItem = 1 };
 enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kExportItem = 7, kRevertItem = 8,
 	kPageSetupItem = 10, kPrintItem = 11, kQuitItem = 13 };
 enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
-	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kSpellItem = 14, kPrefsItem = 16 };
+	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kSpellItem = 14, kWordSvcItem = 15, kPrefsItem = 17 };
 enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6, kPreviewItem = 7,
 	kPublishItem = 9 };
 /* osEvt's suspend/resume (Inside Macintosh VI) */
@@ -46,10 +47,21 @@ enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
 
 static Boolean gQuit;
 static Boolean gInBackground;
-static Boolean gHaveAE;
+static Boolean gHaveAE, gHaveWordSvc;
+
+#ifndef TOPICA_LITE
+/* The Option key, held now (a menu choice's variant) */
+static Boolean OptionDown(void)
+{
+	unsigned char k[16];                /* a KeyMap */
+
+	GetKeys(k);
+	return (k[0x3A >> 3] >> (0x3A & 7)) & 1;
+}
+#endif
 
 static const char *const kUndoNames[kUndoKinds] = {
-	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace", "Change", "Drag"
+	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace", "Change", "Drag", "Spelling"
 };
 
 static void Enable(MenuHandle m, short item, Boolean on)
@@ -134,6 +146,12 @@ static void AdjustMenus(void)
 	Enable(edit, kFindAgainItem, d != NULL && FindHasPattern());
 	Enable(edit, kReplaceAgainItem, d != NULL && FindHasPattern());
 	Enable(edit, kSpellItem, d != NULL);
+	if (gHaveWordSvc) {
+		Str255 s;
+		WordServicesItemText(s);
+		SetMenuItemText(edit, kWordSvcItem, s);
+		Enable(edit, kWordSvcItem, d != NULL);
+	}
 	Enable(post, kPostInfoItem, d != NULL);
 	Enable(post, kInsertImageItem, d != NULL);
 	Enable(post, kInsertLinkItem, d != NULL);
@@ -227,6 +245,8 @@ static void DoMenu(long choice)
 		break;
 	case kEditMenu: {
 		/* a desk accessory's Edit menu: Undo, Cut, Copy, Paste, Clear */
+		if (!gHaveWordSvc && item >= kWordSvcItem)
+			item++;                     /* the item was deleted */
 		static const short kSystemEdit[] = { -1, 0, -1, -1, 2, 3, 4, 5 };
 		if (item < (short) (sizeof(kSystemEdit) / sizeof(kSystemEdit[0])) && kSystemEdit[item] >= 0
 				&& SystemEdit(kSystemEdit[item]))
@@ -250,6 +270,7 @@ static void DoMenu(long choice)
 		case kFindAgainItem: FindAgain(d); break;
 		case kReplaceAgainItem: ReplaceAndFindAgain(d); break;
 		case kSpellItem: SpellCheck(d); break;
+		case kWordSvcItem: WordServicesCheck(d, OptionDown()); break;   /* Option: another checker */
 		}
 		break;
 	}
@@ -454,6 +475,9 @@ static void Setup(void)
 	SettingsLoad();
 	DragInit();
 	gHaveAE = AppleEventsInit(DoQuit, OpenAppEvent, OpenFileEvent, PrintFileEvent);
+	gHaveWordSvc = gHaveAE && WordServicesInit();
+	if (!gHaveWordSvc)                  /* no Check Spelling With (DoMenu numbers the rest as if it were there) */
+		DeleteMenuItem(GetMenuHandle(kEditMenu), kWordSvcItem);
 }
 
 /* Posts a crash left unsaved come back first, before anything else opens */

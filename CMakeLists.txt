@@ -69,9 +69,10 @@ set(TOPICA_SOURCES
 # Publish's TCP: MacTCP, or talkip's stack in the application (a 512K Mac
 # on LocalTalk, which has no room for MacTCP). talkip is a separate
 # repository: https://github.com/ecliptik/talkip, next to this one.
-# Drag and drop (System 7.5): not in Lite, for 512K Macs on System 6
+# Drag and drop (System 7.5) and Word Services (System 7): not in Lite,
+# for 512K Macs on System 6
 if(NOT TOPICA_LITE)
-    list(APPEND TOPICA_SOURCES app/textdrag.c)
+    list(APPEND TOPICA_SOURCES app/textdrag.c app/wordsvc.c)
 endif()
 
 if(TOPICA_TALKIP)

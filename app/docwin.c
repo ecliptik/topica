@@ -56,6 +56,7 @@ enum { kStylePause = 30 };              /* ticks of quiet before restyling */
 
 struct Doc {
 	WindowPtr w;
+	long id;                            /* for Apple events: unique while Topica runs */
 	Editor *ed;
 	ControlHandle vbar;
 	UndoStack undo;
@@ -186,6 +187,15 @@ void DocGroupEdits(Doc *d, Boolean begin)
 {
 	undo_seal(&d->undo);
 	undo_group(&d->undo, begin);
+}
+
+void DocJoinEdits(Doc *d, short kind, Boolean begin)
+{
+	undo_seal(&d->undo);
+	if (!begin)
+		undo_group(&d->undo, 0);
+	else if (undo_peek(&d->undo, 0) == kind)
+		undo_join(&d->undo);
 }
 
 static void BarRect(Doc *d, Rect *r)
@@ -329,6 +339,34 @@ static void NewWindowRect(Rect *r)
 		OffsetRect(r, (short) (s.right - r->right), 0);
 }
 
+static long gLastId;
+
+long DocId(Doc *d)
+{
+	return d->id;
+}
+
+Doc *DocFromId(long id)
+{
+	short i;
+
+	for (i = 0; i < TOPICA_MAX_DOCS; i++)
+		if (gDocs[i] != NULL && gDocs[i]->id == id)
+			return gDocs[i];
+	return NULL;
+}
+
+Doc *DocNth(short n)
+{
+	WindowPtr w;
+	Doc *d;
+
+	for (w = FrontWindow(); w != NULL; w = (WindowPtr) ((WindowPeek) w)->nextWindow)
+		if ((d = DocFromWindow(w)) != NULL && --n == 0)
+			return d;
+	return NULL;
+}
+
 static Doc *MakeDoc(void)
 {
 	short slot;
@@ -342,6 +380,8 @@ static Doc *MakeDoc(void)
 		return NULL;
 	}
 	d = (Doc *) NewPtrClear(sizeof(Doc));
+	if (d != NULL)
+		d->id = ++gLastId;
 	if (d == NULL)
 		goto nomem;
 	NewWindowRect(&r);

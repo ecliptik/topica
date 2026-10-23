@@ -46,7 +46,7 @@
 - [x] Check Spelling with a dictionary on disk (front-coded, indexed),
       suggestions, a user dictionary; code, URLs and front matter keys
       skipped
-- [ ] Word Services on System 7
+- [x] Word Services on System 7 (Check Spelling With; Excalibur 2.6)
 - [ ] Faster suggestions on a 68000 (a second for most words)
 - [ ] vi: :w and :q, registers, marks, a block cursor in normal mode
 

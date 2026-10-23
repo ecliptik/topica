@@ -112,6 +112,12 @@ void undo_group(UndoStack *u, int begin)
 	u->open = 0;
 }
 
+void undo_join(UndoStack *u)
+{
+	u->group = u->done > 0 ? 2 : 1;
+	u->open = 0;
+}
+
 /* Drops the oldest step; 0 when there is none to drop besides keep (the
    step being grown). */
 static int DropOldest(UndoStack *u, int keep)
