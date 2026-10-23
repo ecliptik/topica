@@ -30,6 +30,7 @@ math(EXPR TOPICA_VERS_MINOR "${PROJECT_VERSION_MINOR} * 16 + ${PROJECT_VERSION_P
 
 configure_file(resources/topica.r.in ${CMAKE_CURRENT_BINARY_DIR}/topica.r @ONLY)
 configure_file(resources/icons.r ${CMAKE_CURRENT_BINARY_DIR}/icons.r COPYONLY)
+configure_file(resources/balloons.r ${CMAKE_CURRENT_BINARY_DIR}/balloons.r COPYONLY)
 list(APPEND REZ_INCLUDE_PATH ${CMAKE_CURRENT_BINARY_DIR})
 
 set(TOPICA_SOURCES

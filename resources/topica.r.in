@@ -317,6 +317,7 @@ resource 'DITL' (145, "Check Spelling", purgeable) {
 /* ---- the Finder and MultiFinder ---- */
 
 #include "icons.r"
+#include "balloons.r"
 
 /* Topica opens and owns text files: its own posts get the post icon */
 resource 'FREF' (128) { 'APPL', 0, "" };

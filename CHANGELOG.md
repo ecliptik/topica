@@ -12,6 +12,9 @@ Polish.
   beside Topica (or with its preferences), any front matter you like;
   `{{date}}` in it becomes today's date. New keys from Post Info go above
   the front matter's trailing blank lines.
+- Balloon Help on System 7, short and only where it helps: the menu items
+  whose names don't say it all, the Headings menu, and the Publish and
+  Preferences fields. The text is in `resources/balloons.txt`.
 - Undoing (or redoing) back to the text as it was saved leaves the post
   unchanged: closing it doesn't ask to save.
 - Publish can be canceled while it connects or waits for the bridge:

@@ -45,6 +45,9 @@ Boolean IsSystem7(void);
 
 /* A modal dialog from a DLOG: a plain box on System 6, movable on 7 */
 DialogPtr GetModalDialog(short id);
+/* The next dialog or alert has no balloons (System 7): before alerts, which
+   would otherwise take the last dialog's by item number */
+void NoDialogHelp(void);
 /* Centres a window on the main screen, a third of the way down (the HIG's spot) */
 void CenterWindow(WindowPtr w);
 /* Item outline: a user item drawn as the default button's ring */

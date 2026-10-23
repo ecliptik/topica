@@ -3,7 +3,8 @@
 ## Next: the Mac's manners
 
 - [x] System 7 Apple events (open, print, quit)
-- [ ] Balloon Help
+- [x] Balloon Help: a few short balloons where an item's name doesn't say
+      enough (resources/balloons.txt)
 - [x] Find and Replace (⌘F, ⌘G)
 - [x] Recover posts after a crash: an autosave copy reopened at the next launch
 - [x] Preferences: font and size, the image folder, the new post's layout,

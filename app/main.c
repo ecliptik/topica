@@ -199,6 +199,7 @@ static void DoMenu(long choice)
 	case kAppleMenu:
 		if (item == kAboutItem) {
 			InitCursor();
+			NoDialogHelp();
 			(void) Alert(kAboutAlert, (ModalFilterUPP) StandardFilter);
 		} else {
 			Str255 name;

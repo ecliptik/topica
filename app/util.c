@@ -7,6 +7,7 @@
 #include <Memory.h>
 #include <Resources.h>
 #include <ToolUtils.h>
+#include <Multiverse.h>
 #include <OSUtils.h>
 #include <Traps.h>
 #include <Gestalt.h>
@@ -97,6 +98,12 @@ Boolean IsSystem7(void)
 
 #define kDlogProcOffset 8           /* the procID, after the DLOG's rect */
 
+void NoDialogHelp(void)
+{
+	if (IsSystem7())
+		(void) HMSetDialogResID(-1);
+}
+
 DialogPtr GetModalDialog(short id)
 {
 	Handle h = NULL;
@@ -108,6 +115,9 @@ DialogPtr GetModalDialog(short id)
 			HNoPurge(h);
 			*(short *) (*h + kDlogProcOffset) = movableDBoxProc;
 		}
+		/* its balloons, when it has some (resources/balloons.txt); the Help
+		   Manager reads this while the dialog is up, so it stays set */
+		(void) HMSetDialogResID(GetResource('hdlg', id) != NULL ? id : -1);
 	}
 	d = GetNewDialog(id, NULL, (WindowPtr) -1L);
 	DLOG(("GetModalDialog %d -> %lx (ResError %d, sys7 %d)", id, (long) d, ResError(), IsSystem7()));
@@ -291,6 +301,7 @@ void ErrorAlert(const char *what, OSErr err)
 	PStr(p, msg);
 	ParamText(p, "\p", "\p", "\p");
 	InitCursor();
+	NoDialogHelp();
 	StopAlert(kErrorAlert, (ModalFilterUPP) StandardFilter);
 }
 
@@ -301,6 +312,7 @@ void ShowNote(const char *msg)
 	PStr(p, msg);
 	ParamText(p, "\p", "\p", "\p");
 	InitCursor();
+	NoDialogHelp();
 	NoteAlert(kErrorAlert, (ModalFilterUPP) StandardFilter);
 }
 

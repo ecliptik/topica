@@ -848,6 +848,7 @@ void DocRevert(Doc *d)
 		return;
 	memcpy(name, d->file.name, (size_t) d->file.name[0] + 1);
 	ParamText(name, "\p", "\p", "\p");
+	NoDialogHelp();
 	if (CautionAlert(kRevertAlert, (ModalFilterUPP) StandardFilter) != kOK)
 		return;
 	if (Load(d, &d->file)) {
@@ -870,6 +871,7 @@ Boolean DocClose(Doc *d, Boolean quitting)
 		ParamText(name, quitting ? "\pquitting" : "\pclosing", "\p", "\p");
 		SelectWindow(d->w);
 		InitCursor();
+		NoDialogHelp();
 		switch (CautionAlert(kSaveChangesAlert, (ModalFilterUPP) StandardFilter)) {
 		case 1:                         /* Save */
 			if (!DocSave(d))

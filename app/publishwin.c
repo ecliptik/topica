@@ -175,6 +175,7 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	(void) tc_to_disk(t, n, *h + headLen, bodyLen, 1, 1);
 	EdUnlockText(ed);
 
+	NoDialogHelp();
 	p = GetNewDialog(kProgressDialog, NULL, (WindowPtr) -1);
 	if (p != NULL) {
 		CenterWindow(p);

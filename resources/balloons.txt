@@ -1,0 +1,48 @@
+# Topica's Balloon Help (System 7), made into resources/balloons.r by
+# tools/make-balloons.py. Less is more: a balloon says what an item's name
+# doesn't, in a sentence. Items left out get none.
+#
+#   menu ID | dialog ID      a MENU's 'hmnu', or a DLOG's 'hdlg' (by item number)
+#   missing: TEXT            items not listed (a menu filled at run time)
+#   N: ENABLED | DIMMED      item N (a menu's title is 0); either text may be empty
+
+menu 129
+1: Starts a post from Topica Template, when there is one beside Topica.
+7: Saves the preview as a web page.
+8: Goes back to the post as it was last saved. | The post hasn't changed since it was saved.
+11: Prints the post as the preview lays it out.
+
+menu 130
+2: Puts back what Undo took out (Command-Shift-Z).
+13: Replaces the found text, then finds the next.
+14: Checks spelling from the insertion point, skipping code, links and front matter.
+16: The font, the kind of blog, how posts are saved, and vi keys.
+
+menu 131
+1: The post's title, description, category, tags, layout and date.
+3: Inserts a Markdown image for a file in the blog's image folder.
+4: Inserts a Markdown link; the selection becomes its text.
+6: Shows Markdown styled as you write (slow on a 68000 Mac).
+7: Shows the post laid out as its web page.
+9: Sends the post to topica-bridge, which puts it on the blog's drafts branch.
+
+menu 132
+0: Jumps to a heading in the front post.
+missing: Jumps to this heading.
+
+dialog 143
+11: Posts go in _posts, named with their date.
+12: Posts go in content/posts, marked as drafts until they're ready.
+13: What the web expects. Characters a Mac can't show are kept as they are.
+14: For posts other Mac applications will open.
+15: The folder Insert Image starts an image's address with, like /assets/images/.
+16: The layout New Post gives a Jekyll post.
+17: How often Topica keeps a copy of an unsaved post, for after a crash.
+27: vi's normal, insert and visual modes. Escape or Command-period ends insert mode.
+28: Typing j then k quickly in insert mode is Escape.
+
+dialog 146
+4: The post's file in the blog's repository.
+5: Into _drafts, which Jekyll leaves off the site.
+6: topica-bridge's IP address and port.
+7: The key topica-bridge was set up with. Topica keeps it.
