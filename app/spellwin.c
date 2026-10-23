@@ -329,6 +329,7 @@ static pascal Boolean SpellFilter(DialogPtr d, EventRecord *e, short *item)
 static void FillList(char sug[][DICT_WORD], int n)
 {
 	Cell c;
+	Rect r;
 	int i;
 
 	LSetDrawingMode(false, gList);
@@ -346,6 +347,9 @@ static void FillList(char sug[][DICT_WORD], int n)
 		LSetSelect(true, c, gList);
 	}
 	LSetDrawingMode(true, gList);
+	/* the update draws only the rows there are: erase the old ones */
+	r = (**gList).rView;
+	EraseRect(&r);
 }
 
 /* The word in its line: "...he said \322wrod\323 and..." */

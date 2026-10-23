@@ -39,9 +39,11 @@ resource 'MENU' (129, "File") {
 	}
 };
 
-/* Redo is Command-Shift-Z, which a menu can't show: main.c handles it. */
+/* Redo is Command-Shift-Z, which a menu can't show: main.c handles it.
+   The flags are $BD7B, not 0xBD7B: Retro68's Rez misreads hex that
+   starts 0xB (0xBD7B came out 0x4D, and Preferences dimmed). */
 resource 'MENU' (130, "Edit") {
-	130, textMenuProc, 0xBD7B, enabled, "Edit",
+	130, textMenuProc, $BD7B, enabled, "Edit",
 	{
 		"Undo", noIcon, "Z", noMark, plain;
 		"Redo", noIcon, noKey, noMark, plain;
