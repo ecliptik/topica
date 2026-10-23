@@ -29,6 +29,7 @@ typedef struct {
 	int done;           /* steps applied; [done, count) can be redone */
 	int open;           /* the last step can still grow */
 	int lost;           /* history was dropped: not everything can be undone */
+	int group;          /* 0, or a group is open: 1 before its first step, 2 after */
 } UndoStack;
 
 /* One step to apply: replace [pos, pos + removeLen) with insert. */
@@ -40,11 +41,16 @@ typedef struct {
 	long insertLen;
 	/* where the selection goes afterwards */
 	long selStart, selEnd;
+	int more;           /* another step goes with this one: step again */
 } UndoApply;
 
 void undo_init(UndoStack *u, char *buf, long cap);
 void undo_clear(UndoStack *u);
 void undo_seal(UndoStack *u);
+
+/* Steps recorded between begin (1) and end (0) undo and redo as one, as
+   vi's changes do: an operator and the typing after it */
+void undo_group(UndoStack *u, int begin);
 
 /* Records a change before or after it is made: at pos, del (dlen bytes)
    was replaced by ins (ilen bytes). */

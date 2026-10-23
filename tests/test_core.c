@@ -14,6 +14,7 @@
 #include "../core/post.h"
 #include "../core/textconv.h"
 #include "../core/undo.h"
+#include "../core/vi.h"
 
 static int gFailed, gRun;
 
@@ -1017,6 +1018,432 @@ static void TestMdhtml(void)
 	}
 }
 
+/* ---- vi ---- */
+
+/* A plain buffer as vi's host, with a real undo stack */
+static char gVt[1024];
+static long gVn, gVs, gVe;
+static int gVbeeps;
+static UndoStack gVu;
+static char gVub[4096];
+
+static const char *VhText(void *c, long *n) { (void) c; *n = gVn; return gVt; }
+static void VhGet(void *c, long *s, long *e) { (void) c; *s = gVs; *e = gVe; }
+static void VhSet(void *c, long s, long e) { (void) c; gVs = s; gVe = e; }
+static void VhBeep(void *c) { (void) c; gVbeeps++; }
+static void VhGroup(void *c, int begin) { (void) c; undo_group(&gVu, begin); }
+
+static void VhApply(long s, long e, const char *ins, long len)
+{
+	memmove(gVt + s + len, gVt + e, (size_t) (gVn - e));
+	memcpy(gVt + s, ins, (size_t) len);
+	gVn += len - (e - s);
+}
+
+static int VhReplace(void *c, int kind, long s, long e, const char *ins, long len)
+{
+	(void) c;
+	if (s < 0 || e < s || e > gVn) {
+		gFailed++;
+		return 0;
+	}
+	if (gVn - (e - s) + len > (long) sizeof(gVt) - 1)
+		return 0;                   /* too long, as the editor can say */
+	undo_record(&gVu, kind == VI_TYPE ? kUndoTyping : kind == VI_DELETE ? kUndoDelete : kUndoReplace,
+		s, gVt + s, e - s, ins, len);
+	VhApply(s, e, ins, len);
+	gVs = gVe = s + len;
+	return 1;
+}
+
+static long VhLineStart(long p)
+{
+	while (p > 0 && gVt[p - 1] != '\n' && gVt[p - 1] != '\r')
+		p--;
+	return p;
+}
+
+static long VhLineEnd(long p)
+{
+	while (p < gVn && gVt[p] != '\n' && gVt[p] != '\r')
+		p++;
+	return p;
+}
+
+static long VhVertical(void *c, long pos, int lines, long *goal)
+{
+	long ls = VhLineStart(pos);
+
+	(void) c;
+	if (*goal < 0)
+		*goal = pos - ls;
+	for (; lines > 0 && VhLineEnd(ls) < gVn; lines--)
+		ls = VhLineEnd(ls) + 1;
+	for (; lines < 0 && ls > 0; lines++)
+		ls = VhLineStart(ls - 1);
+	return ls + *goal < VhLineEnd(ls) ? ls + *goal : VhLineEnd(ls) > ls ? VhLineEnd(ls) - 1 : ls;
+}
+
+static void VhUndo(void *c, int redo)
+{
+	UndoApply a;
+
+	(void) c;
+	do {
+		if (!undo_step(&gVu, redo, &a))
+			return;
+		VhApply(a.pos, a.pos + a.removeLen, a.insert, a.insertLen);
+		gVs = gVe = a.selStart;
+	} while (a.more);
+}
+
+static void VhInit(ViHost *h, Vi *v, char *reg, long cap, const char *text)
+{
+	const char *bar = strchr(text, '|');
+
+	memset(h, 0, sizeof(*h));
+	h->text = VhText;
+	h->get_sel = VhGet;
+	h->set_sel = VhSet;
+	h->replace = VhReplace;
+	h->vertical = VhVertical;
+	h->undo = VhUndo;
+	h->group = VhGroup;
+	h->beep = VhBeep;
+	gVn = (long) strlen(text) - 1;
+	memcpy(gVt, text, (size_t) (bar - text));
+	memcpy(gVt + (bar - text), bar + 1, strlen(bar + 1));
+	gVs = gVe = bar - text;
+	gVbeeps = 0;
+	undo_init(&gVu, gVub, sizeof(gVub));
+	vi_init(v, reg, cap);
+	v->on = 1;
+}
+
+/* The text with | at the cursor */
+static void VhShow(char *out)
+{
+	memcpy(out, gVt, (size_t) gVs);
+	out[gVs] = '|';
+	memcpy(out + gVs + 1, gVt + gVs, (size_t) (gVn - gVs));
+	out[gVn + 1] = '\0';
+}
+
+static void ViCase(const char *text, const char *keys, const char *want, int cr, int line)
+{
+	char in[512], got[1024], exp[512], reg[512];
+	const char *k;
+	Vi v;
+	ViHost h;
+	unsigned long t = 0;
+	size_t i;
+
+	strcpy(in, text);
+	strcpy(exp, want);
+	if (cr) {
+		/* the editor's CR line ends */
+		for (i = 0; in[i]; i++)
+			if (in[i] == '\n')
+				in[i] = '\r';
+		for (i = 0; exp[i]; i++)
+			if (exp[i] == '\n')
+				exp[i] = '\r';
+	}
+	VhInit(&h, &v, reg, sizeof(reg), in);
+	for (k = keys; *k; k++)
+		(void) vi_key(&v, &h, (unsigned char) *k, t += 100);
+	VhShow(got);
+	if (!cr)
+		for (i = 0; got[i]; i++)
+			if (got[i] == '\r')
+				got[i] = '\n';     /* vi makes CR line ends, the editor's */
+	CheckStr(got, exp, line);
+	CHECK(v.mode == VI_NORMAL);
+}
+
+static void TestVi(void)
+{
+	static const char *const kVi[][3] = {
+		{ "hello |world", "x", "hello |orld" },
+		{ "|hello world", "$", "hello worl|d" },
+		{ "hello wor|ld", "0", "|hello world" },
+		{ "   ind|ent", "^", "   |indent" },
+		{ "|one two three", "w", "one |two three" },
+		{ "|one two three", "2w", "one two |three" },
+		{ "one two |three", "b", "one |two three" },
+		{ "|one two", "e", "on|e two" },
+		{ "|one.two three", "w", "one|.two three" },
+		{ "|one.two three", "W", "one.two |three" },
+		{ "|a\n\nb", "w", "a\n|\nb" },
+		{ "a\n\n|b", "b", "a\n|\nb" },
+		{ "|one\ntwo", "w", "one\n|two" },
+		{ "one|\ntwo", "w", "one\n|two" },
+		{ "|ab cd", "ee", "ab c|d" },
+		{ "x |y", "b", "|x y" },
+		{ "|l1\nl2\nl3", "G", "l1\nl2\n|l3" },
+		{ "l1\nl2\n|l3", "gg", "|l1\nl2\nl3" },
+		{ "|l1\nl2\nl3", "2G", "l1\n|l2\nl3" },
+		{ "|a\nb\n\nc\nd\n\ne", "}", "a\nb\n|\nc\nd\n\ne" },
+		{ "|a\nb\n\nc\nd\n\ne", "2}", "a\nb\n\nc\nd\n|\ne" },
+		{ "a\nb\n\nc\n|d", "{", "a\nb\n|\nc\nd" },
+		{ "|hello world", "fo", "hell|o world" },
+		{ "|hello world", "fo;", "hello w|orld" },
+		{ "|hello world", "to", "hel|lo world" },
+		{ "hello |world", "Fe", "h|ello world" },
+		{ "hello wor|ld", "To", "hello wo|rld" },
+		{ "|a.b.c", "f.;,", "a|.b.c" },
+		{ "|abc\nde\nfghi", "jj", "abc\nde\n|fghi" },
+		{ "ab|c\nd\nefg", "jj", "abc\nd\nef|g" },
+		{ "|ab\ncd", "j$k", "a|b\ncd" },
+		{ "|one", "l", "o|ne" },
+		{ "on|e", "l", "on|e" },
+		{ "|one two three", "dw", "|two three" },
+		{ "one |two three", "dw", "one |three" },
+		{ "one two |three", "dw", "one two| " },
+		{ "|one two three", "d2w", "|three" },
+		{ "|one two three", "2dw", "|three" },
+		{ "|one two\nthree", "dw", "|two\nthree" },
+		{ "one tw|o\nthree", "dw", "one t|w\nthree" },
+		{ "|hello world", "de", "| world" },
+		{ "hello |world", "db", "|world" },
+		{ "hello |world", "d0", "|world" },
+		{ "hello |world", "d$", "hello| " },
+		{ "hello |world", "D", "hello| " },
+		{ "|hello world", "dfo", "| world" },
+		{ "|hello world", "dto", "|o world" },
+		{ "|l1\nl2\nl3", "dj", "|l3" },
+		{ "l1\nl2\n|l3", "dk", "|l1" },
+		{ "l1\n|l2\nl3", "dG", "|l1" },
+		{ "l1\n|l2\nl3", "dgg", "|l3" },
+		{ "|a\nb\n\nc", "d}", "|\nc" },
+		{ "|hello", "x", "|ello" },
+		{ "hell|o", "x", "hel|l" },
+		{ "|hello", "3x", "|lo" },
+		{ "hel|lo", "X", "he|lo" },
+		{ "|hello", "~", "H|ello" },
+		{ "|hello", "3~", "HEL|lo" },
+		{ "|hello", "rX", "|Xello" },
+		{ "|hello", "3rX", "XX|Xlo" },
+		{ "|l1\nl2\nl3", "dd", "|l2\nl3" },
+		{ "l1\n|l2\nl3", "dd", "l1\n|l3" },
+		{ "l1\nl2\n|l3", "dd", "l1\n|l2" },
+		{ "|l1\nl2\nl3", "2dd", "|l3" },
+		{ "|only", "dd", "|" },
+		{ "|l1\nl2", "yyp", "l1\n|l1\nl2" },
+		{ "|l1\nl2", "yyP", "|l1\nl1\nl2" },
+		{ "l1\n|l2", "yyp", "l1\nl2\n|l2" },
+		{ "|l1\nl2\nl3", "ddp", "l2\n|l1\nl3" },
+		{ "|l1\nl2", "Yp", "l1\n|l1\nl2" },
+		{ "|  l1\nl2", "J", "  l1| l2" },
+		{ "|a\n  b\nc", "3J", "a b| c" },
+		{ "|a.\nb", "J", "a.| b" },
+		{ "|a\n)b", "J", "a|)b" },
+		{ "|one two", "cwONE\033", "ON|E two" },
+		{ "one |two", "cwX\033", "one |X" },
+		{ "o|ne two", "cwX\033", "o|X two" },
+		{ "|one two", "c2wX\033", "|X" },
+		{ "|one two", "ceX\033", "|X two" },
+		{ "one |two", "C!\033", "one |!" },
+		{ "|l1\nl2", "ccX\033", "|X\nl2" },
+		{ "|l1\nl2", "SX\033", "|X\nl2" },
+		{ "|hello", "sJ\033", "|Jello" },
+		{ "|hello", "3sJ\033", "|Jlo" },
+		{ "|ab", "iX\033", "|Xab" },
+		{ "|ab", "aX\033", "a|Xb" },
+		{ "a|b", "IX\033", "|Xab" },
+		{ "|ab", "AX\033", "ab|X" },
+		{ "|ab\ncd", "oX\033", "ab\n|X\ncd" },
+		{ "ab\n|cd", "OX\033", "ab\n|X\ncd" },
+		{ "|ab", "3iX\033", "XX|Xab" },
+		{ "|ab", "2aXY\033", "aXYX|Yb" },
+		{ "|ab", "iXY\bZ\033", "X|Zab" },
+		{ "|ab", "i1\r2\033", "1\n|2ab" },
+		{ "|a", "3oX\033", "a\nX\nX\n|X" },
+		{ "one t|wo three", "diw", "one | three" },
+		{ "one t|wo three", "daw", "one |three" },
+		{ "one two thre|e", "daw", "one tw|o" },
+		{ "one t|wo three", "ciwX\033", "one |X three" },
+		{ "say \"he|llo\" now", "di\"", "say \"|\" now" },
+		{ "say \"he|llo\" now", "da\"", "say |now" },
+		{ "say \"he|llo\" now", "ci\"X\033", "say \"|X\" now" },
+		{ "f(a, |b) g", "di(", "f(|) g" },
+		{ "f(a, |b) g", "da(", "f| g" },
+		{ "f(a, (|b)) g", "di(", "f(a, (|)) g" },
+		{ "[x |y]", "di[", "[|]" },
+		{ "{a\n|b\n}", "di{", "|{\n}" },
+		{ "|a\nb\n\nc", "dip", "|\nc" },
+		{ "|a\nb\n\nc", "dap", "|c" },
+		{ "a\n|b\n\nc\nd", "yipP", "|a\nb\na\nb\n\nc\nd" },
+		{ "|one two", "ywP", "one| one two" },
+		{ "|one two", "yw$p", "one twoone| " },
+		{ "|one two", "dwu", "|one two" },
+		{ "|one two", "dwu\022", "|two" },
+		{ "|one two", "cwX\033u", "|one two" },
+		{ "|one two three", "cwX\033wu", "|one two three" },
+		{ "|a\nb\nc", "dd.", "|c" },
+		{ "|abcdef", "x..", "|def" },
+		{ "|abcdef", "x3.", "|ef" },
+		{ "|one two three", "cwX\033w.", "X |X three" },
+		{ "|a b c", "iX\033w.w.", "Xa Xb |Xc" },
+		{ "|ab\ncd", "Ax\033j.", "abx\ncd|x" },
+		{ "|l1\nl2\nl3\nl4", "dj.", "|" },
+		{ "|a\nb", "yyjp.", "a\nb\na\n|a" },
+		{ "|one two", "dwP", "one| two" },
+		{ "|abc", "xp", "b|ac" },
+		{ "|one two three", "dwwP", "two one| three" },
+		{ "|aXbXc", "fXr-;.", "a-b|-c" },
+		{ "|l1\nl2", "ddu", "|l1\nl2" },
+		{ "|hello world", "vlld", "|lo world" },
+		{ "|hello world", "vey$p", "hello worldhell|o" },
+		{ "|l1\nl2\nl3", "Vjd", "|l3" },
+		{ "|hello world", "vec!\033", "|! world" },
+		{ "|hello", "v$~", "|HELLO" },
+		{ "|a\nb\nc", "VjJ", "a| b\nc" },
+		{ "hel|lo world", "vbd", "|o world" },
+		{ "|abc", "lvhd", "|c" },
+		{ "|l1\nl2", "Vy$p", "l1\n|l1\nl2" },
+		{ "|ab", "v\033x", "|b" },
+		{ "|", "x", "|" },
+		{ "|", "dd", "|" },
+		{ "|", "iX\033", "|X" },
+		{ "|", "oX\033", "\n|X" },
+		{ "|", "p", "|" },
+		{ "|a", "ddp", "\n|a" },
+		{ "|ab", "dw", "|" },
+		{ "a|b", "dw", "|a" },
+		{ "a |b", "dw", "a| " },
+		{ "ab|\ncd", "x", "|a\ncd" },
+		{ "ab\n|\ncd", "x", "ab\n|\ncd" },
+		{ "ab\n|\ncd", "dd", "ab\n|cd" },
+		{ "|one  two", "cwX\033", "|X  two" },
+		{ "one| two", "cwX\033", "one|Xtwo" },
+		{ "|ab cd", "5w", "ab c|d" },
+		{ "|ab cd", "5e", "ab c|d" },
+		{ "ab |cd", "5b", "|ab cd" },
+		{ "|l1\nl2", "9G", "l1\n|l2" },
+		{ "|l1\nl2", "9j", "l1\n|l2" },
+		{ "l1\n|l2", "9k", "|l1\nl2" },
+		{ "|l1\nl2", "9dd", "|" },
+		{ "|l1\nl2", "yy9p", "l1\n|l1\nl1\nl1\nl1\nl1\nl1\nl1\nl1\nl1\nl2" },
+		{ "l1\n|l2", "yyP", "l1\n|l2\nl2" },
+		{ "l1\n|l2", "ddP", "|l2\nl1" },
+		{ "|l1\nl2", "J", "l1| l2" },
+		{ "l1\n|l2", "J", "l1\n|l2" },
+		{ "|l1", "J", "|l1" },
+		{ "|abc", "$a!\033", "abc|!" },
+		{ "|abc", "A\b\bX\033", "a|X" },
+		{ "|ab\ncd", "jdk", "|" },
+		{ "|ab\ncd\nef", "jdj", "|ab" },
+		{ "|ab", "yl3p", "aaa|ab" },
+		{ "|ab", "yl3P", "aa|aab" },
+		{ "|hello", "fz", "|hello" },
+		{ "|hello", "dfz", "|hello" },
+		{ "he|llo", "d0", "|llo" },
+		{ "|a b c d", "dW.", "|c d" },
+		{ "|a\nb\nc", "jyykp", "a\n|b\nb\nc" },
+		{ "|  ab", "0cwX\033", "|Xab" },
+		{ "|ab", "vd", "|b" },
+		{ "a|b", "v$y0P", "|bab" },
+		{ "|one\ntwo\nthree", "Vjy", "|one\ntwo\nthree" },
+		{ "|one\ntwo\nthree", "VjyGp", "one\ntwo\nthree\n|one\ntwo" },
+		{ "|abc def", "wvbd", "|ef" },
+		{ "|a\n\nb", "}dd", "a\n|b" },
+		{ "|x", "rX~", "|x" },
+		{ "|abc", "d\033x", "|bc" },
+		{ "|abc", "3\033x", "|bc" },
+	};
+
+	char reg[256], got[256];
+	Vi v;
+	ViHost h;
+	size_t i;
+
+	/* every case checked against vim (tests/vi_oracle.py), with LF and CR */
+	for (i = 0; i < sizeof(kVi) / sizeof(kVi[0]); i++) {
+		ViCase(kVi[i][0], kVi[i][1], kVi[i][2], 0, (int) i);
+		ViCase(kVi[i][0], kVi[i][1], kVi[i][2], 1, (int) i);
+	}
+
+	/* off: every key is the app's */
+	VhInit(&h, &v, reg, sizeof(reg), "|ab");
+	v.on = 0;
+	CHECK(vi_key(&v, &h, 'x', 0) == 0);
+	CHECK_STR(vi_status(&v), "");
+	v.on = 1;
+	CHECK_STR(vi_status(&v), "");
+	CHECK(vi_key(&v, &h, 'i', 0) == 1);
+	CHECK_STR(vi_status(&v), "-- INSERT --");
+	CHECK(vi_key(&v, &h, 0x1C, 0) == 0);            /* an arrow key: the app's */
+	CHECK(vi_key(&v, &h, VI_ESC, 0) == 1);
+	CHECK(vi_key(&v, &h, 'V', 0) == 1);
+	CHECK_STR(vi_status(&v), "-- VISUAL LINE --");
+	CHECK(gVs == 0 && gVe == 2);
+	(void) vi_key(&v, &h, 'v', 0);
+	CHECK_STR(vi_status(&v), "-- VISUAL --");
+	vi_clicked(&v, &h);
+	CHECK(v.mode == VI_NORMAL && gVs == gVe);
+
+	/* jk: quickly, it's Escape; slowly, it's text */
+	VhInit(&h, &v, reg, sizeof(reg), "|ab");
+	v.jk = 1;
+	(void) vi_key(&v, &h, 'i', 1000);
+	(void) vi_key(&v, &h, 'x', 1001);
+	(void) vi_key(&v, &h, 'j', 1002);
+	(void) vi_key(&v, &h, 'k', 1010);
+	VhShow(got);
+	CHECK_STR(got, "|xab");
+	CHECK(v.mode == VI_NORMAL);
+	(void) vi_key(&v, &h, 'u', 1100);
+	VhShow(got);
+	CHECK_STR(got, "|ab");
+	VhInit(&h, &v, reg, sizeof(reg), "|ab");
+	v.jk = 1;
+	(void) vi_key(&v, &h, 'i', 1000);
+	(void) vi_key(&v, &h, 'j', 1002);
+	(void) vi_key(&v, &h, 'k', 1200);
+	CHECK(v.mode == VI_INSERT);
+	(void) vi_key(&v, &h, VI_ESC, 1300);
+	VhShow(got);
+	CHECK_STR(got, "j|kab");
+
+	/* a full register: what fits */
+	{
+		char small[4];
+		VhInit(&h, &v, small, sizeof(small), "|abcdef");
+		(void) vi_key(&v, &h, 'y', 0);
+		(void) vi_key(&v, &h, '$', 0);
+		(void) vi_key(&v, &h, 'P', 0);
+		VhShow(got);
+		CHECK_STR(got, "ab|cabcdef");
+	}
+
+	/* any keys at all: no reads or writes out of bounds, the caret in the text */
+	{
+		static const char kKeys[] = "hjklwbeWBE0^$GgfFtT;,dcyxXDCsSYpPrJ~iaIAoOvVuU.{}\033\033\033\b\r 12a";
+		char big[64];
+		int round, j;
+		srand(4);
+		for (round = 0; round < 3000; round++) {
+			int len = rand() % 40;
+			char text[64];
+			for (j = 0; j < len; j++)
+				text[j] = "ab .(\n\n x"[rand() % 9];
+			text[len] = '\0';
+			memmove(text + 1, text, (size_t) len + 1);
+			text[0] = '|';
+			VhInit(&h, &v, big, sizeof(big), text);
+			for (j = 0; j < 30; j++) {
+				(void) vi_key(&v, &h, (unsigned char) kKeys[rand() % (int) (sizeof(kKeys) - 1)], (unsigned long) j);
+				if (gVs < 0 || gVe > gVn || gVs > gVe) {
+					gFailed++;
+					break;
+				}
+			}
+		}
+		CHECK(round == 3000);
+	}
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -1031,6 +1458,7 @@ int main(void)
 	TestMdpage();
 	TestLayout();
 	TestMdhtml();
+	TestVi();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

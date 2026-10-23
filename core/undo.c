@@ -9,6 +9,9 @@ typedef struct {
 	short kind, pad;
 } Hdr;
 
+/* In a step's kind: the step goes with the one before it */
+#define kJoined 0x100
+
 #define HDR 16L                 /* packed big-endian, the same on every host */
 
 static long StepSize(long dlen, long ilen)
@@ -78,10 +81,17 @@ void undo_clear(UndoStack *u)
 	u->done = 0;
 	u->open = 0;
 	u->lost = 0;
+	u->group = 0;
 }
 
 void undo_seal(UndoStack *u)
 {
+	u->open = 0;
+}
+
+void undo_group(UndoStack *u, int begin)
+{
+	u->group = begin ? 1 : 0;
 	u->open = 0;
 }
 
@@ -129,7 +139,7 @@ static int Coalesce(UndoStack *u, int kind, long pos, const char *del, long dlen
 		return 0;
 	off = Offset(u, u->count - 1);
 	GetHdr(u, off, &h);
-	if (kind == kUndoTyping && h.kind == kUndoTyping && dlen == 0 && pos == h.pos + h.ilen) {
+	if (kind == kUndoTyping && (h.kind & ~kJoined) == kUndoTyping && dlen == 0 && pos == h.pos + h.ilen) {
 		grow = StepSize(h.dlen, h.ilen + ilen) - StepSize(h.dlen, h.ilen);
 		if (!MakeRoom(u, grow, 1)) {
 			Overflow(u);
@@ -142,7 +152,7 @@ static int Coalesce(UndoStack *u, int kind, long pos, const char *del, long dlen
 		u->used += grow;
 		return 1;
 	}
-	if (kind == kUndoDelete && h.kind == kUndoTyping && ilen == 0 && dlen <= h.ilen
+	if (kind == kUndoDelete && (h.kind & ~kJoined) == kUndoTyping && ilen == 0 && dlen <= h.ilen
 			&& pos + dlen == h.pos + h.ilen) {
 		/* Delete after typing takes back what was typed */
 		u->used -= StepSize(h.dlen, h.ilen) - StepSize(h.dlen, h.ilen - dlen);
@@ -156,7 +166,7 @@ static int Coalesce(UndoStack *u, int kind, long pos, const char *del, long dlen
 		}
 		return 1;
 	}
-	if (kind == kUndoDelete && h.kind == kUndoDelete && ilen == 0 && h.ilen == 0
+	if (kind == kUndoDelete && (h.kind & ~kJoined) == kUndoDelete && ilen == 0 && h.ilen == 0
 			&& (pos + dlen == h.pos || pos == h.pos)) {
 		grow = StepSize(h.dlen + dlen, 0) - StepSize(h.dlen, 0);
 		if (!MakeRoom(u, grow, 1)) {
@@ -202,8 +212,10 @@ void undo_record(UndoStack *u, int kind, long pos, const char *del, long dlen, c
 	h.pos = pos;
 	h.dlen = dlen;
 	h.ilen = ilen;
-	h.kind = (short) kind;
+	h.kind = (short) (kind | (u->group == 2 ? kJoined : 0));
 	h.pad = 0;
+	if (u->group == 1)
+		u->group = 2;
 	SetHdr(u, off, &h);
 	if (dlen > 0)
 		memcpy(u->buf + off + HDR, del, (size_t) dlen);
@@ -222,7 +234,7 @@ int undo_peek(const UndoStack *u, int redo)
 	if (redo ? u->done >= u->count : u->done <= 0)
 		return kUndoNone;
 	GetHdr(u, Offset(u, redo ? u->done : u->done - 1), &h);
-	return h.kind;
+	return h.kind & ~kJoined;
 }
 
 int undo_step(UndoStack *u, int redo, UndoApply *a)
@@ -234,7 +246,7 @@ int undo_step(UndoStack *u, int redo, UndoApply *a)
 		return 0;
 	off = Offset(u, redo ? u->done : u->done - 1);
 	GetHdr(u, off, &h);
-	a->kind = h.kind;
+	a->kind = h.kind & ~kJoined;
 	a->pos = h.pos;
 	if (redo) {
 		a->removeLen = h.dlen;
@@ -242,6 +254,12 @@ int undo_step(UndoStack *u, int redo, UndoApply *a)
 		a->insertLen = h.ilen;
 		a->selStart = a->selEnd = h.pos + h.ilen;
 		u->done++;
+		a->more = 0;
+		if (u->done < u->count) {
+			Hdr next;
+			GetHdr(u, off + StepSize(h.dlen, h.ilen), &next);
+			a->more = (next.kind & kJoined) != 0;
+		}
 	} else {
 		a->removeLen = h.ilen;
 		a->insert = u->buf + off + HDR;
@@ -249,6 +267,7 @@ int undo_step(UndoStack *u, int redo, UndoApply *a)
 		a->selStart = h.pos;
 		a->selEnd = h.pos + h.dlen;
 		u->done--;
+		a->more = (h.kind & kJoined) != 0;
 	}
 	u->open = 0;
 	return 1;

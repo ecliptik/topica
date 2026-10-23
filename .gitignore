@@ -18,6 +18,8 @@ build-*/
 diskimages/
 screenshots/
 tests/test_core
+tests/vi_run
+tests/__pycache__/
 tests/*.dSYM
 __pycache__/
 
