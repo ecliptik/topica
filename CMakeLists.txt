@@ -69,6 +69,11 @@ set(TOPICA_SOURCES
 # Publish's TCP: MacTCP, or talkip's stack in the application (a 512K Mac
 # on LocalTalk, which has no room for MacTCP). talkip is a separate
 # repository: https://github.com/ecliptik/talkip, next to this one.
+# Drag and drop (System 7.5): not in Lite, for 512K Macs on System 6
+if(NOT TOPICA_LITE)
+    list(APPEND TOPICA_SOURCES app/textdrag.c)
+endif()
+
 if(TOPICA_TALKIP)
     if(NOT DEFINED TALKIP_DIR)
         set(TALKIP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../talkip)

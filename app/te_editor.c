@@ -188,6 +188,65 @@ static short LineHeight(Editor *ed)
 	return (*ed->te)->lineHeight;
 }
 
+long EdOffsetAt(Editor *ed, Point local)
+{
+	return TEGetOffset(local, ed->te);
+}
+
+/* The bottom left of the character at offset (TEGetPoint packs v, h) */
+static Point PointOf(Editor *ed, long offset)
+{
+	long packed = TEGetPoint((short) offset, ed->te);
+	Point p;
+
+	p.v = (short) (packed >> 16);
+	p.h = (short) (packed & 0xFFFF);
+	return p;
+}
+
+void EdCaretRect(Editor *ed, long offset, Rect *r)
+{
+	Point p = PointOf(ed, offset);
+
+	SetRect(r, p.h - 1, p.v - LineHeight(ed), p.h, p.v);
+}
+
+RgnHandle EdSelectionRgn(Editor *ed)
+{
+	TEPtr t = *ed->te;
+	RgnHandle rgn = NewRgn(), part = NewRgn();
+	short start = t->selStart, end = t->selEnd, h = t->lineHeight;
+	Rect view = t->viewRect, r;
+	Point a, b;
+
+	if (rgn == NULL || part == NULL || start >= end) {
+		if (part != NULL)
+			DisposeRgn(part);
+		return rgn;
+	}
+	a = PointOf(ed, start);
+	b = PointOf(ed, end);
+	if (a.v == b.v) {                               /* one line */
+		SetRect(&r, a.h, a.v - h, b.h, b.v);
+		RectRgn(rgn, &r);
+	} else {
+		SetRect(&r, a.h, a.v - h, view.right, a.v);        /* the first line's end */
+		RectRgn(rgn, &r);
+		if (b.v - h > a.v) {                               /* whole lines between */
+			SetRect(&r, view.left, a.v, view.right, b.v - h);
+			RectRgn(part, &r);
+			UnionRgn(rgn, part, rgn);
+		}
+		SetRect(&r, view.left, b.v - h, b.h, b.v);         /* the last line's start */
+		RectRgn(part, &r);
+		UnionRgn(rgn, part, rgn);
+	}
+	RectRgn(part, &view);
+	SectRgn(rgn, part, rgn);
+	DisposeRgn(part);
+	return rgn;
+}
+
 /* Lines that fit in the view */
 static short PageLines(Editor *ed)
 {

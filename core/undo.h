@@ -19,6 +19,7 @@ enum {
 	kUndoInsert,        /* an Insert menu item */
 	kUndoReplace,       /* Find/Replace */
 	kUndoChange,        /* a vi command */
+	kUndoDrag,          /* drag and drop */
 	kUndoKinds
 };
 

@@ -79,5 +79,6 @@
 - [x] A template file for New Post ("Topica Template", `{{date}}`)
 - [x] Stationery pads (System 7): open as an untitled post, `{{date}}`
       filled in
-- [ ] Drag and drop on 7.5, a quick-note desk accessory
+- [x] Drag and drop text on System 7.5 (moves within a post, copies out)
+- [ ] A quick-note desk accessory
 - [ ] Release script: `.dsk`, `.hqx` and `.sit` for both builds

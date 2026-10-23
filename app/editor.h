@@ -33,6 +33,13 @@ void EdActivate(Editor *ed, Boolean active);
 void EdIdle(Editor *ed);                       /* blinks the caret */
 /* A click in the view; extend: Shift was down */
 void EdClick(Editor *ed, Point local, Boolean extend);
+
+/* For drag and drop: the offset nearest a point in the view, where the
+   caret for an offset would be, and the selection's outline (a new region,
+   local coordinates, clipped to the view; empty with no selection) */
+long EdOffsetAt(Editor *ed, Point local);
+void EdCaretRect(Editor *ed, long offset, Rect *r);
+RgnHandle EdSelectionRgn(Editor *ed);
 /* Arrow, Home, End, Page Up and Page Down keys: 1 if it was one */
 Boolean EdNavigate(Editor *ed, char c, short modifiers);
 

@@ -54,6 +54,10 @@ Boolean DocHasSelection(Doc *d);
 Boolean DocIsDirty(Doc *d);
 Boolean DocHasFile(Doc *d);
 void DocSealUndo(Doc *d);
+/* The text's area in the window (local coordinates) */
+void DocTextRect(Doc *d, Rect *r);
+/* Edits between begin and end undo as one (a drag that moves text) */
+void DocGroupEdits(Doc *d, Boolean begin);
 
 /* Opens the recovery copies a crash left behind; how many */
 short DocRecoverAll(void);

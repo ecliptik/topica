@@ -12,6 +12,10 @@ Polish.
   beside Topica (or with its preferences), any front matter you like;
   `{{date}}` in it becomes today's date. New keys from Post Info go above
   the front matter's trailing blank lines.
+- Drag and drop text on System 7.5 and later: press on the selection and
+  drag. Within a post it moves; to another post, another application or
+  the desktop (a clipping) it copies; text dropped on a post goes where
+  the caret shows. Edit says Undo Drag. Not in Topica Lite.
 - Stationery pads on System 7: a post made a stationery pad in the
   Finder's Get Info opens as a new untitled post, `{{date}}` filled in.
 - Balloon Help on System 7, short and only where it helps: the menu items

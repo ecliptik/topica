@@ -28,6 +28,7 @@
 #include "preview.h"
 #include "print.h"
 #include "publishwin.h"
+#include "textdrag.h"
 #include "settings.h"
 #include "spellwin.h"
 #include "util.h"
@@ -48,7 +49,7 @@ static Boolean gInBackground;
 static Boolean gHaveAE;
 
 static const char *const kUndoNames[kUndoKinds] = {
-	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace", "Change"
+	"", "Typing", "Delete", "Cut", "Paste", "Clear", "Post Info", "Insert", "Replace", "Change", "Drag"
 };
 
 static void Enable(MenuHandle m, short item, Boolean on)
@@ -451,6 +452,7 @@ static void Setup(void)
 	DrawMenuBar();
 	gUpdateHook = Update;
 	SettingsLoad();
+	DragInit();
 	gHaveAE = AppleEventsInit(DoQuit, OpenAppEvent, OpenFileEvent, PrintFileEvent);
 }
 

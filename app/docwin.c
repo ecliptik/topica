@@ -31,6 +31,7 @@
 #include "postinfo.h"
 #include "preview.h"
 #include "settings.h"
+#include "textdrag.h"
 #include "util.h"
 
 #ifndef TOPICA_MAX_DOCS
@@ -174,6 +175,17 @@ static void ViewRect(Doc *d, Rect *r)
 	*r = d->w->portRect;
 	r->right -= kScrollWidth - 1;
 	r->bottom -= kStatusHeight;
+}
+
+void DocTextRect(Doc *d, Rect *r)
+{
+	ViewRect(d, r);
+}
+
+void DocGroupEdits(Doc *d, Boolean begin)
+{
+	undo_seal(&d->undo);
+	undo_group(&d->undo, begin);
 }
 
 static void BarRect(Doc *d, Rect *r)
@@ -359,6 +371,7 @@ static Doc *MakeDoc(void)
 	vi_init(&d->vi, &gViReg);
 	d->vi.on = gPrefs.vi;
 	d->vi.jk = gPrefs.viJk;
+	DragInstall(d->w);
 	gDocs[slot] = d;
 	return d;
 nomem:
@@ -774,6 +787,7 @@ Doc *DocOpen(const FileRef *f)
 				gDocs[i] = NULL;
 		EdDispose(d->ed);
 		DisposePtr(d->undoBuf);
+		DragRemove(d->w);
 		DisposeWindow(d->w);
 		DisposePtr((Ptr) d);
 		return NULL;
@@ -919,6 +933,7 @@ Boolean DocClose(Doc *d, Boolean quitting)
 			gDocs[i] = NULL;
 	EdDispose(d->ed);
 	DisposePtr(d->undoBuf);
+	DragRemove(d->w);
 	DisposeWindow(d->w);
 	DisposePtr((Ptr) d);
 	return true;
@@ -1118,6 +1133,11 @@ void DocClick(Doc *d, EventRecord *e)
 	}
 	ViewRect(d, &v);
 	if (PtInRect(p, &v)) {
+		if (!(e->modifiers & shiftKey) && DragText(d, e)) {
+			SyncScrollBar(d);
+			UpdateStatus(d, false);
+			return;
+		}
 		EdClick(d->ed, p, (e->modifiers & shiftKey) != 0);
 		ViClicked(d);
 		SyncScrollBar(d);
