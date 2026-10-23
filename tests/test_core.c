@@ -505,15 +505,16 @@ static void TestPrefs(void)
 	prefs_default(&p);
 	CHECK_STR(p.font, "Monaco");
 	CHECK(p.size == 9 && p.utf8 && p.lf && p.autosaveMinutes == 2 && p.profile == kProfileJekyll && p.format);
-	CHECK(!p.vi && !p.viJk && p.bridge[0] == '\0' && p.bridgeKey[0] == '\0');
+	CHECK(!p.vi && !p.viJk && p.bridge[0] == '\0' && p.bridgeKey[0] == '\0' && !p.yearFolders);
 	{
 		const char *text = "publish-bridge: 10.0.2.2:8023\rpublish-key: a b:c\r# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
-			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\rvi: on\r";
+			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\rvi: on\r"
+			"publish-year-folders: on\r";
 		prefs_read(&p, text, (long) strlen(text));
 	}
 	CHECK_STR(p.font, "Geneva");
 	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5 && !p.format);
-	CHECK(p.vi && !p.viJk);
+	CHECK(p.vi && !p.viJk && p.yearFolders);
 	CHECK_STR(p.imagePath, "/img/");
 	CHECK_STR(p.layout, "page");
 	CHECK_STR(p.bridge, "10.0.2.2:8023");
@@ -1721,23 +1722,23 @@ static void TestPublish(void)
 	CHECK(!pub_address("1.2.3.4 ", &ip, &port));
 
 	/* the post's path */
-	pub_path(0, 0, "2026-10-23-hello.md", "Other", "2026-01-01", out, sizeof(out));
+	pub_path(0, 0, 0, "2026-10-23-hello.md", "Other", "2026-01-01", out, sizeof(out));
 	CHECK_STR(out, "_posts/2026-10-23-hello.md");
-	pub_path(0, 0, "Hello World", "Hello, W\x9Arld!", "2026-10-23 09:00:00 -0700", out, sizeof(out));
+	pub_path(0, 0, 0, "Hello World", "Hello, W\x9Arld!", "2026-10-23 09:00:00 -0700", out, sizeof(out));
 	CHECK_STR(out, "_posts/2026-10-23-hello-world.md");
-	pub_path(0, 0, "untitled", "", "", out, sizeof(out));
+	pub_path(0, 0, 0, "untitled", "", "", out, sizeof(out));
 	CHECK_STR(out, "_posts/untitled.md");                  /* no date: the dialog asks for one */
-	pub_path(0, 1, "2026-10-23-hello.md", "x", "2026-10-23", out, sizeof(out));
+	pub_path(0, 1, 0, "2026-10-23-hello.md", "x", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "_drafts/hello.md");
-	pub_path(0, 1, "notes.md", "x", "2026-10-23", out, sizeof(out));
+	pub_path(0, 1, 0, "notes.md", "x", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "_drafts/notes.md");
-	pub_path(0, 1, "My Notes", "Caf\x8E Notes", "2026-10-23", out, sizeof(out));
+	pub_path(0, 1, 0, "My Notes", "Caf\x8E Notes", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "_drafts/cafe-notes.md");
-	pub_path(1, 0, "hello.md", "x", "2026-10-23", out, sizeof(out));
+	pub_path(1, 0, 0, "hello.md", "x", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "content/posts/hello.md");
-	pub_path(1, 1, "Hello", "Hugo Post", "", out, sizeof(out));
+	pub_path(1, 1, 0, "Hello", "Hugo Post", "", out, sizeof(out));
 	CHECK_STR(out, "content/posts/hugo-post.md");
-	pub_path(0, 0, "2026-10-23-hello.md", "x", "", out, 12);
+	pub_path(0, 0, 0, "2026-10-23-hello.md", "x", "", out, 12);
 	CHECK_STR(out, "_posts/2026");
 	CHECK(pub_path_ok("_posts/2026-10-23-hello.md"));
 	CHECK(pub_path_ok("_drafts/a.markdown"));
@@ -1751,6 +1752,25 @@ static void TestPublish(void)
 	CHECK(!pub_path_ok("_posts/a b.md"));
 	CHECK(!pub_path_ok("_posts/untitled.md"));             /* Jekyll skips a post without a date */
 	CHECK(!pub_path_ok("_posts/2026-10-2-x.md"));
+	pub_path(0, 0, 1, "Hello World", "Hello", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_posts/2026/2026-10-23-hello.md");
+	pub_path(0, 0, 1, "untitled", "", "", out, sizeof(out));
+	CHECK_STR(out, "_posts/untitled.md");
+	pub_path(0, 1, 1, "Hello World", "Hello", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_drafts/hello.md");
+	pub_path(1, 0, 1, "Hello World", "Hello", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "content/posts/hello.md");
+	CHECK(pub_path_ok("_posts/2026/2026-10-23-hello.md"));
+	CHECK(pub_path_years("_posts/2026/2026-10-23-hello.md"));
+	CHECK(!pub_path_years("_posts/2026-10-23-hello.md"));
+	CHECK(!pub_path_years("_posts/2026"));
+	CHECK(!pub_path_years("_posts/"));
+	CHECK(!pub_path_ok("_posts/2025/2026-10-23-hello.md"));
+	CHECK(!pub_path_ok("_posts/2026/hello.md"));
+	CHECK(!pub_path_ok("_posts/2026/10/2026-10-23-x.md"));
+	CHECK(!pub_path_ok("_posts/2026/2026-10-23-a/b.md"));
+	CHECK(!pub_path_ok("_posts/2026/"));
+	CHECK(!pub_path_ok("_drafts/2026/2026-10-23-x.md"));
 
 	/* the request */
 	n = pub_request(out, sizeof(out), "10.0.2.2", 8023, "kkkkkkkkkkkkkkkk", "_posts/a.md", 1234);

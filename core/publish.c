@@ -97,11 +97,25 @@ static int Dated(const char *n)
 	return Ymd(n) && n[10] == '-';
 }
 
+int pub_path_years(const char *path)
+{
+	int i;
+
+	if (strncmp(path, "_posts/", 7) != 0)
+		return 0;
+	for (i = 7; i < 11; i++)
+		if (!IS_DIGIT(path[i]))
+			return 0;
+	return path[11] == '/' && Ymd(path + 12) && strncmp(path + 7, path + 12, 4) == 0;
+}
+
 int pub_path_ok(const char *path)
 {
 	static const char *const dirs[] = { "_posts/", "_drafts/", "content/posts/" };
 	int i;
 
+	if (pub_path_years(path))
+		return strchr(path + 12, '/') == NULL && NameOk(path + 12) && Dated(path + 12);
 	for (i = 0; i < 3; i++) {
 		size_t k = strlen(dirs[i]);
 		if (strncmp(path, dirs[i], k) == 0)
@@ -110,10 +124,11 @@ int pub_path_ok(const char *path)
 	return 0;
 }
 
-void pub_path(int hugo, int draft, const char *name, const char *title, const char *date, char *out, int cap)
+void pub_path(int hugo, int draft, int years, const char *name, const char *title, const char *date, char *out,
+		int cap)
 {
 	const char *dir = hugo ? "content/posts/" : draft ? "_drafts/" : "_posts/";
-	char file[96];
+	char file[96], year[8];
 	int y = 0, m = 0, d = 0;
 
 	if (NameOk(name) && strlen(name) < sizeof(file) && (hugo || draft || Dated(name))) {
@@ -128,9 +143,15 @@ void pub_path(int hugo, int draft, const char *name, const char *title, const ch
 		}
 		post_filename(y, m, d, title, 0, file, (int) sizeof(file));
 	}
+	year[0] = '\0';
+	if (years && !hugo && !draft && Dated(file)) {
+		memcpy(year, file, 4);
+		strcpy(year + 4, "/");
+	}
 	if (cap > 0) {
 		strncpy(out, dir, (size_t) cap - 1);
 		out[cap - 1] = '\0';
+		strncat(out, year, (size_t) cap - 1 - strlen(out));
 		strncat(out, file, (size_t) cap - 1 - strlen(out));
 	}
 }

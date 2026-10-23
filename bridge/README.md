@@ -55,8 +55,9 @@ Any method but `POST`, any path but `/publish`, a source address off
 `TOPICA_BRIDGE_ALLOW` (by default loopback, link-local and the private
 ranges, but not the 100.64.0.0/10 shared range), a missing or wrong key, a
 post over 512K, text that isn't UTF-8, and a path that isn't a Markdown
-file right in `_posts` (named with its date, as Jekyll wants), `_drafts`
-or `content/posts`.
+file right in `_posts` (named with its date, as Jekyll wants, and maybe in
+a folder for its year: `_posts/2026/2026-10-23-title.md`), `_drafts` or
+`content/posts`.
 
 ## The trust boundary
 

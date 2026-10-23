@@ -102,7 +102,9 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(self.send(key="wrong" * 5)[0], 401)
         self.assertEqual(self.send(key="")[0], 401)
         for bad in ("../x.md", "_posts/../x.md", "_posts/x.txt", "_posts/sub/x.md", "_config.yml", "x.md",
-                    "/_posts/x.md", "_posts/.hidden.md", "_posts/", "", "_posts/undated.md"):
+                    "/_posts/x.md", "_posts/.hidden.md", "_posts/", "", "_posts/undated.md",
+                    "_posts/2025/2026-10-23-x.md", "_posts/2026/x.md", "_posts/2026/10/2026-10-23-x.md",
+                    "_posts/20266/20266-10-23-x.md", "_drafts/2026/2026-10-23-x.md"):
             self.assertEqual(self.send(path=bad)[0], 400, bad)
         self.assertEqual(self.send(body=b"\xff\xfe bad")[0], 400)
         self.assertEqual(self.send(body=b"nul\0")[0], 400)
@@ -110,6 +112,11 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(self.send(target="/publish/../x")[0], 404)
         self.assertEqual(self.send(target="/publish?x=1")[0], 404)
         self.assertEqual(self.remote_file("drafts", "_posts/2026-10-23-hello.md"), b"")
+
+    def test_year_folder(self):
+        status, text = self.send(path="_posts/2026/2026-10-23-hello.md")
+        self.assertEqual(status, 200, text)
+        self.assertNotEqual(self.remote_file("drafts", "_posts/2026/2026-10-23-hello.md"), b"")
 
     def test_too_large(self):
         self.server.config.max_bytes = 100

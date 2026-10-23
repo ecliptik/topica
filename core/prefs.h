@@ -22,6 +22,7 @@ typedef struct {
 	short viJk;                 /* jk in insert mode is Escape */
 	char bridge[64];            /* Publish's bridge: "192.0.2.10:8023" */
 	char bridgeKey[64];         /* the key it asks for */
+	short yearFolders;          /* a post goes in a folder for its year: _posts/2026/ */
 } TopicaPrefs;
 
 void prefs_default(TopicaPrefs *p);

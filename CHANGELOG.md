@@ -9,7 +9,9 @@ Publish.
   A classic Mac has no TLS, so it can't push to a git host itself. The
   dialog suggests the post's path (`_posts/2026-10-23-title.md`, or
   `_drafts/title.md` for a draft, or `content/posts/title.md` for Hugo)
-  and remembers the bridge's address and key. The post goes as UTF-8 with
+  and remembers the bridge's address and key. A blog that keeps posts in
+  a folder for each year (`_posts/2026/2026-10-23-title.md`) works too:
+  publish one there, and the next post is suggested there. The post goes as UTF-8 with
   LF line ends, whatever the Preferences say for saving.
 - MacTCP on the Plus and System 7. A `--talkip` build of Topica Lite
   carries [talkip](https://github.com/ecliptik/talkip), TCP/IP over

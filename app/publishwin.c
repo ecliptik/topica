@@ -57,7 +57,7 @@ static void SuggestPath(Doc *d, Boolean draft, char *out, int cap)
 		Today(date);
 	GetWTitle(DocWindow(d), w);
 	CStr(name, w);
-	pub_path(gPrefs.profile == kProfileHugo, draft, name, title, date, out, cap);
+	pub_path(gPrefs.profile == kProfileHugo, draft, gPrefs.yearFolders, name, title, date, out, cap);
 }
 
 /* What went wrong with the connection, in words that say what to do */
@@ -176,7 +176,7 @@ void PublishPost(Doc *d)
 	char path[PUB_PATH], bridge[64], key[64], about[400], title[256];
 	unsigned long ip = 0;
 	unsigned short port = 0;
-	short item, draft = 0;
+	short item, draft = 0, years;
 	Boolean hugo = gPrefs.profile == kProfileHugo;
 
 	dlg = GetModalDialog(kPublishDialog);
@@ -231,7 +231,8 @@ void PublishPost(Doc *d)
 		} else if (!pub_path_ok(path)) {
 			ShowNote(hugo
 				? "A post goes in content/posts, named like content/posts/title.md."
-				: "A post goes in _posts, named with its date: _posts/2026-10-23-title.md. A draft goes in _drafts.");
+				: "A post goes in _posts, named with its date: _posts/2026-10-23-title.md, or "
+				"_posts/2026/2026-10-23-title.md. A draft goes in _drafts.");
 			SelectDialogItemText(dlg, kPathField, 0, 32767);
 		} else {
 			break;
@@ -240,9 +241,12 @@ void PublishPost(Doc *d)
 	DisposeDialog(dlg);
 	if (item == kCancel)
 		return;
-	if (strcmp(bridge, gPrefs.bridge) != 0 || strcmp(key, gPrefs.bridgeKey) != 0) {
+	/* the next post goes where this one did, in a folder for its year or not */
+	years = strncmp(path, "_posts/", 7) == 0 ? pub_path_years(path) : gPrefs.yearFolders;
+	if (strcmp(bridge, gPrefs.bridge) != 0 || strcmp(key, gPrefs.bridgeKey) != 0 || years != gPrefs.yearFolders) {
 		strcpy(gPrefs.bridge, bridge);
 		strcpy(gPrefs.bridgeKey, key);
+		gPrefs.yearFolders = years;
 		SettingsSave();
 	}
 	Send(d, ip, port, bridge, path);

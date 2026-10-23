@@ -32,7 +32,8 @@ Standard library only. Settings (environment):
                             loopback and the private ranges, as Python's ipaddress has them)
     TOPICA_BRIDGE_REMOTE    the remote to fetch and push (origin)
     TOPICA_BRIDGE_BRANCH    the drafts branch (drafts); TOPICA_BRIDGE_BASE the branch it starts from (main)
-    TOPICA_BRIDGE_DIRS      the folders a post may go in (_posts,_drafts,content/posts)
+    TOPICA_BRIDGE_DIRS      the folders a post may go in (_posts,_drafts,content/posts); a dated post in _posts may
+                            also go in a folder for its year (_posts/2026/2026-10-23-title.md)
     TOPICA_BRIDGE_MAX_BYTES the largest post (524288); TOPICA_BRIDGE_TIMEOUT git's timeout in seconds (60)
 """
 import hmac
@@ -49,6 +50,7 @@ VERSION = "0.1.0"
 
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(md|markdown)\Z")
 DATED_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}-")    # Jekyll skips a post in _posts without its date
+YEAR_RE = re.compile(r"[0-9]{4}\Z")
 
 
 class Config:
@@ -78,8 +80,12 @@ class Config:
 
 
 def valid_path(path, dirs):
-    """The post's path if it names a Markdown file directly in one of dirs (dated in _posts), else None."""
+    """The post's path if it names a Markdown file directly in one of dirs (dated in _posts), else None.
+
+    A dated post may also go in a folder for its year, _posts/2026/2026-10-23-title.md, as some blogs keep them."""
     folder, _, name = path.rpartition("/")
+    if folder.startswith("_posts/") and folder[7:] == name[:4] and "_posts" in dirs and YEAR_RE.match(folder[7:]):
+        folder = "_posts"
     if folder in dirs and NAME_RE.match(name) and ".." not in name and (folder != "_posts" or DATED_RE.match(name)):
         return path
     return None

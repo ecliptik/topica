@@ -16,17 +16,23 @@ int pub_address(const char *text, unsigned long *ip, unsigned short *port);
 /*
  * The post's path in the blog's repository:
  *   Jekyll  "_posts/2026-10-23-title.md", a draft "_drafts/title.md"
+ *           (with years, "_posts/2026/2026-10-23-title.md")
  *   Hugo    "content/posts/title.md" (a draft says so in its front matter)
  * name is the post's file name on the Mac: used as it is when it already
  * has the blog's form ("2026-10-23-title.md" for a Jekyll post, with the
  * date dropped for a draft); otherwise the name comes from title (Mac
  * Roman) and date ("2026-10-23", the post's or today's).
  */
-void pub_path(int hugo, int draft, const char *name, const char *title, const char *date, char *out, int cap);
+void pub_path(int hugo, int draft, int years, const char *name, const char *title, const char *date, char *out,
+		int cap);
 
 /* 1 when the bridge takes path: a Markdown file right in _posts (dated,
-   as Jekyll wants), _drafts or content/posts */
+   as Jekyll wants, and maybe in a folder for its year), _drafts or
+   content/posts */
 int pub_path_ok(const char *path);
+
+/* 1 when path is a post in a folder for its year: "_posts/2026/2026-..." */
+int pub_path_years(const char *path);
 
 /* The request's head: POST /publish with the key, the path and the body's
    length. Returns its length, -1 when it doesn't fit out. */
