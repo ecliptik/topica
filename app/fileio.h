@@ -39,6 +39,9 @@ OSErr FileWrite(const FileRef *f, const char *data, long len, OSType type, OSTyp
 
 OSErr FileDelete(const FileRef *f);
 
+/* 1 when the Finder says f is a stationery pad (System 7's Get Info) */
+Boolean FileIsStationery(const FileRef *f);
+
 /* Where preferences go: the Preferences folder on System 7, the System
    Folder before it. f gets that folder, with name set to name. */
 OSErr FilePrefsFolder(const char *name, FileRef *f);

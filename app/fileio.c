@@ -94,6 +94,14 @@ static OSErr GetInfo(const FileRef *f, HParamBlockRec *pb, Str63 copy)
 	return PBHGetFInfoSync(pb);
 }
 
+Boolean FileIsStationery(const FileRef *f)
+{
+	HParamBlockRec pb;
+	Str63 copy;
+
+	return GetInfo(f, &pb, copy) == noErr && (pb.fileParam.ioFlFndrInfo.fdFlags & 0x0800) != 0;
+}
+
 static Boolean Exists(const FileRef *f)
 {
 	HParamBlockRec pb;

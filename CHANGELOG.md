@@ -12,6 +12,8 @@ Polish.
   beside Topica (or with its preferences), any front matter you like;
   `{{date}}` in it becomes today's date. New keys from Post Info go above
   the front matter's trailing blank lines.
+- Stationery pads on System 7: a post made a stationery pad in the
+  Finder's Get Info opens as a new untitled post, `{{date}}` filled in.
 - Balloon Help on System 7, short and only where it helps: the menu items
   whose names don't say it all, the Headings menu, and the Publish and
   Preferences fields. The text is in `resources/balloons.txt`.

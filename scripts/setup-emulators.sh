@@ -81,7 +81,16 @@ if [ -f "$src7" ]; then
     fi
     hubprefs="$EMU/basilisk/basilisk_ii_prefs"
     if [ -f "$hubprefs" ]; then
-        { sed -e '/^ether /d' -e "s#^disk .*#disk $img7#" "$hubprefs"; echo "ether slirp"; } > "$out/basilisk_prefs"
+        # a second disk, HFS, for what the Finder must see on a real disk (drops, Get Info's
+        # Stationery pad): the Unix ExtFS volume can't
+        test7="$out/topica-test7.dsk"
+        if [ ! -f "$test7" ]; then
+            dd if=/dev/zero of="$test7" bs=1024 count=4096 status=none
+            hformat -l "Topica Test" "$test7" >/dev/null
+            echo "setup-emulators: made $test7"
+        fi
+        { sed -e '/^ether /d' -e "s#^disk .*#disk $img7#" "$hubprefs"; echo "disk $test7"; echo "ether slirp"; } \
+            > "$out/basilisk_prefs"
         echo "setup-emulators: wrote $out/basilisk_prefs (slirp: the host is 10.0.2.2)"
     fi
     mkdir -p "$EMU/unix/Topica"

@@ -727,12 +727,39 @@ static Boolean Load(Doc *d, const FileRef *f)
 	return true;
 }
 
+/* A stationery pad opened: an untitled post with the pad's text, {{date}}
+   filled in as Topica Template's is */
+static void FromPad(Doc *d)
+{
+	char date[16];
+	const char *t;
+	long n, m;
+	Ptr p;
+
+	Today(date);
+	t = EdLockText(d->ed);
+	n = EdLength(d->ed);
+	m = post_fill(t, n, date, NULL, 0);
+	p = m != n ? NewPtr(m > 0 ? m : 1) : NULL;
+	if (p != NULL)
+		(void) post_fill(t, n, date, p, m);
+	EdUnlockText(d->ed);
+	if (p != NULL) {
+		(void) EdSetText(d->ed, p, m);
+		DisposePtr(p);
+		undo_clear(&d->undo);
+	}
+	EdSetSelection(d->ed, EdLength(d->ed), EdLength(d->ed));
+	NameUntitled(d);
+}
+
 Doc *DocOpen(const FileRef *f)
 {
 	short i;
 	Doc *d;
+	Boolean pad = FileIsStationery(f);
 
-	for (i = 0; i < TOPICA_MAX_DOCS; i++) {
+	for (i = 0; i < TOPICA_MAX_DOCS && !pad; i++) {
 		if (gDocs[i] != NULL && gDocs[i]->hasFile && FileRefSame(&gDocs[i]->file, f)) {
 			SelectWindow(gDocs[i]->w);
 			return gDocs[i];
@@ -751,8 +778,12 @@ Doc *DocOpen(const FileRef *f)
 		DisposePtr((Ptr) d);
 		return NULL;
 	}
-	d->file = *f;
-	d->hasFile = true;
+	if (pad) {
+		FromPad(d);                     /* a pad can be opened again and again */
+	} else {
+		d->file = *f;
+		d->hasFile = true;
+	}
 	ShowDoc(d);
 	return d;
 }

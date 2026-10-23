@@ -4,7 +4,7 @@ Version @VERSION@
 Topica is a Markdown writer for blogs made with Jekyll, Hugo and other static site generators.
 
 Writing a post
-- File > New Post starts from front matter: the lines between the two "---" at the top. To start from your own, put a text file called Topica Template beside Topica or with its preferences; {{date}} in it becomes today's date.
+- File > New Post starts from front matter: the lines between the two "---" at the top. To start from your own, put a text file called Topica Template beside Topica or with its preferences; {{date}} in it becomes today's date. On System 7, any post made a stationery pad (the Finder's Get Info) opens the same way, as a new untitled post.
 - Post > Post Info (Command-E) fills in the title, description, category, tags, layout and date, in YAML front matter (between --- lines) or Hugo's TOML (between +++ lines).
 - Post > Insert Image writes a placeholder for a picture you'll add to the blog later.
 - File > Save suggests a name made of today's date and the title, like 2026-10-22-my-post.md.
