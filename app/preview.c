@@ -358,7 +358,9 @@ static void Layout(Boolean full)
 	Refine();
 	SyncBar();
 	Render();
-	DLOG(("Preview: on the screen after %ld ticks", (long) (TickCount() - gRefineTicks)));
+	DLOG(("Preview: on the screen after %ld ticks; heap %ld, free %ld, largest block %ld",
+		(long) (TickCount() - gRefineTicks), (long) (ApplicationZone()->bkLim - (Ptr) ApplicationZone()),
+		(long) FreeMem(), (long) MaxBlock()));
 }
 
 /* Shows d from the top */
