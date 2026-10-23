@@ -34,7 +34,8 @@
       takes most of a second on a 68000)
 - [ ] Name the print job after the post when the preview is in front
 - [ ] A "Printing" status dialog that says how to cancel (Command-period)
-- [ ] Measure fonts from the Font Manager's width table (1.5 s on a 68000)
+- [ ] Measure fonts from the Font Manager's width table (1.5 s on a 68000),
+      and keep them when the preview closes (reopening measures again)
 
 ## vi mode and spelling
 
