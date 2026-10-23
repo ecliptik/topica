@@ -116,6 +116,31 @@ long post_template(int hugo, const char *layout, const char *date, char eol, cha
 	return n;
 }
 
+long post_fill(const char *tpl, long n, const char *date, char *out, long cap)
+{
+	static const char kDate[] = "{{date}}";
+	long i = 0, len = 0, k = (long) sizeof(kDate) - 1, dl = (long) strlen(date);
+
+	while (i < n) {
+		const char *s = tpl + i;
+		long sl = 1;
+		if (n - i >= k && memcmp(s, kDate, (size_t) k) == 0) {
+			s = date;
+			sl = dl;
+			i += k;
+		} else {
+			i++;
+		}
+		if (out != NULL) {
+			if (len + sl > cap)
+				return -1;
+			memcpy(out + len, s, (size_t) sl);
+		}
+		len += sl;
+	}
+	return len;
+}
+
 /* A letter or digit in Mac Roman */
 static int IsWordChar(unsigned char c)
 {

@@ -41,8 +41,10 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   category, tags, layout and date in a dialog, and rewrites only those
   lines. Keys it doesn't know, comments and list styles stay as they were;
   values that need YAML quotes get them.
-- **New Post** (⌘N) starts from a front-matter template; Save suggests a
-  `YYYY-MM-DD-title.md` name that fits the Mac's 31 characters.
+- **New Post** (⌘N) starts from a front-matter template, or your own: a
+  text file called "Topica Template" beside Topica, where `{{date}}`
+  becomes today's date. Save suggests a `YYYY-MM-DD-title.md` name that
+  fits the Mac's 31 characters.
 - **Insert Image** writes a Markdown image placeholder,
   `![description](/assets/images/posts/<category>/<file>)`, and **Insert
   Link** (⌘K) a link around the selection.

@@ -70,5 +70,6 @@
 
 - [ ] A custom text engine instead of TextEdit: no 32,000-character limit,
       inline styling, faster vi motions
+- [x] A template file for New Post ("Topica Template", `{{date}}`)
 - [ ] Stationery, drag and drop on 7.5, a quick-note desk accessory
 - [ ] Release script: `.dsk`, `.hqx` and `.sit` for both builds

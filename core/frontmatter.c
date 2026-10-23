@@ -84,6 +84,16 @@ static int IsSpace(char c)
 	return c == ' ' || c == '\t';
 }
 
+static int Blank(const char *t, const Line *l)
+{
+	long i;
+
+	for (i = l->start; i < l->end; i++)
+		if (!IsSpace(t[i]))
+			return 0;
+	return 1;
+}
+
 /* A TOML table's header ("[params]", "[[x]]"): the top-level keys end there */
 static int IsTable(const char *t, const Line *l)
 {
@@ -663,6 +673,7 @@ long fm_update(const char *text, long n, const FmField *fields, int count, char 
 	Line l;
 	Entry e;
 	int i, seen[32], toml;
+	long blank;
 
 	o.buf = out;
 	o.cap = cap;
@@ -689,15 +700,27 @@ long fm_update(const char *text, long n, const FmField *fields, int count, char 
 	}
 	LineAt(text, close, 0, &l);
 	Put(&o, text + l.start, l.next - l.start);         /* the opening "---" or "+++" */
+	blank = -1;                     /* blank lines are held back, so new keys go above them */
 	for (pos = l.next; pos < close; ) {
 		LineAt(text, close, pos, &l);
 		if (toml && IsTable(text, &l))
 			break;                  /* new keys go before the first table, or they'd be in it */
 		if (KeyLine(text, &l, toml) == 0) {
-			Put(&o, text + l.start, l.next - l.start);
+			if (Blank(text, &l)) {
+				if (blank < 0)
+					blank = pos;
+			} else {
+				if (blank >= 0)
+					Put(&o, text + blank, pos - blank);
+				blank = -1;
+				Put(&o, text + l.start, l.next - l.start);
+			}
 			pos = l.next;
 			continue;
 		}
+		if (blank >= 0)
+			Put(&o, text + blank, pos - blank);
+		blank = -1;
 		EntryAt(text, close, pos, &e, toml);
 		for (i = 0; i < count; i++)
 			if (KeyIs(text, &e, fields[i].key))
@@ -715,6 +738,6 @@ long fm_update(const char *text, long n, const FmField *fields, int count, char 
 	for (i = 0; i < count; i++)
 		if (!seen[i] && fields[i].value[0] != '\0')
 			PutEntry(&o, fields[i].key, fields[i].value, kPlain, 0, eol, toml);
-	Put(&o, text + pos, end - pos);                   /* any tables, and the closing line */
+	Put(&o, text + (blank >= 0 ? blank : pos), end - (blank >= 0 ? blank : pos));   /* any tables, the closing line */
 	return o.over ? -1 : o.len;
 }

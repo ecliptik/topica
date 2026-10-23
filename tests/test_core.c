@@ -343,6 +343,13 @@ static void TestFrontmatterUpdate(void)
 	f[3].key = "category"; f[3].value = "";
 	Update("+++\ntitle = 'old'\nsubtitle = 'old'\ndate = 2026-10-23\ncategory = \"x\"\n+++\n", f, 4, '\n',
 		"+++\ntitle = 'Plain'\nsubtitle = \"Don't\"\ndate = \"next week\"\ncategory = \"\"\n+++\n", __LINE__);
+	/* new keys go above blank lines before a table or the end */
+	f[0].key = "title"; f[0].value = "T";
+	f[1].key = "category"; f[1].value = "retro";
+	Update("+++\ntitle = \"\"\n\n[params]\na = 1\n+++\n", f, 2, '\n',
+		"+++\ntitle = \"T\"\ncategory = \"retro\"\n\n[params]\na = 1\n+++\n", __LINE__);
+	Update("---\ntitle: x\n\n---\n", f, 2, '\n', "---\ntitle: T\ncategory: retro\n\n---\n", __LINE__);
+	Update("---\ntitle: x\n\nlayout: post\n---\n", f, 2, '\n', "---\ntitle: T\n\nlayout: post\ncategory: retro\n---\n", __LINE__);
 	/* a new key: a date with seconds is bare, without them a string */
 	f[0].key = "date"; f[0].value = "2026-10-24 09:00:00";
 	Update("+++\n+++\n", f, 1, '\n', "+++\ndate = 2026-10-24 09:00:00\n+++\n", __LINE__);
@@ -527,6 +534,16 @@ static void TestPost(void)
 	n = post_template(1, NULL, "", '\n', t, sizeof(t) - 1);
 	t[n < 0 ? 0 : n] = '\0';
 	CHECK_STR(t, "---\ntitle:\ndate:\ndraft: true\ndescription:\ncategories:\ntags:\n---\n\n");
+
+	{
+		const char *tpl = "+++\rdate = {{date}}\rtags = [\"mac\"]\r+++\r\r{{date}}{{dat";
+		n = post_fill(tpl, (long) strlen(tpl), "2026-10-23", NULL, 0);
+		CHECK(n == post_fill(tpl, (long) strlen(tpl), "2026-10-23", t, sizeof(t) - 1));
+		t[n < 0 ? 0 : n] = '\0';
+		CHECK_STR(t, "+++\rdate = 2026-10-23\rtags = [\"mac\"]\r+++\r\r2026-10-23{{dat");
+		CHECK(post_fill(tpl, (long) strlen(tpl), "2026-10-23", t, 10) == -1);
+		CHECK(post_fill("", 0, "x", t, 1) == 0);
+	}
 
 	CHECK(post_words("---\ntitle: a b c\n---\nOne two, three-four don't.\n", 46) == 4);
 	CHECK(post_words("caf\x8E na\x95ve \xD1 r\x8Esum\x8E", 18) == 3);

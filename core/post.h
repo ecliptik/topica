@@ -23,6 +23,11 @@ void post_filename(int year, int month, int day, const char *title, int maxLen, 
    tags. Returns its length (-1 when it doesn't fit). */
 long post_template(int hugo, const char *layout, const char *date, char eol, char *out, long cap);
 
+/* A template of the writer's own ("Topica Template") made into a new
+   post: "{{date}}" becomes date, the rest stays as it is. Returns the
+   length (-1 when it doesn't fit; out NULL only measures). */
+long post_fill(const char *tpl, long n, const char *date, char *out, long cap);
+
 /* Words in text, front matter left out. */
 long post_words(const char *text, long n);
 

@@ -8,6 +8,10 @@ Polish.
   writes it, quoting as TOML wants (strings always, dates and booleans
   bare), and puts new keys before the first `[table]`. Formatting,
   spelling and Publish know it too.
+- Your own template for New Post: a text file called "Topica Template"
+  beside Topica (or with its preferences), any front matter you like;
+  `{{date}}` in it becomes today's date. New keys from Post Info go above
+  the front matter's trailing blank lines.
 
 ## 0.6.0 (unreleased)
 

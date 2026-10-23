@@ -495,6 +495,44 @@ static void ShowDoc(Doc *d)
 	SelectWindow(d->w);
 }
 
+#define kTemplateName "Topica Template"
+enum { kTemplateMax = 8192 };
+
+/* The writer's own template, beside Topica or with the preferences, made
+   into a new post's text: a new pointer, or NULL when there's none */
+static Ptr OwnTemplate(const char *date, long *len)
+{
+	FileRef f;
+	Ptr data, text, out;
+	long n, m;
+	int utf8;
+
+	FileBesideApp(kTemplateName, &f);
+	if (FileRead(&f, &data, &n) != noErr
+			&& (FilePrefsFolder(kTemplateName, &f) != noErr || FileRead(&f, &data, &n) != noErr))
+		return NULL;
+	if (n > kTemplateMax) {
+		DisposePtr(data);
+		return NULL;
+	}
+	utf8 = tc_is_utf8(data, n);
+	m = tc_to_mac(data, n, NULL, 0, utf8);
+	text = NewPtr(m > 0 ? m : 1);
+	if (text == NULL) {
+		DisposePtr(data);
+		return NULL;
+	}
+	(void) tc_to_mac(data, n, text, m, utf8);
+	DisposePtr(data);
+	n = post_fill(text, m, date, NULL, 0);
+	out = NewPtr(n > 0 ? n : 1);
+	if (out != NULL)
+		(void) post_fill(text, m, date, out, n);
+	DisposePtr(text);
+	*len = n;
+	return out;
+}
+
 Doc *DocNew(Boolean withTemplate)
 {
 	Doc *d = MakeDoc();
@@ -506,11 +544,18 @@ Doc *DocNew(Boolean withTemplate)
 	NameUntitled(d);
 	if (withTemplate) {
 		char date[16];
+		Ptr own;
 		Today(date);
-		n = post_template(gPrefs.profile == kProfileHugo, gPrefs.layout, date, '\r', t, sizeof(t));
-		if (n > 0) {
-			(void) EdSetText(d->ed, t, n);
+		if ((own = OwnTemplate(date, &n)) != NULL) {
+			(void) EdSetText(d->ed, own, n);
 			EdSetSelection(d->ed, n, n);
+			DisposePtr(own);
+		} else {
+			n = post_template(gPrefs.profile == kProfileHugo, gPrefs.layout, date, '\r', t, sizeof(t));
+			if (n > 0) {
+				(void) EdSetText(d->ed, t, n);
+				EdSetSelection(d->ed, n, n);
+			}
 		}
 	}
 	ShowDoc(d);
