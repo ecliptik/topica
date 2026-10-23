@@ -14,7 +14,7 @@
       the Finder's comments and dates
 - [ ] A smaller application for the 512Ke (newlib's printf is most of it;
       sscanf alone would add 20K)
-- [ ] Undo back to the saved text leaves the post unchanged (no Save
+- [x] Undo back to the saved text leaves the post unchanged (no Save
       Changes alert)
 
 ## Formatting preview and images
@@ -60,9 +60,10 @@
 - [x] Cancel Publish while it waits: ⌘., Escape or Cancel (asynchronous
       MacTCP calls; talkip's open and a receive that asks TCPStatus)
 - [ ] Publish in the background, while you go on writing
-- [ ] MacTCP in Basilisk II crashes (an error of type 3) a few seconds
-      into a connection nothing answers (an unroutable address), with or
-      without these changes: Topica's or slirp's? Try it on a real Mac
+- [ ] **Before 1.0:** MacTCP in Basilisk II crashes (an error of type 3) a
+      few seconds into a connection nothing answers (an unroutable
+      address), with or without these changes: Topica's or slirp's? Try
+      it on a real Mac
 - [ ] Publish the post's images too
 - [ ] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
 - [x] Hide the key in Publish as it's typed (bullets, like a password

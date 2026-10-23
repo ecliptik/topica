@@ -82,11 +82,28 @@ void undo_clear(UndoStack *u)
 	u->open = 0;
 	u->lost = 0;
 	u->group = 0;
+	u->saved = 0;
 }
 
 void undo_seal(UndoStack *u)
 {
 	u->open = 0;
+}
+
+void undo_mark_saved(UndoStack *u)
+{
+	u->open = 0;                        /* typing after a save is a step of its own */
+	u->saved = u->done;
+}
+
+int undo_at_saved(const UndoStack *u)
+{
+	return u->saved >= 0 && u->saved == u->done;
+}
+
+void undo_forget_saved(UndoStack *u)
+{
+	u->saved = -1;
 }
 
 void undo_group(UndoStack *u, int begin)
@@ -111,6 +128,7 @@ static int DropOldest(UndoStack *u, int keep)
 	u->count--;
 	u->done--;
 	u->lost = 1;
+	u->saved = u->saved > 0 ? u->saved - 1 : -1;     /* before the dropped step: gone */
 	return 1;
 }
 
@@ -127,6 +145,7 @@ static void Overflow(UndoStack *u)
 {
 	undo_clear(u);
 	u->lost = 1;
+	u->saved = -1;
 }
 
 /* Joins a change to the last step when it continues it; 1 if it did. */
@@ -200,6 +219,8 @@ void undo_record(UndoStack *u, int kind, long pos, const char *del, long dlen, c
 		u->used = Offset(u, u->done);
 		u->count = u->done;
 		u->open = 0;
+		if (u->saved > u->done)
+			u->saved = -1;                  /* the saved text was among them */
 	}
 	if (Coalesce(u, kind, pos, del, dlen, ins, ilen))
 		return;

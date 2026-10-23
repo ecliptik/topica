@@ -262,11 +262,12 @@ static void UpdateStatus(Doc *d, Boolean force)
 	SetPort(save);
 }
 
-/* After any change: the scroll bar, and the words soon */
+/* After any change: the scroll bar, and the words soon. Undone (or redone)
+   back to the saved text, the post is unchanged again. */
 static void Changed(Doc *d)
 {
 	d->changes++;
-	d->dirty = true;
+	d->dirty = !undo_at_saved(&d->undo);
 	d->recDue = true;
 	d->changedAt = TickCount();
 	if (!d->countDue) {
@@ -646,6 +647,7 @@ short DocRecoverAll(void)
 			d->rec = f;
 			d->hasRec = true;
 			d->dirty = true;
+			undo_forget_saved(&d->undo);
 			ShowDoc(d);
 			opened++;
 		}
@@ -784,7 +786,7 @@ static Boolean Write(Doc *d, const FileRef *f)
 		return false;
 	}
 	d->dirty = false;
-	undo_seal(&d->undo);
+	undo_mark_saved(&d->undo);
 	DiscardRecovery(d);
 	return true;
 }

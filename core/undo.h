@@ -31,6 +31,7 @@ typedef struct {
 	int open;           /* the last step can still grow */
 	int lost;           /* history was dropped: not everything can be undone */
 	int group;          /* 0, or a group is open: 1 before its first step, 2 after */
+	int saved;          /* done when the post was last saved (or opened); -1 when that can't come back */
 } UndoStack;
 
 /* One step to apply: replace [pos, pos + removeLen) with insert. */
@@ -46,8 +47,16 @@ typedef struct {
 } UndoApply;
 
 void undo_init(UndoStack *u, char *buf, long cap);
+/* Empties the history; the text as it is counts as saved */
 void undo_clear(UndoStack *u);
 void undo_seal(UndoStack *u);
+
+/* The post was saved as it is now: undoing or redoing back to here makes it
+   unchanged again (undo_at_saved) */
+void undo_mark_saved(UndoStack *u);
+int undo_at_saved(const UndoStack *u);
+/* The text as it is was never saved (a recovered post) */
+void undo_forget_saved(UndoStack *u);
 
 /* Steps recorded between begin (1) and end (0) undo and redo as one, as
    vi's changes do: an operator and the typing after it */

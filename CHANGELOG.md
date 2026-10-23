@@ -12,6 +12,8 @@ Polish.
   beside Topica (or with its preferences), any front matter you like;
   `{{date}}` in it becomes today's date. New keys from Post Info go above
   the front matter's trailing blank lines.
+- Undoing (or redoing) back to the text as it was saved leaves the post
+  unchanged: closing it doesn't ask to save.
 - Publish can be canceled while it connects or waits for the bridge:
   Command-period, Escape, or the Cancel button in its progress window.
   The windows behind it are redrawn meanwhile.

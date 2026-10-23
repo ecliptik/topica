@@ -406,6 +406,51 @@ static int Step(UndoStack *u, int redo)
 	return a.kind;
 }
 
+/* Back to the saved text, by undo or redo, is unchanged again */
+static void TestUndoSaved(void)
+{
+	UndoStack u;
+	char buf[64];
+	int i;
+
+	undo_init(&u, buf, sizeof(buf));
+	gLen = 0;
+	gDoc[0] = '\0';
+	CHECK(undo_at_saved(&u));               /* as opened */
+	Type(&u, "ab");
+	CHECK(!undo_at_saved(&u));
+	(void) Step(&u, 0);
+	CHECK(undo_at_saved(&u));               /* undone back to it */
+	(void) Step(&u, 1);
+	undo_mark_saved(&u);                    /* saved "ab" */
+	CHECK(undo_at_saved(&u));
+	Type(&u, "c");                          /* typing after a save is its own step */
+	CHECK(u.count == 2 && !undo_at_saved(&u));
+	(void) Step(&u, 0);
+	CHECK(undo_at_saved(&u) && strcmp(gDoc, "ab") == 0);
+	(void) Step(&u, 0);
+	CHECK(!undo_at_saved(&u));              /* before the save */
+	(void) Step(&u, 1);
+	CHECK(undo_at_saved(&u));               /* redone back to it */
+	/* undo past the save, then change: the saved text can't come back */
+	(void) Step(&u, 0);
+	undo_seal(&u);
+	Type(&u, "x");
+	(void) Step(&u, 0);
+	CHECK(!undo_at_saved(&u));
+	/* the saved step falls off the history: gone too */
+	undo_clear(&u);
+	gLen = 0;
+	gDoc[0] = '\0';
+	Type(&u, "a");
+	undo_mark_saved(&u);
+	for (i = 0; i < 8; i++) {
+		undo_seal(&u);
+		Type(&u, "0123456789");
+	}
+	CHECK(u.lost && u.saved == -1);
+}
+
 static void TestUndo(void)
 {
 	UndoStack u;
@@ -1941,6 +1986,7 @@ int main(void)
 	TestFrontmatterToml();
 	TestFrontmatterUpdate();
 	TestUndo();
+	TestUndoSaved();
 	TestPost();
 	TestFind();
 	TestPrefs();
