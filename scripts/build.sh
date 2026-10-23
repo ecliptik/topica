@@ -114,6 +114,32 @@ cp "$build/Topica.bin" "$build/$name.bin"
 if command -v binhex >/dev/null 2>&1; then
     binhex "$build/$name.bin" > "$build/$name.hqx"
 fi
+# A StuffIt 1.5 archive of the same files, when the emulators hub's tools are
+# there (EMU, ~/emulators: tools/sit, scripts/macbinary_split.py)
+EMU=${EMU:-$HOME/emulators}
+sit="$EMU/tools/sit/sit"
+split="$EMU/scripts/macbinary_split.py"
+if [ -x "$sit" ] && [ -f "$split" ]; then
+    stage="$build/.sit"
+    rm -rf "$stage" "$build/$name.sit"
+    mkdir -p "$stage"
+    python3 "$split" split "$build/Topica.bin" "$stage/Topica"
+    files=(Topica)
+    if [ -f "$dict" ]; then
+        cp "$dict" "$stage/Topica Dictionary"
+        python3 "$split" make-info "$stage/Topica Dictionary" TDIC TPCA
+        cp "$build/Dictionary Licence" "$stage/Dictionary Licence"
+        python3 "$split" make-info "$stage/Dictionary Licence" ttro ttxt
+        files+=("Topica Dictionary" "Dictionary Licence")
+    fi
+    if [ -f "$build/About Topica" ]; then
+        cp "$build/About Topica" "$stage/About Topica"
+        python3 "$split" make-info "$stage/About Topica" ttro ttxt
+        files+=("About Topica")
+    fi
+    (cd "$stage" && "$sit" -o "$build/$name.sit" "${files[@]}" >/dev/null) || rm -f "$build/$name.sit"
+    rm -rf "$stage"
+fi
 echo
 echo "build.sh: Topica $display ($flavor)"
 for f in "$build/$name".*; do

@@ -90,13 +90,18 @@ make -C tests test               # the portable core's tests, on the host
 python3 -m unittest discover -s bridge    # the bridge's tests
 ```
 
-Each build makes a MacBinary `.bin`, an 800K `.dsk` floppy image and a
-BinHex `.hqx`. The first build downloads SCOWL's word lists (and checks
+Each build makes a MacBinary `.bin`, an 800K `.dsk` floppy image, a
+BinHex `.hqx`, and a StuffIt `.sit` of the floppy's files when a `sit`
+archiver is at hand (`EMU`). The first build downloads SCOWL's word lists (and checks
 them) to make the spelling dictionary, Topica Dictionary, which goes on the
 floppy beside Topica with SCOWL's copyright notice. `RETRO68` points at the toolchain. `--talkip` needs
 [talkip](https://github.com/ecliptik/talkip) cloned next to Topica (or
 `TALKIP_DIR`). [docs/TESTING.md](docs/TESTING.md)
 covers the emulators.
+
+`scripts/release.sh` builds all three from the version's tag (talkip at a
+released version) and publishes them with the version's CHANGELOG section;
+`--dry-run` builds and shows what it would publish.
 
 ## Layout
 

@@ -81,4 +81,4 @@
       filled in
 - [x] Drag and drop text on System 7.5 (moves within a post, copies out)
 - [ ] A quick-note desk accessory
-- [ ] Release script: `.dsk`, `.hqx` and `.sit` for both builds
+- [x] Release script: `.dsk`, `.hqx` and `.sit` for each build
