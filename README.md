@@ -8,7 +8,7 @@ front matter, Markdown, and UTF-8 files a blog can use as they are.
 The name is Aristotle's *Topics*, his book on finding things to say: the
 *topoi*, the "places" a writer goes for material.
 
-> Topica is new and unfinished (0.5). See [TODO.md](TODO.md) for what's
+> Topica is new and unfinished (0.7). See [TODO.md](TODO.md) for what's
 > coming.
 
 ## What it does today

@@ -192,6 +192,62 @@ static void TestFrontmatterGet(void)
 	CHECK_STR(v, "Vibe");
 }
 
+static void TestFrontmatterToml(void)
+{
+	char v[128];
+	long s, e;
+	const char *t =
+		"+++\n"
+		"title = \"Vibe \\\"Coding\\\"\"\n"
+		"date = 2026-10-23T09:00:00-07:00\n"
+		"tags = [\"mac\", 'retro', \"two words\"]\n"
+		"draft = true\n"
+		"description = 'C:\\temp'\n"
+		"weight=5 # comment\n"
+		"summary = \"\"\"\n"
+		"title = \"inside\"\n"
+		"\"\"\"\n"
+		"categories = [\n"
+		"  \"a\",\n"
+		"]\n"
+		"empty = \"\"\n"
+		"---\n"
+		"[params]\n"
+		"author = \"x\"\n"
+		"+++\n"
+		"body = 1\n";
+	long n = (long) strlen(t);
+
+	CHECK(fm_find(t, n, &s, &e) && s == 0);
+	CHECK_STR(t + e, "body = 1\n");
+	CHECK(fm_is_toml(t, n));
+	CHECK(!fm_is_toml(kPost, (long) strlen(kPost)));
+	CHECK(fm_get(t, n, "title", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "Vibe \"Coding\"");
+	CHECK(fm_get(t, n, "date", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "2026-10-23T09:00:00-07:00");
+	CHECK(fm_get(t, n, "tags", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "mac retro two words");
+	CHECK(fm_get(t, n, "draft", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "true");
+	CHECK(fm_get(t, n, "description", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "C:\\temp");                        /* a literal string has no escapes */
+	CHECK(fm_get(t, n, "weight", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "5");
+	CHECK(fm_get(t, n, "summary", v, sizeof(v)) == kFmComplex);
+	CHECK(fm_get(t, n, "categories", v, sizeof(v)) == kFmComplex);
+	CHECK(fm_get(t, n, "empty", v, sizeof(v)) == kFmFound);
+	CHECK_STR(v, "");
+	CHECK(fm_get(t, n, "author", v, sizeof(v)) == kFmAbsent);   /* in a table */
+	CHECK(fm_get(t, n, "body", v, sizeof(v)) == kFmAbsent);
+	/* "---" doesn't close TOML, nor "+++" YAML */
+	{
+		const char *a = "+++\ntitle = \"x\"\n---\n", *b = "---\ntitle: x\n+++\n";
+		CHECK(!fm_find(a, (long) strlen(a), &s, &e));
+		CHECK(!fm_find(b, (long) strlen(b), &s, &e));
+	}
+}
+
 static void Update(const char *text, const FmField *f, int count, char eol, const char *want, int line)
 {
 	char out[1024];
@@ -268,6 +324,30 @@ static void TestFrontmatterUpdate(void)
 	Update("---\ndraft: true\n---\n", f, 2, '\n', "---\ndraft: false\ntitle: \"true\"\n---\n", __LINE__);
 	/* too small */
 	CHECK(fm_update(kPost, (long) strlen(kPost), f, 1, '\n', out, sizeof(out)) == -1);
+
+	/* TOML: strings quoted, booleans and dates bare, new keys before the first table */
+	f[0].key = "title";       f[0].value = "New: \"quoted\"";
+	f[1].key = "tags";        f[1].value = "mac retro";
+	f[2].key = "draft";       f[2].value = "true";
+	f[3].key = "date";        f[3].value = "2026-10-24";
+	f[4].key = "description"; f[4].value = "Hello";
+	Update("+++\ntitle = \"Old\"\ntags = [\"a\"]\ndraft = false\ndate = 2026-10-23\nsummary = \"\"\"\nx\n\"\"\"\n"
+		"[params]\nauthor = \"x\"\n+++\nBody\n", f, 5, '\n',
+		"+++\ntitle = \"New: \\\"quoted\\\"\"\ntags = [\"mac\", \"retro\"]\ndraft = true\ndate = 2026-10-24\n"
+		"summary = \"\"\"\nx\n\"\"\"\ndescription = \"Hello\"\n[params]\nauthor = \"x\"\n+++\nBody\n", __LINE__);
+	/* a literal string stays literal, unless the value has a quote; a bare date that isn't one is quoted;
+	   an emptied key is "" */
+	f[0].key = "title";    f[0].value = "Plain";
+	f[1].key = "subtitle"; f[1].value = "Don't";
+	f[2].key = "date";     f[2].value = "next week";
+	f[3].key = "category"; f[3].value = "";
+	Update("+++\ntitle = 'old'\nsubtitle = 'old'\ndate = 2026-10-23\ncategory = \"x\"\n+++\n", f, 4, '\n',
+		"+++\ntitle = 'Plain'\nsubtitle = \"Don't\"\ndate = \"next week\"\ncategory = \"\"\n+++\n", __LINE__);
+	/* a new key: a date with seconds is bare, without them a string */
+	f[0].key = "date"; f[0].value = "2026-10-24 09:00:00";
+	Update("+++\n+++\n", f, 1, '\n', "+++\ndate = 2026-10-24 09:00:00\n+++\n", __LINE__);
+	f[0].value = "2026-10-24 09:00";
+	Update("+++\n+++\n", f, 1, '\n', "+++\ndate = \"2026-10-24 09:00\"\n+++\n", __LINE__);
 
 	CHECK(fm_needs_quotes("yes"));
 	CHECK(fm_needs_quotes("True"));
@@ -608,6 +688,9 @@ static void TestMdscan(void)
 
 	STYLED("# Title", "mmhhhhh");
 	STYLED("#No heading", "...........");
+	/* TOML front matter (Hugo): "+++" opens and only "+++" closes it */
+	STYLED("+++\n# x = 1\n---\n+++\n# H", "mmm/fffffff/fff/mmm/mmh");
+	STYLED("+++\n# x", "mmm/fff");
 	STYLED("## Two ##", "mmmhhhmmm");
 	STYLED("Some *it* and **bold** and ***both***", "....."   "miim"  "....." "mmbbbbmm" "....." "mmmBBBBmmm");
 	STYLED("a snake_case_word here", "......................");
@@ -1690,6 +1773,27 @@ static void TestSpell(void)
 			at += len;
 		}
 		CHECK(kWant[k] == NULL);
+		/* TOML front matter: a title's words are checked, other keys' values aren't */
+		{
+			static const char kToml[] = "+++\ntitle = \"A wrod\"\nlayout = \"psot\"\ntitlex = \"zzz\"\n+++\nOk.\n";
+			static const char *const kWantToml[] = { "wrod", "Ok", NULL };
+			unsigned char cls3[128];
+			long n3 = (long) strlen(kToml), at3 = 0;
+			int len3;
+			int k3 = 0;
+			md_begin(&st);
+			md_classify(&st, kToml, n3, n3, cls3);
+			sp_prepare(kToml, n3, cls3);
+			while ((at3 = sp_next(kToml, n3, at3, cls3, &len3)) >= 0 && kWantToml[k3] != NULL) {
+				char w[64];
+				memcpy(w, kToml + at3, (size_t) len3);
+				w[len3] = '\0';
+				CheckStr(w, kWantToml[k3], __LINE__);
+				k3++;
+				at3 += len3;
+			}
+			CHECK(kWantToml[k3] == NULL && at3 < 0);
+		}
 		/* from the middle of a word: that word */
 		at = sp_next(kPost, n2, (long) (strstr(kPost, "Some") - kPost) + 2, cls, &len);
 		CHECK(at == strstr(kPost, "Some") - kPost && len == 4);
@@ -1817,6 +1921,7 @@ int main(void)
 {
 	TestTextconv();
 	TestFrontmatterGet();
+	TestFrontmatterToml();
 	TestFrontmatterUpdate();
 	TestUndo();
 	TestPost();

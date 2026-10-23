@@ -56,7 +56,7 @@
 - [x] TCP/IP over LocalTalk for Macs without MacTCP (the 512Ke): the
       `--talkip` build
 - [x] Drafts (`_drafts/`), and Hugo's `content/posts/`
-- [ ] Hugo's TOML front matter (`+++`)
+- [x] Hugo's TOML front matter (`+++`)
 - [ ] Publish without stopping the Mac: asynchronous calls, and ⌘. to
       cancel (each step waits now, at most 20-60 s)
 - [ ] Publish the post's images too

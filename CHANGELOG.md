@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+Polish.
+
+- Hugo's TOML front matter (`+++` and `key = value`): Post Info reads and
+  writes it, quoting as TOML wants (strings always, dates and booleans
+  bare), and puts new keys before the first `[table]`. Formatting,
+  spelling and Publish know it too.
+
 ## 0.6.0 (unreleased)
 
 Publish.

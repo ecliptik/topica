@@ -5,7 +5,7 @@ Topica is a Markdown writer for blogs made with Jekyll, Hugo and other static si
 
 Writing a post
 - File > New Post starts from front matter: the lines between the two "---" at the top.
-- Post > Post Info (Command-E) fills in the title, description, category, tags, layout and date.
+- Post > Post Info (Command-E) fills in the title, description, category, tags, layout and date, in YAML front matter (between --- lines) or Hugo's TOML (between +++ lines).
 - Post > Insert Image writes a placeholder for a picture you'll add to the blog later.
 - File > Save suggests a name made of today's date and the title, like 2026-10-22-my-post.md.
 

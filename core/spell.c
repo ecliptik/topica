@@ -303,7 +303,7 @@ static long LineEnd(const char *t, long n, long p)
 
 void sp_prepare(const char *text, long n, unsigned char *cls)
 {
-	static const char *const kKeys[] = { "title:", "description:", "summary:", NULL };
+	static const char *const kKeys[] = { "title", "description", "summary", NULL };
 	long start, end, ls, le, p;
 	int k;
 
@@ -314,8 +314,13 @@ void sp_prepare(const char *text, long n, unsigned char *cls)
 		for (k = 0; kKeys[k] != NULL; k++) {
 			long kl = (long) strlen(kKeys[k]);
 			if (le - ls > kl && memcmp(text + ls, kKeys[k], (size_t) kl) == 0) {
-				for (p = ls + kl; p < le; p++)
-					cls[p] = 0;
+				/* "title:" (YAML) or "title =" (TOML): the value is prose */
+				p = ls + kl;
+				while (p < le && (text[p] == ' ' || text[p] == '\t'))
+					p++;
+				if (p < le && (text[p] == ':' || text[p] == '=') && (text[p] == '=' || p == ls + kl))
+					for (p++; p < le; p++)
+						cls[p] = 0;
 				break;
 			}
 		}

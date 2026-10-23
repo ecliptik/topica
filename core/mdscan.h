@@ -25,7 +25,7 @@ enum {
 /* Where the scan is, and the blocks that carry from line to line */
 typedef struct {
 	long pos;                   /* the start of the next line to scan */
-	int front;                  /* 0: at the top, 1: in the front matter, 2: past it */
+	int front;                  /* 0: at the top, 1: in the front matter (3: TOML's), 2: past it */
 	char fence;                 /* '`' or '~' inside a fenced code block, else 0 */
 	int fenceLen;
 	int quoteFace;              /* 1: a block quote's lines are MD_ITALIC (the default) */

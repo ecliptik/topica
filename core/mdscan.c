@@ -78,12 +78,12 @@ static int Block(MdState *s, const char *t, long ls, long le)
 
 	if (s->front == 0) {
 		s->front = 2;
-		if (LineIs(t, ls, le, "---")) {
-			s->front = 1;
+		if (LineIs(t, ls, le, "---") || LineIs(t, ls, le, "+++")) {
+			s->front = t[ls] == '+' ? 3 : 1;
 			return kFrontDelim;
 		}
-	} else if (s->front == 1) {
-		if (LineIs(t, ls, le, "---") || LineIs(t, ls, le, "...")) {
+	} else if (s->front == 1 || s->front == 3) {
+		if (s->front == 3 ? LineIs(t, ls, le, "+++") : (LineIs(t, ls, le, "---") || LineIs(t, ls, le, "..."))) {
 			s->front = 2;
 			return kFrontDelim;
 		}

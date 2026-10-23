@@ -1,7 +1,7 @@
 # Topica: a Markdown writer for blogs, for the classic Macintosh.
 # Built with Retro68: scripts/build.sh --preset lite|full.
 cmake_minimum_required(VERSION 3.13)
-project(Topica VERSION 0.6.0 LANGUAGES C)
+project(Topica VERSION 0.7.0 LANGUAGES C)
 
 # Lite: the Macintosh 512Ke (512K, no MultiFinder). Full: everything else.
 option(TOPICA_LITE "Build for 512K Macs: fewer windows, a smaller undo history" OFF)
