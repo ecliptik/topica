@@ -29,7 +29,7 @@ vi keys
 Edit > Preferences can turn on vi keys: normal, insert and visual modes, as in vi. Escape is the Esc key, or Command-period on keyboards without one; "jk leaves insert mode" makes typing j then k quickly do it too. The status line shows INSERT and VISUAL.
 
 Publishing
-Post > Publish sends the post to topica-bridge, a small server on your network, which puts it on your blog's drafts branch; you merge that branch when you want the post on the site. The dialog suggests where the post goes (_posts with its date, _drafts for a draft, or content/posts for Hugo) and remembers the bridge's address and key. If your blog keeps posts in a folder for each year, publish one as _posts/2026/2026-10-23-title.md and Topica suggests that form from then on. Topica needs MacTCP for this, or the talkip build of Topica Lite on a Mac with LocalTalk and a MacIP gateway.
+Post > Publish sends the post to topica-bridge, a small server on your network, which puts it on your blog's drafts branch; you merge that branch when you want the post on the site. The dialog suggests where the post goes (_posts with its date, _drafts for a draft, or content/posts for Hugo) and remembers the bridge's address and key. If your blog keeps posts in a folder for each year, publish one as _posts/2026/2026-10-23-title.md and Topica suggests that form from then on. Command-period, or Cancel, stops it while it waits. Topica needs MacTCP for this, or the talkip build of Topica Lite on a Mac with LocalTalk and a MacIP gateway.
 
 Undo and Redo
 Command-Z undoes, many steps back. Command-Shift-Z redoes.

@@ -24,6 +24,9 @@ enum {
 };
 
 enum { kHeadCap = 600, kReplyCap = 1024, kTimeout = 20 };
+enum { kProgressCancel = 2 };   /* the progress dialog's Cancel button */
+
+static DialogPtr gProgress;
 
 /* The key as typed: its field shows a bullet for each character */
 static char gKey[64];
@@ -101,6 +104,46 @@ static void Progress(DialogPtr p, const char *text)
 	DrawDialog(p);
 }
 
+/* Asked while the network waits: Command-period, Escape or Cancel ends
+   the publishing. Windows are redrawn meanwhile. */
+static Boolean Canceled(void)
+{
+	EventRecord e;
+	DialogPtr d;
+	WindowPtr w;
+	short item;
+	char c;
+
+	if (!GetNextEvent(keyDownMask | mDownMask | updateMask, &e))
+		return false;
+	switch (e.what) {
+	case keyDown:
+		c = (char) (e.message & charCodeMask);
+		if (c == 0x1B || ((e.modifiers & cmdKey) && c == '.')) {
+			if (gProgress != NULL)
+				FlashButton(gProgress, kProgressCancel);
+			return true;
+		}
+		break;
+	case mouseDown:
+		if (gProgress != NULL && FindWindow(e.where, &w) == inContent && w == gProgress
+				&& DialogSelect(&e, &d, &item) && item == kProgressCancel)
+			return true;
+		break;
+	case updateEvt:
+		w = (WindowPtr) e.message;
+		if (w == gProgress) {
+			BeginUpdate(w);
+			DrawDialog(w);
+			EndUpdate(w);
+		} else if (gUpdateHook != NULL) {
+			gUpdateHook(w);
+		}
+		break;
+	}
+	return false;
+}
+
 /* Sends the post and shows what the bridge said */
 static void Send(Doc *d, unsigned long ip, unsigned short port, const char *bridge, const char *path)
 {
@@ -110,9 +153,11 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	long n, bodyLen, headLen, have = 0, got;
 	Handle h;
 	DialogPtr p;
+	GrafPtr save;
 	OSErr err;
 	int status = 0, done = 0;
 
+	GetPort(&save);
 	sprintf(host, "%lu.%lu.%lu.%lu", (ip >> 24) & 255, (ip >> 16) & 255, (ip >> 8) & 255, ip & 255);
 	/* the request: its head, then the post as the web wants it (UTF-8, LF) */
 	t = EdLockText(ed);
@@ -136,6 +181,8 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 		ShowWindow(p);
 		SetPort(p);
 	}
+	gProgress = p;
+	NetSetCancel(Canceled);
 	SetCursor(*GetCursor(watchCursor));
 	sprintf(line, "Connecting to the bridge at %s\xC9", bridge);
 	Progress(p, line);
@@ -161,11 +208,16 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 		}
 	}
 	NetClose();
+	NetSetCancel(NULL);
+	gProgress = NULL;
 	DisposeHandle(h);
 	if (p != NULL)
 		DisposeDialog(p);
+	SetPort(save);                  /* not the dialog just disposed of */
 	InitCursor();
 
+	if (err == netCanceled)
+		return;                     /* the writer said so: nothing to tell */
 	if (err != noErr) {
 		Problem(err, bridge, line);
 	} else if (done < 0) {
@@ -296,6 +348,7 @@ void PublishPost(Doc *d)
 		}
 	}
 	DisposeDialog(dlg);
+	SetPort(DocWindow(d));          /* not the dialog just disposed of */
 	if (item == kCancel)
 		return;
 	/* the next post goes where this one did, in a folder for its year or not */

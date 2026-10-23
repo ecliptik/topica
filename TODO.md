@@ -57,8 +57,12 @@
       `--talkip` build
 - [x] Drafts (`_drafts/`), and Hugo's `content/posts/`
 - [x] Hugo's TOML front matter (`+++`)
-- [ ] Publish without stopping the Mac: asynchronous calls, and ⌘. to
-      cancel (each step waits now, at most 20-60 s)
+- [x] Cancel Publish while it waits: ⌘., Escape or Cancel (asynchronous
+      MacTCP calls; talkip's open and a receive that asks TCPStatus)
+- [ ] Publish in the background, while you go on writing
+- [ ] MacTCP in Basilisk II crashes (an error of type 3) a few seconds
+      into a connection nothing answers (an unroutable address), with or
+      without these changes: Topica's or slirp's? Try it on a real Mac
 - [ ] Publish the post's images too
 - [ ] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
 - [x] Hide the key in Publish as it's typed (bullets, like a password

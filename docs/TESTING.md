@@ -49,6 +49,15 @@ scripts/deploy.sh basilisk --launch   # System 7 in 256 colors
 memory-mapped while Snow runs). Never run Snow and Basilisk II at once, and
 shut Basilisk II down from the Special menu rather than killing it.
 
+`SNOW_DISPLAY=:78` runs either emulator (and `tests/snow_session.py`) on
+that X display: a private `Xvfb :78 -screen 0 1280x800x24` keeps a
+desktop's password prompts and notifications away from the keystrokes.
+
+Publish's cancel: point the Bridge at a listener that accepts and never
+answers (a few lines of Python on the host), wait for "Waiting for the
+bridge", press Escape or Command-period: the progress window goes, no
+alert, and Topica goes on working; then publish to the real bridge.
+
 `deploy.sh` also puts `tests/fixtures/formatting.md` on the disk as
 "Formatting", a post with every kind of Markdown Topica styles, and two
 copies of `tests/fixtures/round-trip.md`: "Round Trip", typed as another application's text file, and

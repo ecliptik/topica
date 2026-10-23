@@ -16,7 +16,9 @@ Steps, in order (coordinates are the Mac's 512x342 screen, calibrated each run):
                   Mac's screen alone: /tmp/topica/NAME-mac.png
     wait:SECONDS  sleep
 
-Snow must be running on DISPLAY=:0 (scripts/deploy.sh snow --launch). Never
+Snow must be running on DISPLAY=:0 (scripts/deploy.sh snow --launch), or on
+the display SNOW_DISPLAY names: a private Xvfb, say, which no desktop prompt
+can pop up on (SNOW_DISPLAY=:78 for both deploy.sh and this). Never
 use ImageMagick's import here: it grabs the pointer and breaks Snow's mouse.
 """
 import os
@@ -28,12 +30,14 @@ sys.path.insert(0, os.path.join(os.environ.get("EMU", os.path.expanduser("~/emul
 from snow_automation import SnowAutomation  # noqa: E402
 
 OUT = "/tmp/topica"
+DISPLAY = os.environ.get("SNOW_DISPLAY", ":0")
+ENV = {**os.environ, "DISPLAY": DISPLAY}
 
 
 def shot(snow, name):
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name + ".png")
-    subprocess.run(["scrot", "-o", path], env={**os.environ, "DISPLAY": ":0"}, check=True)
+    subprocess.run(["scrot", "-o", path], env=ENV, check=True)
     # the Mac's screen alone, at its own size
     x0, y0 = snow.mac_to_screen(0, 0)
     x1, y1 = snow.mac_to_screen(512, 342)
@@ -48,9 +52,14 @@ def shot(snow, name):
 
 def snow_has_focus():
     """Keystrokes go to whatever window has the focus. Stop rather than
-    type into another application (a password prompt that popped up)."""
-    env = {**os.environ, "DISPLAY": ":0"}
-    name = subprocess.run(["xdotool", "getactivewindow", "getwindowname"], env=env,
+    type into another application (a password prompt that popped up).
+    A private display has no window manager and nothing else on it: give
+    Snow the focus there."""
+    if DISPLAY != ":0":
+        subprocess.run(["xdotool", "search", "--name", "Snow", "windowfocus", "--sync"], env=ENV,
+                       capture_output=True)
+        return
+    name = subprocess.run(["xdotool", "getactivewindow", "getwindowname"], env=ENV,
                           capture_output=True, text=True).stdout.strip()
     if "Snow" not in name:
         sys.exit("snow_session: the focused window is %r, not Snow: stopping before typing" % name)
@@ -68,7 +77,7 @@ def at(snow, xy, double=False):
 
 
 def main(steps):
-    snow = SnowAutomation(auto_calibrate=True)
+    snow = SnowAutomation(display_name=DISPLAY, auto_calibrate=True)
     for step in steps:
         print("step", step, flush=True)
         kind, _, arg = step.partition(":")
@@ -83,11 +92,11 @@ def main(steps):
             snow.move_to(*snow.mac_to_screen(x1, y1))
             snow.jiggle()
             time.sleep(0.3)
-            subprocess.run(["xdotool", "mousedown", "1"], env={**os.environ, "DISPLAY": ":0"})
+            subprocess.run(["xdotool", "mousedown", "1"], env=ENV)
             time.sleep(0.2)
             snow.move_to(*snow.mac_to_screen(x2, y2))
             time.sleep(0.3)
-            subprocess.run(["xdotool", "mouseup", "1"], env={**os.environ, "DISPLAY": ":0"})
+            subprocess.run(["xdotool", "mouseup", "1"], env=ENV)
             time.sleep(0.5)
         elif kind == "cmd":
             snow.cmd_key(arg)

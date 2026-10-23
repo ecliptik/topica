@@ -10,7 +10,8 @@
 # SNOW picks Snow's binary and SNOW_ARGS adds to its command line: for the
 # talkip build (--preset lite-talkip) through a MacIP gateway, a Snow with
 # LocalTalk over UDP and SNOW_ARGS="--serial-bridge-b localtalk". SNOWW
-# picks the workspace (diskimages/topica.snoww).
+# picks the workspace (diskimages/topica.snoww), SNOW_DISPLAY the X display
+# (:0; a private Xvfb keeps desktop prompts out of the way).
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 EMU=${EMU:-$HOME/emulators}
@@ -73,7 +74,7 @@ snow)
     echo "deploy: Topica ($preset) is on $img"
     if [ $launch = 1 ]; then
         # shellcheck disable=SC2086
-        DISPLAY=:0 SDL_AUDIODRIVER=dummy "${SNOW:-$EMU/snow/snowemu}" ${SNOW_ARGS:-} "${SNOWW:-$here/diskimages/topica.snoww}" >/tmp/topica-snow.log 2>&1 &
+        DISPLAY=${SNOW_DISPLAY:-:0} SDL_AUDIODRIVER=dummy "${SNOW:-$EMU/snow/snowemu}" ${SNOW_ARGS:-} "${SNOWW:-$here/diskimages/topica.snoww}" >/tmp/topica-snow.log 2>&1 &
         echo "deploy: Snow running (PID $!), log /tmp/topica-snow.log"
     fi
     ;;
@@ -90,7 +91,7 @@ basilisk)
         [ -f "$prefs" ] || { echo "deploy: no $prefs (scripts/setup-emulators.sh)" >&2; exit 1; }
         [ -n "$(snow_pids)" ] && { echo "deploy: Snow is running; quit it first" >&2; exit 1; }
         pgrep -x BasiliskII >/dev/null && { echo "deploy: Basilisk II is already running" >&2; exit 0; }
-        DISPLAY=:0 "${BASILISK:-BasiliskII}" --config "$prefs" >/tmp/topica-basilisk.log 2>&1 </dev/null &
+        DISPLAY=${SNOW_DISPLAY:-:0} "${BASILISK:-BasiliskII}" --config "$prefs" >/tmp/topica-basilisk.log 2>&1 </dev/null &
         echo "deploy: Basilisk II running (PID $!), log /tmp/topica-basilisk.log"
     fi
     ;;

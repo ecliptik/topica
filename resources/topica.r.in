@@ -386,10 +386,11 @@ resource 'DITL' (146, "Publish", purgeable) {
 
 /* Publish's progress: one line that changes */
 resource 'DLOG' (147, "Publishing", purgeable) {
-	{ 0, 0, 64, 380 }, dBoxProc, invisible, noGoAway, 0x0, 147, "", noAutoCenter
+	{ 0, 0, 86, 380 }, dBoxProc, invisible, noGoAway, 0x0, 147, "", noAutoCenter
 };
 resource 'DITL' (147, "Publishing", purgeable) {
 	{
 		{ 14, 16, 50, 364 }, StaticText { disabled, "" };
+		{ 56, 292, 76, 364 }, Button { enabled, "Cancel" };
 	}
 };
