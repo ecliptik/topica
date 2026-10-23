@@ -13,6 +13,8 @@
 /* Opens the window (or brings it forward) showing d */
 void PreviewShow(Doc *d);
 void PreviewClose(void);
+/* After Post > Theme */
+void PreviewApplyTheme(void);
 Boolean PreviewIsFront(void);
 Boolean IsPreview(WindowPtr w);
 

@@ -20,6 +20,7 @@
 #include "editor.h"
 #include "page.h"
 #include "preview.h"
+#include "theme.h"
 #include "util.h"
 
 enum { kScrollWidth = 16, kMargin = 10 };
@@ -187,6 +188,13 @@ static void DrawEmpty(const Rect *r)
 	static char kMsg[] = "Open a post to preview it.";
 	short w;
 
+	if (ColorScreen()) {
+		RGBColor c;
+		ThemeColor(kThBg, &c);
+		RGBBackColor(&c);
+		ThemeColor(kThText, &c);
+		RGBForeColor(&c);
+	}
 	EraseRect(r);
 	TextFont(kGeneva);
 	TextSize(9);
@@ -221,11 +229,13 @@ static void DrawPage(const Rect *r)
 	}
 }
 
-/* Draws the content, through the offscreen when there is one */
+/* Draws the content, through the offscreen when there is one. Dark in
+   black and white is the page drawn as Light, then inverted. */
 static void Render(void)
 {
 	Rect content;
 	GrafPtr save;
+	short mode = ThemeDark() && !ColorScreen() ? notSrcCopy : srcCopy;
 
 	GetPort(&save);
 	SetPort(gWin);
@@ -241,22 +251,28 @@ static void Render(void)
 			SetGWorld(oldPort, oldDevice);
 			ForeColor(blackColor);
 			BackColor(whiteColor);
-			CopyBits((BitMap *) *pm, &gWin->portBits, &gOffRect, &content, srcCopy, NULL);
+			CopyBits((BitMap *) *pm, &gWin->portBits, &gOffRect, &content, mode, NULL);
 			UnlockPixels(pm);
 		} else {
 			SetGWorld(oldPort, oldDevice);
 			DrawPage(&content);
+			if (mode == notSrcCopy)
+				InvertRect(&content);
+			ThemePlain();
 		}
 	} else if (gHaveOffPort) {
 		SetPort(&gOffPort);
 		DrawPage(&gOffRect);
 		SetPort(gWin);
-		CopyBits(&gOffPort.portBits, &gWin->portBits, &gOffRect, &content, srcCopy, NULL);
+		CopyBits(&gOffPort.portBits, &gWin->portBits, &gOffRect, &content, mode, NULL);
 	} else {
 		RgnHandle clip = NewRgn();
 		GetClip(clip);
 		ClipRect(&content);
 		DrawPage(&content);
+		if (mode == notSrcCopy)
+			InvertRect(&content);
+		ThemePlain();                   /* for the scroll bar */
 		SetClip(clip);
 		DisposeRgn(clip);
 	}
@@ -418,7 +434,9 @@ void PreviewShow(Doc *d)
 			ErrorAlert("The preview couldn\xD5t be opened.", memFullErr);
 			return;
 		}
+		ThemeWindow(gWin);              /* the color its updates are erased in */
 		SetPort(gWin);
+		ThemePlain();                   /* the page sets its own colors */
 		BarRect(&r);
 		gBar = NewControl(gWin, &r, "\p", true, 0, 0, 0, scrollBarProc, 0);
 		MakeOffscreen();
@@ -452,6 +470,16 @@ void PreviewForget(Doc *d)
 	gLaidOut = false;
 	SetTitle();
 	SyncBar();
+	Render();
+}
+
+void PreviewApplyTheme(void)
+{
+	if (gWin == NULL)
+		return;
+	ThemeWindow(gWin);
+	SetPort(gWin);
+	ThemePlain();
 	Render();
 }
 

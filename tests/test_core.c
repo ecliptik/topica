@@ -678,13 +678,14 @@ static void TestPrefs(void)
 	{
 		const char *text = "publish-bridge: 10.0.2.2:8023\rpublish-key: a b:c\r# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
 			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\rvi: on\r"
-			"publish-year-folders: on\rspelling-checker: Disk:Apps:Excalibur 2.6\r";
+			"publish-year-folders: on\rspelling-checker: Disk:Apps:Excalibur 2.6\rtheme: Solarized Dark\r";
 		prefs_read(&p, text, (long) strlen(text));
 	}
 	CHECK_STR(p.font, "Geneva");
 	CHECK(p.size == 12 && p.profile == kProfileHugo && !p.utf8 && !p.lf && p.autosaveMinutes == 5 && !p.format);
 	CHECK(p.vi && !p.viJk && p.yearFolders);
 	CHECK_STR(p.wordService, "Disk:Apps:Excalibur 2.6");
+	CHECK_STR(p.theme, "Solarized Dark");
 	CHECK_STR(p.imagePath, "/img/");
 	CHECK_STR(p.layout, "page");
 	CHECK_STR(p.bridge, "10.0.2.2:8023");
@@ -706,6 +707,7 @@ static void TestPrefs(void)
 	memset(p.bridge, 'b', sizeof(p.bridge) - 1);
 	memset(p.bridgeKey, 'k', sizeof(p.bridgeKey) - 1);
 	memset(p.wordService, 'w', sizeof(p.wordService) - 1);
+	memset(p.theme, 't', sizeof(p.theme) - 1);
 	n = prefs_write(&p, '\r', buf, sizeof(buf));
 	CHECK(n > 0);
 	prefs_default(&q);

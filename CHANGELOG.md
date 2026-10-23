@@ -27,6 +27,12 @@ Polish.
   Undo takes back all of a check's. The item names the checker once you
   have chosen it; hold Option to choose another. Not in Topica Lite, and
   not shown on System 6.
+- Themes, in Post › Theme: Light and Dark on every Mac (Dark on a Plus is
+  white on black), and twelve color themes with Color QuickDraw:
+  Solarized Light and Dark, TokyoNight Day and Night, Amber CRT, System 7,
+  Dracula, Nord, Green Screen, Classic, Monokai and Gruvbox. The post, its
+  status line and the preview take the theme; printing doesn't. Topica
+  Lite has Light and Dark.
 - Undoing (or redoing) back to the text as it was saved leaves the post
   unchanged: closing it doesn't ask to save.
 - Publish can be canceled while it connects or waits for the bridge:

@@ -49,6 +49,7 @@ set(TOPICA_SOURCES
     app/print.c
     app/spellwin.c
     app/publishwin.c
+    app/theme.c
     core/textconv.c
     core/frontmatter.c
     core/undo.c

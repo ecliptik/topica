@@ -32,6 +32,7 @@
 #include "preview.h"
 #include "settings.h"
 #include "textdrag.h"
+#include "theme.h"
 #include "util.h"
 
 #ifndef TOPICA_MAX_DOCS
@@ -217,10 +218,16 @@ static void StatusRect(Doc *d, Rect *r)
 static void SyncScrollBar(Doc *d)
 {
 	short value, max, page;
+	GrafPtr save;
 
 	EdScrollInfo(d->ed, &value, &max, &page);
+	GetPort(&save);
+	SetPort(d->w);
+	ThemePlain();                       /* the scroll bar draws in the port's colors */
 	SetControlMaximum(d->vbar, max);
 	SetControlValue(d->vbar, value);
+	ThemePort();
+	SetPort(save);
 }
 
 /* ---- the status line ---- */
@@ -233,6 +240,7 @@ static void DrawStatus(Doc *d)
 	long words = d->words;
 
 	StatusRect(d, &r);
+	ThemePort();                        /* TextEdit leaves its last run's color */
 	EraseRect(&r);
 	TextFont(kGeneva);
 	TextSize(9);
@@ -394,6 +402,7 @@ static Doc *MakeDoc(void)
 	if (d->w == NULL)
 		goto nomem;
 	SetPort(d->w);
+	ThemeWindow(d->w);                  /* before TextEdit takes the port's colors */
 	ViewRect(d, &v);
 	d->ed = EdNew(&v, SettingsFontNumber(), gPrefs.size);
 	BarRect(d, &r);
@@ -531,6 +540,21 @@ void DocRestyleAll(void)
 	for (i = 0; i < TOPICA_MAX_DOCS; i++)
 		if (gDocs[i] != NULL)
 			TouchAll(gDocs[i]);
+}
+
+void DocApplyTheme(void)
+{
+	short i;
+	Doc *d;
+
+	for (i = 0; i < TOPICA_MAX_DOCS; i++)
+		if ((d = gDocs[i]) != NULL) {
+			ThemeWindow(d->w);
+			SetPort(d->w);
+			EdSetTheme(d->ed);
+			InvalRect(&d->w->portRect);
+			TouchAll(d);                /* the colors, restyled */
+		}
 }
 
 Boolean DocCanStyle(Doc *d)
@@ -1094,8 +1118,10 @@ void DocUpdate(Doc *d)
 	SetPort(d->w);
 	BeginUpdate(d->w);
 	EdDraw(d->ed);
+	ThemePlain();
 	DrawControls(d->w);
 	DrawGrowIcon(d->w);
+	ThemePort();
 	DrawStatus(d);
 	EndUpdate(d->w);
 }
@@ -1104,8 +1130,10 @@ void DocActivate(Doc *d, Boolean active)
 {
 	SetPort(d->w);
 	EdActivate(d->ed, active);
+	ThemePlain();
 	HiliteControl(d->vbar, active ? 0 : 255);
 	DrawGrowIcon(d->w);
+	ThemePort();
 	if (active)
 		undo_seal(&d->undo);
 }
@@ -1144,7 +1172,9 @@ static pascal void ScrollAction(ControlHandle c, short part)
 	case inPageDown: delta = (short) (page > 1 ? page - 1 : 1); break;
 	default: return;
 	}
+	ThemePort();                        /* the text, in the theme; the bar, plain */
 	EdScrollTo(gScrolling->ed, (short) (value + delta));
+	ThemePlain();
 	SetControlValue(c, (short) (value + delta));
 }
 
@@ -1160,14 +1190,17 @@ void DocClick(Doc *d, EventRecord *e)
 	undo_seal(&d->undo);
 	part = FindControl(p, d->w, &c);
 	if (part != 0 && c == d->vbar) {
+		ThemePlain();
 		if (part == inThumb) {
 			(void) TrackControl(c, p, NULL);
+			ThemePort();
 			EdScrollTo(d->ed, GetControlValue(c));
 		} else {
 			gScrolling = d;
 			(void) TrackControl(c, p, (ControlActionUPP) ScrollAction);
 			gScrolling = NULL;
 		}
+		ThemePort();
 		SyncScrollBar(d);
 		return;
 	}
@@ -1384,8 +1417,10 @@ static void Resized(Doc *d)
 	ViewRect(d, &r);
 	EdSetView(d->ed, &r);
 	BarRect(d, &r);
+	ThemePlain();
 	MoveControl(d->vbar, r.left, r.top);
 	SizeControl(d->vbar, (short) (r.right - r.left), (short) (r.bottom - r.top));
+	ThemePort();
 	SyncScrollBar(d);
 	InvalRect(&d->w->portRect);
 }

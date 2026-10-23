@@ -19,6 +19,7 @@
 
 #include "../core/mdscan.h"
 #include "editor.h"
+#include "theme.h"
 #include "util.h"
 
 struct Editor {
@@ -76,6 +77,7 @@ static void BaseStyle(Editor *ed, TextStyle *ts)
 	memset(ts, 0, sizeof(*ts));
 	ts->tsFont = ed->font;
 	ts->tsSize = ed->size;
+	ThemeColor(kThText, &ts->tsColor);
 }
 
 /* All the text in the base style, through the selection's fields so that
@@ -112,8 +114,14 @@ Editor *EdNew(const Rect *view, short font, short size)
 		return NULL;
 	}
 	Metrics(ed);                        /* TEStyleNew took the port's font */
+	(*ed->te)->txMode = ThemeTextMode();
 	TEAutoView(true, ed->te);
 	return ed;
+}
+
+void EdSetTheme(Editor *ed)
+{
+	(*ed->te)->txMode = ThemeTextMode();
 }
 
 Boolean EdCanStyle(Editor *ed)
@@ -469,19 +477,11 @@ Handle EdClipboard(long *len)
 
 /* ---- styles ---- */
 
-/* Colors only on a color screen (util's ColorScreen); each is dark enough
-   to come out black if the screen goes to black and white */
-static const RGBColor kBlack = { 0, 0, 0 };
-static const RGBColor kMarkColor = { 0x6000, 0x6000, 0x6000 };
-static const RGBColor kCodeColor = { 0x0000, 0x6000, 0x0000 };
-static const RGBColor kLinkColor = { 0x0000, 0x0000, 0xC000 };
-static const RGBColor kHeadingColor = { 0x0000, 0x0000, 0x8000 };
-static const RGBColor kMetaColor = { 0x7000, 0x3800, 0x0000 };
-
 /* How a Markdown class looks */
 static void ClassStyle(Editor *ed, int cls, ScrpSTElement *e)
 {
 	Style face = 0;
+	short role;
 
 	memset(e, 0, sizeof(*e));
 	if (cls & (MD_BOLD | MD_HEADING))
@@ -497,19 +497,22 @@ static void ClassStyle(Editor *ed, int cls, ScrpSTElement *e)
 	e->scrpSize = ed->size;
 	e->scrpHeight = ed->height;
 	e->scrpAscent = ed->ascent;
-	e->scrpColor = kBlack;
+	/* the theme's colors on a color screen (util's ColorScreen); in black
+	   and white, its text color */
+	role = kThText;
 	if (ColorScreen()) {
 		if (cls & (MD_MARK | MD_URL))
-			e->scrpColor = kMarkColor;
+			role = kThMark;
 		else if (cls & MD_CODE)
-			e->scrpColor = kCodeColor;
+			role = kThCode;
 		else if (cls & MD_LINK)
-			e->scrpColor = kLinkColor;
+			role = kThLink;
 		else if (cls & MD_HEADING)
-			e->scrpColor = kHeadingColor;
+			role = kThHeading;
 		else if (cls & MD_META)
-			e->scrpColor = kMetaColor;
+			role = kThMeta;
 	}
+	ThemeColor(role, &e->scrpColor);
 }
 
 static Boolean SameStyle(const ScrpSTElement *a, const ScrpSTElement *b)

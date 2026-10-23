@@ -81,5 +81,6 @@
 - [x] Stationery pads (System 7): open as an untitled post, `{{date}}`
       filled in
 - [x] Drag and drop text on System 7.5 (moves within a post, copies out)
+- [x] Themes: Light and Dark everywhere, color themes on a color Mac
 - [ ] A quick-note desk accessory
 - [x] Release script: `.dsk`, `.hqx` and `.sit` for each build

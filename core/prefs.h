@@ -24,6 +24,7 @@ typedef struct {
 	char bridgeKey[64];         /* the key it asks for */
 	short yearFolders;          /* a post goes in a folder for its year: _posts/2026/ */
 	char wordService[160];      /* the Word Services checker: "Disk:Folder:Excalibur" */
+	char theme[32];             /* the colors: "Light", "Dark", "Solarized Dark"... */
 } TopicaPrefs;
 
 void prefs_default(TopicaPrefs *p);

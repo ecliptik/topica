@@ -9,6 +9,7 @@ void prefs_default(TopicaPrefs *p)
 {
 	memset(p, 0, sizeof(*p));
 	strcpy(p->font, "Monaco");
+	strcpy(p->theme, "Light");
 	p->size = 9;
 	strcpy(p->imagePath, "/assets/images/posts/");
 	strcpy(p->layout, "post");
@@ -100,6 +101,8 @@ void prefs_read(TopicaPrefs *p, const char *text, long n)
 			p->yearFolders = Is(text + vs, ve - vs, "on");
 		else if (Is(text + ks, ke - ks, "spelling-checker"))
 			Copy(p->wordService, sizeof(p->wordService), text + vs, ve - vs);
+		else if (Is(text + ks, ke - ks, "theme"))
+			Copy(p->theme, sizeof(p->theme), text + vs, ve - vs);
 	}
 }
 
@@ -124,13 +127,15 @@ long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 		"publish-bridge: %s%c"
 		"publish-key: %s%c"
 		"publish-year-folders: %s%c"
-		"spelling-checker: %s%c",
+		"spelling-checker: %s%c"
+		"theme: %s%c",
 		eol, p->font, eol, p->size, eol, p->imagePath, eol, p->layout, eol,
 		p->profile == kProfileHugo ? "hugo" : "jekyll", eol,
 		p->utf8 ? "utf-8" : "mac-roman", eol, p->lf ? "lf" : "cr", eol, p->autosaveMinutes, eol,
 		p->format ? "on" : "off", eol, p->vi ? "on" : "off", eol, p->viJk ? "on" : "off", eol,
 		p->bridge, eol, p->bridgeKey, eol, p->yearFolders ? "on" : "off", eol,
-		p->wordService, eol);
+		p->wordService, eol,
+		p->theme, eol);
 	if (out != NULL) {
 		if (n > cap)
 			return -1;

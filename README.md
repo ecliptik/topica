@@ -19,6 +19,10 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   bold, *emphasis* in italics, `code` in Monaco, link text underlined, in
   color on a color screen. Post › Hide Formatting turns it off; it starts
   off on a 68000, where it slows down long posts.
+- **Themes** (Post › Theme): Light and Dark on any Mac, and on a color
+  Mac Solarized, TokyoNight, Amber CRT, System 7, Dracula, Nord, Green
+  Screen, Classic, Monokai and Gruvbox, for the post and the preview.
+  Printing stays black on white.
 - **The Headings menu** lists the post's headings; choose one to go there.
 - **Preview** (⌘R) shows the post laid out like its web page: the title and
   date from the front matter, headings, lists, quotes, code, tables, images

@@ -15,6 +15,7 @@
 #include "../core/layout.h"
 #include "../core/mdpage.h"
 #include "page.h"
+#include "theme.h"
 #include "util.h"
 
 enum { kTimes = 20 };
@@ -625,22 +626,22 @@ long PageHeight(const Page *pg)
 
 /* ---- drawing ---- */
 
-static void Color(Boolean color, unsigned short r, unsigned short g, unsigned short b)
+/* The theme's color for role (theme.h), on a color screen */
+static void Color(Boolean color, short role)
 {
 	RGBColor c;
 
 	if (!color)
 		return;
-	c.red = r;
-	c.green = g;
-	c.blue = b;
+	ThemeColor(role, &c);
 	RGBForeColor(&c);
 }
 
+/* The text's color */
 static void Black(Boolean color)
 {
 	if (color)
-		Color(true, 0, 0, 0);
+		Color(true, kThText);
 	else
 		ForeColor(blackColor);
 }
@@ -661,9 +662,9 @@ static void DrawLine(Page *pg, const PgBlock *p, const LayLine *line, short x, s
 		TextSize(pg->size[mf]);
 		TextFace((Style) (pg->face[mf] | (look & MS_LINK ? underline : 0)));
 		if (look & MS_LINK)
-			Color(color, 0, 0, 0xC000);
+			Color(color, kThLink);
 		else if ((look & MS_META) || p->b.kind == MP_BYLINE)
-			Color(color, 0x6000, 0x6000, 0x6000);
+			Color(color, kThMark);
 		else
 			Black(color);
 		if ((pg->sty[i] & MS_NOTE) && p->what == kBody) {
@@ -734,7 +735,7 @@ static void DrawBlock(Page *pg, const char *text, long n, const PgBlock *p, long
 		SetRect(&box, (short) (r->left + q * kQuoteIndent + 2), (short) (py - (p->gap > 6 ? 3 : p->gap)),
 			(short) (r->left + q * kQuoteIndent + 5), (short) (py + p->h));
 		if (color) {
-			Color(true, 0xC000, 0xC000, 0xC000);
+			Color(true, kThLine);
 			PaintRect(&box);
 			Black(true);
 		} else {
@@ -745,7 +746,7 @@ static void DrawBlock(Page *pg, const char *text, long n, const PgBlock *p, long
 	if (p->b.kind == MP_RULE) {
 		MoveTo(x, (short) (py + kRuleHeight / 2));
 		if (color)
-			Color(true, 0xA000, 0xA000, 0xA000);
+			Color(true, kThLine);
 		else
 			PenPat(&qd.gray);
 		LineTo(right, (short) (py + kRuleHeight / 2));
@@ -758,9 +759,9 @@ static void DrawBlock(Page *pg, const char *text, long n, const PgBlock *p, long
 		char url[256];
 		short w;
 		if (color) {
-			Color(true, 0xF0F0, 0xF0F0, 0xF0F0);
+			Color(true, kThShade);
 			PaintRect(&box);
-			Color(true, 0x9000, 0x9000, 0x9000);
+			Color(true, kThLine);
 		}
 		FrameRect(&box);
 		Black(color);
@@ -780,7 +781,7 @@ static void DrawBlock(Page *pg, const char *text, long n, const PgBlock *p, long
 			TextSize(pg->size[MF_SMALL]);
 			TextFace(0);
 			w = TextWidth(url, 0, (short) len);
-			Color(color, 0x6000, 0x6000, 0x6000);
+			Color(color, kThMark);
 			MoveTo((short) ((box.left + box.right - w) / 2 > box.left + 4 ? (box.left + box.right - w) / 2 : box.left + 4),
 				(short) (box.bottom - 6 - pg->f.descent[MF_SMALL]));
 			DrawText(url, 0, (short) len);
@@ -790,7 +791,7 @@ static void DrawBlock(Page *pg, const char *text, long n, const PgBlock *p, long
 	}
 	if (Boxed(&p->b)) {
 		if (color) {
-			Color(true, 0xEEEE, 0xEEEE, 0xEEEE);
+			Color(true, kThShade);
 			PaintRect(&box);
 			Black(true);
 		} else {
@@ -827,6 +828,11 @@ void PageDraw(Page *pg, const char *text, long n, long top, const Rect *r, Boole
 	oldFont = port->txFont;
 	oldSize = port->txSize;
 	oldFace = port->txFace;
+	if (color) {
+		RGBColor bg;
+		ThemeColor(kThBg, &bg);
+		RGBBackColor(&bg);
+	}
 	EraseRect(r);
 	HLock((Handle) pg->blocks);
 	for (i = 0; i < pg->count; i++) {

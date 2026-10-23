@@ -71,6 +71,8 @@ short DocRecoverAll(void);
 void DocApplySettings(void);
 /* After Show or Hide Formatting: every window restyled when idle */
 void DocRestyleAll(void);
+/* After Post > Theme: every post in the new colors */
+void DocApplyTheme(void);
 Boolean DocCanStyle(Doc *d);
 /* Puts the caret at offset, with its line at the top of the window */
 void DocShowLine(Doc *d, long offset);

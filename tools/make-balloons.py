@@ -64,7 +64,7 @@ def resource(kind, rid, items, missing):
         body += struct.pack(">h", 0)        # item number offset
     body += struct.pack(">lhh", 0, 0, 0)
     body += struct.pack(">h", last - first + 1)
-    body += record((missing, "") if missing else None, (0, 0, 0, 0) if dialog else None)
+    body += record(missing, (0, 0, 0, 0) if dialog else None)
     for n in range(first, last + 1):
         body += record(items.get(n), rects[n - 1] if dialog else None)
     return body
@@ -82,11 +82,11 @@ def parse(path):
             out.append(cur)
             continue
         key, _, text = line.partition(":")
-        if key == "missing":
-            cur["missing"] = text.strip()
-            continue
         enabled, _, dimmed = text.partition("|")
-        cur["items"][int(key)] = (enabled.strip(), dimmed.strip())
+        if key == "missing":
+            cur["missing"] = (enabled.strip(), dimmed.strip())
+        else:
+            cur["items"][int(key)] = (enabled.strip(), dimmed.strip())
     return out
 
 

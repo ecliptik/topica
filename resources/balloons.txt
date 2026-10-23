@@ -3,7 +3,7 @@
 # doesn't, in a sentence. Items left out get none.
 #
 #   menu ID | dialog ID      a MENU's 'hmnu', or a DLOG's 'hdlg' (by item number)
-#   missing: TEXT            items not listed (a menu filled at run time)
+#   missing: ENABLED | DIMMED  items not listed (a menu filled at run time)
 #   N: ENABLED | DIMMED      item N (a menu's title is 0); either text may be empty
 
 menu 129
@@ -25,7 +25,10 @@ menu 131
 4: Inserts a Markdown link; the selection becomes its text.
 6: Shows Markdown styled as you write (slow on a 68000 Mac).
 7: Shows the post laid out as its web page.
-9: Sends the post to topica-bridge, which puts it on the blog's drafts branch.
+10: Sends the post to topica-bridge, which puts it on the blog's drafts branch.
+
+menu 133
+missing: | Color themes need a color Mac.
 
 menu 132
 0: Jumps to a heading in the front post.

@@ -65,8 +65,10 @@ resource 'MENU' (130, "Edit") {
 	}
 };
 
+/* Theme is a submenu: hierarchicalMenu (\033) as its key, the menu (133,
+   main.c fills it) as its mark */
 resource 'MENU' (131, "Post") {
-	131, textMenuProc, 0x16D, enabled, "Post",
+	131, textMenuProc, 0x2ED, enabled, "Post",
 	{
 		"Post Info\311", noIcon, "E", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
@@ -75,6 +77,7 @@ resource 'MENU' (131, "Post") {
 		"-", noIcon, noKey, noMark, plain;
 		"Hide Formatting", noIcon, noKey, noMark, plain;
 		"Show Preview", noIcon, "R", noMark, plain;
+		"Theme", noIcon, "\033", "\205", plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Publish\311", noIcon, noKey, noMark, plain
 	}

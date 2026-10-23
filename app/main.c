@@ -29,19 +29,23 @@
 #include "print.h"
 #include "publishwin.h"
 #include "textdrag.h"
+#include "theme.h"
 #include "wordsvc.h"
 #include "settings.h"
 #include "spellwin.h"
 #include "util.h"
 
-enum { kAppleMenu = 128, kFileMenu = 129, kEditMenu = 130, kPostMenu = 131 };
+enum { kAppleMenu = 128, kFileMenu = 129, kEditMenu = 130, kPostMenu = 131, kThemeMenu = 133 };
 enum { kAboutItem = 1 };
 enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem = 6, kExportItem = 7, kRevertItem = 8,
 	kPageSetupItem = 10, kPrintItem = 11, kQuitItem = 13 };
 enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
 	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kSpellItem = 14, kWordSvcItem = 15, kPrefsItem = 17 };
 enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6, kPreviewItem = 7,
-	kPublishItem = 9 };
+	kThemeItem = 8, kPublishItem = 10 };
+/* The Theme menu: Light and Dark, a line, then the color themes */
+#define ThemeItem(i) ((short) ((i) < 2 ? (i) + 1 : (i) + 2))
+#define ItemTheme(n) ((short) ((n) < 3 ? (n) - 1 : (n) - 2))
 /* osEvt's suspend/resume (Inside Macintosh VI) */
 enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
 
@@ -160,6 +164,14 @@ static void AdjustMenus(void)
 	SetMenuItemText(post, kPreviewItem, PreviewIsFront() ? "\pHide Preview" : "\pShow Preview");
 	Enable(post, kPreviewItem, target != NULL);
 	Enable(post, kPublishItem, d != NULL);
+	{
+		MenuHandle theme = GetMenuHandle(kThemeMenu);
+		short i;
+		for (i = 0; i < ThemeCount(); i++) {
+			CheckItem(theme, ThemeItem(i), i == ThemeCurrent());
+			Enable(theme, ThemeItem(i), ThemeUsable(i));
+		}
+	}
 	/* whole menus */
 	if (EnableMenu(post, target != NULL) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
 		DrawMenuBar();
@@ -301,6 +313,13 @@ static void DoMenu(long choice)
 		break;
 	case kHeadingsMenu:
 		HeadingsGo(d, item);
+		break;
+	case kThemeMenu:
+		if (ItemTheme(item) != ThemeCurrent()) {
+			ThemeChoose(ItemTheme(item));
+			DocApplyTheme();
+			PreviewApplyTheme();
+		}
 		break;
 	}
 	HiliteMenu(0);
@@ -473,6 +492,21 @@ static void Setup(void)
 	DrawMenuBar();
 	gUpdateHook = Update;
 	SettingsLoad();
+	ThemeInit();
+	{
+		/* Post > Theme, from the themes there are */
+		MenuHandle theme = NewMenu(kThemeMenu, "\pTheme");
+		Str255 s;
+		short i;
+		for (i = 0; i < ThemeCount(); i++) {
+			if (i == 2)
+				AppendMenu(theme, "\p(-");
+			AppendMenu(theme, "\p ");
+			PStr(s, ThemeName(i));
+			SetMenuItemText(theme, ThemeItem(i), s);
+		}
+		InsertMenu(theme, -1);
+	}
 	DragInit();
 	gHaveAE = AppleEventsInit(DoQuit, OpenAppEvent, OpenFileEvent, PrintFileEvent);
 	gHaveWordSvc = gHaveAE && WordServicesInit();

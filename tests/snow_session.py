@@ -11,6 +11,8 @@ Steps, in order (coordinates are the Mac's 512x342 screen, calibrated each run):
     type:TEXT     types plain text
     key:NAME      one key by X keysym name (Return, BackSpace, Tab, Up, Down...)
     menu:X,Y      the menu at X, its item at Y (items 16 apart from y = 28)
+    sub:X,Y,X2,Y2 a submenu's item: the menu at X, rest on its item at Y until
+                  the submenu opens, then across and down to X2,Y2
     move:X,Y      the pointer, out of a screenshot's way (509,339)
     shot:NAME     a screenshot of the display: /tmp/topica/NAME.png, and the
                   Mac's screen alone: /tmp/topica/NAME-mac.png
@@ -113,6 +115,21 @@ def main(steps):
         elif kind == "menu":
             x, y = (int(v) for v in arg.split(","))
             snow.menu_select(x, y)
+            time.sleep(1.5)
+        elif kind == "sub":
+            x, y, x2, y2 = (int(v) for v in arg.split(","))
+            path = [(x, 8)] + [(x, 8 + (y - 8) * i // 12) for i in range(1, 13)]
+            path += [(x + (x2 - x) * i // 12, y) for i in range(1, 13)]
+            path += [(x2, y + (y2 - y) * i // 12) for i in range(1, 13)]
+            snow.move_to(*snow.mac_to_screen(x, 8))
+            time.sleep(0.3)
+            subprocess.run(["xdotool", "mousedown", "1"], env=ENV)
+            time.sleep(0.5)
+            for n, (mx, my) in enumerate(path):
+                snow._xtest_move(*snow.mac_to_screen(mx, my))
+                time.sleep(0.8 if n == 12 else 0.03)   # the submenu opens after a rest
+            time.sleep(0.3)
+            subprocess.run(["xdotool", "mouseup", "1"], env=ENV)
             time.sleep(1.5)
         elif kind == "move":
             x, y = (int(v) for v in arg.split(","))

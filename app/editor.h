@@ -22,6 +22,9 @@ void EdDispose(Editor *ed);
    editor decides how each looks. 0 is plain text. */
 Boolean EdCanStyle(Editor *ed);
 void EdSetClasses(Editor *ed, long start, long end, const unsigned char *cls);
+/* After Post > Theme: the text mode TextEdit draws in (the window restyles
+   the colors) */
+void EdSetTheme(Editor *ed);
 
 /* The most text the editor can hold */
 long EdMaxLength(void);
