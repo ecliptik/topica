@@ -35,6 +35,8 @@ Polish.
   Lite has Light and Dark.
 - Undoing (or redoing) back to the text as it was saved leaves the post
   unchanged: closing it doesn't ask to save.
+- Publish over MacTCP says "Nothing answered" when the bridge doesn't
+  answer, not that it refused: MacTCP reports both the same way.
 - Publish can be canceled while it connects or waits for the bridge:
   Command-period, Escape, or the Cancel button in its progress window.
   The windows behind it are redrawn meanwhile.

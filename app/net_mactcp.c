@@ -60,6 +60,7 @@ OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
 {
 	TCPiopb pb;
 	OSErr err;
+	unsigned long start;
 
 	NetClose();
 	if (gIPP == 0) {
@@ -88,8 +89,15 @@ OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
 	gOpenPB.csParam.open.commandTimeoutValue = (byte) timeoutSecs;
 	gOpenPB.csParam.open.remoteHost = ip;
 	gOpenPB.csParam.open.remotePort = port;
-	if ((err = CallWait(&gOpenPB, TCPActiveOpen)) != noErr)
+	start = TickCount();
+	if ((err = CallWait(&gOpenPB, TCPActiveOpen)) != noErr) {
 		NetClose();
+		/* MacTCP says openFailed for a refusal and for its timeout alike
+		   (seen on a Plus): one that took the whole timeout was nothing
+		   answering */
+		if (err == openFailed && TickCount() - start >= (unsigned long) (timeoutSecs - 2) * 60)
+			err = commandTimeout;
+	}
 	return err;
 }
 

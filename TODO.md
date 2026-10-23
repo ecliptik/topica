@@ -61,11 +61,10 @@
 - [x] Cancel Publish while it waits: ⌘., Escape or Cancel (asynchronous
       MacTCP calls; talkip's open and a receive that asks TCPStatus)
 - [ ] Publish in the background, while you go on writing
-- [ ] **Before 1.0:** MacTCP in Basilisk II crashes (an error of type 3) a
-      few seconds into a connection nothing answers (an unroutable
-      address). Flynn, another MacTCP application, crashes the same way
-      there, so it looks like the emulator's; confirm on a real Mac with
-      MacTCP (the Plus)
+- [x] MacTCP in Basilisk II crashes (an error of type 3) a few seconds into
+      a connection nothing answers. Flynn crashes the same way there; a
+      real Plus with MacTCP doesn't (refused, unanswered and canceled
+      connections all come back cleanly): it's the emulator
 - [ ] Publish the post's images too
 - [ ] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
 - [x] Hide the key in Publish as it's typed (bullets, like a password
