@@ -8,7 +8,7 @@
 #                                 only the System at the top level
 #   diskimages/topica.snoww       Snow: a Mac Plus with that disk
 #   diskimages/topica-sys7.hda    System 7, a copy of the hub's disk
-#   diskimages/basilisk_prefs     Basilisk II with that disk, no network
+#   diskimages/basilisk_prefs     Basilisk II with that disk, slirp networking (Publish)
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 EMU=${EMU:-$HOME/emulators}
@@ -81,8 +81,8 @@ if [ -f "$src7" ]; then
     fi
     hubprefs="$EMU/basilisk/basilisk_ii_prefs"
     if [ -f "$hubprefs" ]; then
-        sed -e '/^ether /d' -e "s#^disk .*#disk $img7#" "$hubprefs" > "$out/basilisk_prefs"
-        echo "setup-emulators: wrote $out/basilisk_prefs (no network)"
+        { sed -e '/^ether /d' -e "s#^disk .*#disk $img7#" "$hubprefs"; echo "ether slirp"; } > "$out/basilisk_prefs"
+        echo "setup-emulators: wrote $out/basilisk_prefs (slirp: the host is 10.0.2.2)"
     fi
     mkdir -p "$EMU/unix/Topica"
 else

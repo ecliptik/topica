@@ -27,7 +27,9 @@ enum {
 	kFindDialog = 142,
 	kPrefsDialog = 143,
 	kLinkDialog = 144,
-	kSpellDialog = 145
+	kSpellDialog = 145,
+	kPublishDialog = 146,
+	kProgressDialog = 147
 };
 
 /* C string to Pascal string (cut at 255) and back */
@@ -56,6 +58,10 @@ void FlashButton(DialogPtr d, short item);
 /* A dialog item's text, and setting it */
 void GetItemText(DialogPtr d, short item, char *out, short cap);
 void SetItemText(DialogPtr d, short item, const char *s);
+
+/* Today as "2026-10-23", or "" when the clock is plainly wrong (a Mac
+   without its PRAM battery thinks it's 1904) */
+void Today(char out[16]);
 
 /* An alert that says what went wrong: what we were doing, then the reason */
 void ErrorAlert(const char *what, OSErr err);

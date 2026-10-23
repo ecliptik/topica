@@ -327,3 +327,19 @@ void DebugLog(const char *fmt, ...)
 	(void) FlushVol(NULL, 0);
 }
 #endif
+
+void Today(char out[16])
+{
+	unsigned long secs;
+	DateTimeRec dt;
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"   /* the clock is a low-memory global */
+	GetDateTime(&secs);
+#pragma GCC diagnostic pop
+	SecondsToDate(secs, &dt);
+	if (dt.year < 1990)
+		out[0] = '\0';
+	else
+		sprintf(out, "%04d-%02d-%02d", dt.year % 10000, dt.month % 100, dt.day % 100);
+}

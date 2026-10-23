@@ -1,11 +1,12 @@
 # Topica: a Markdown writer for blogs, for the classic Macintosh.
 # Built with Retro68: scripts/build.sh --preset lite|full.
 cmake_minimum_required(VERSION 3.13)
-project(Topica VERSION 0.5.0 LANGUAGES C)
+project(Topica VERSION 0.6.0 LANGUAGES C)
 
 # Lite: the Macintosh 512Ke (512K, no MultiFinder). Full: everything else.
 option(TOPICA_LITE "Build for 512K Macs: fewer windows, a smaller undo history" OFF)
 option(TOPICA_DEBUG "Log to a Topica Log file beside the application" OFF)
+option(TOPICA_TALKIP "Publish over LocalTalk with talkip (TALKIP_DIR) instead of MacTCP" OFF)
 
 if(NOT DEFINED TOPICA_VERSION_DISPLAY)
     set(TOPICA_VERSION_DISPLAY "${PROJECT_VERSION}")
@@ -46,6 +47,7 @@ set(TOPICA_SOURCES
     app/preview.c
     app/print.c
     app/spellwin.c
+    app/publishwin.c
     core/textconv.c
     core/frontmatter.c
     core/undo.c
@@ -60,15 +62,37 @@ set(TOPICA_SOURCES
     core/vi.c
     core/dict.c
     core/spell.c
+    core/publish.c
 )
 
+# Publish's TCP: MacTCP, or talkip's stack in the application (a 512K Mac
+# on LocalTalk, which has no room for MacTCP). talkip is a separate
+# repository: https://github.com/ecliptik/talkip, next to this one.
+if(TOPICA_TALKIP)
+    if(NOT DEFINED TALKIP_DIR)
+        set(TALKIP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../talkip)
+    endif()
+    if(NOT EXISTS ${TALKIP_DIR}/CMakeLists.txt)
+        message(FATAL_ERROR "TOPICA_TALKIP needs talkip: clone it next to Topica, or pass -DTALKIP_DIR=<path>")
+    endif()
+    add_subdirectory(${TALKIP_DIR} talkip)
+    list(APPEND TOPICA_SOURCES app/net_talkip.c)
+else()
+    list(APPEND TOPICA_SOURCES app/net_mactcp.c)
+endif()
+
 add_application(Topica CREATOR "TPCA" ${TOPICA_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/topica.r)
+
+if(TOPICA_TALKIP)
+    target_link_libraries(Topica talkip)
+endif()
 
 target_compile_definitions(Topica PRIVATE
     TOPICA_MAX_DOCS=${TOPICA_MAX_DOCS}
     TOPICA_UNDO_BYTES=${TOPICA_UNDO_BYTES}L
     $<$<BOOL:${TOPICA_LITE}>:TOPICA_LITE>
     $<$<BOOL:${TOPICA_DEBUG}>:TOPICA_DEBUG>
+    $<$<BOOL:${TOPICA_TALKIP}>:TOPICA_TALKIP>
 )
 
 # The 68000 (a Mac Plus, a 512Ke), smallest code, no dead code.

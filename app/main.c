@@ -23,9 +23,11 @@
 #include "fileio.h"
 #include "findwin.h"
 #include "headings.h"
+#include "net.h"
 #include "postinfo.h"
 #include "preview.h"
 #include "print.h"
+#include "publishwin.h"
 #include "settings.h"
 #include "spellwin.h"
 #include "util.h"
@@ -36,7 +38,8 @@ enum { kNewItem = 1, kOpenItem = 2, kCloseItem = 4, kSaveItem = 5, kSaveAsItem =
 	kPageSetupItem = 10, kPrintItem = 11, kQuitItem = 13 };
 enum { kUndoItem = 1, kRedoItem = 2, kCutItem = 4, kCopyItem = 5, kPasteItem = 6, kClearItem = 7, kSelectAllItem = 9,
 	kFindItem = 11, kFindAgainItem = 12, kReplaceAgainItem = 13, kSpellItem = 14, kPrefsItem = 16 };
-enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6, kPreviewItem = 7 };
+enum { kPostInfoItem = 1, kInsertImageItem = 3, kInsertLinkItem = 4, kFormattingItem = 6, kPreviewItem = 7,
+	kPublishItem = 9 };
 /* osEvt's suspend/resume (Inside Macintosh VI) */
 enum { kSuspendResumeMessage = 1, kResumeFlag = 1 };
 
@@ -137,6 +140,7 @@ static void AdjustMenus(void)
 	SetMenuItemText(post, kFormattingItem, gPrefs.format ? "\pHide Formatting" : "\pShow Formatting");
 	SetMenuItemText(post, kPreviewItem, PreviewIsFront() ? "\pHide Preview" : "\pShow Preview");
 	Enable(post, kPreviewItem, target != NULL);
+	Enable(post, kPublishItem, d != NULL);
 	/* whole menus */
 	if (EnableMenu(post, target != NULL) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
 		DrawMenuBar();
@@ -264,6 +268,8 @@ static void DoMenu(long choice)
 			InsertImage(d);
 		} else if (item == kInsertLinkItem) {
 			InsertLink(d);
+		} else if (item == kPublishItem) {
+			PublishPost(d);
 		} else if (item == kFormattingItem) {
 			gPrefs.format = !gPrefs.format;
 			SettingsSave();
@@ -516,6 +522,7 @@ int main(void)
 		}
 		DocIdleAll();
 		PreviewIdle();
+		NetIdle();
 		front = DocFront();
 		if (front != NULL && !gInBackground) {
 			DocIdle(front);

@@ -8,7 +8,12 @@ make -C tests test
 
 They build `core/` as C89 with `-Werror`, AddressSanitizer and UBSan, and
 check the UTF-8 round trip, front matter reading and writing, undo and
-redo, post names, and the Markdown scanner (with random text, for ASan).
+redo, post names, the Markdown scanner (with random text, for ASan), and
+Publish's addresses, paths, request and reply.
+
+`python3 -m unittest discover -s bridge` tests the bridge against a bare
+repository in a temporary folder. `tests/check-mactcp-layout.sh` compares
+`app/mactcp.h` with Apple's MacTCP.h (talkip carries a copy).
 
 `make -C tests vi-oracle` runs the vi cases through vim itself and through
 `core/vi.c`, and compares the text and the cursor (it needs vim). The host
@@ -71,6 +76,17 @@ file beside the application.
 - Check Spelling on "Spelling": the planted slips and nothing else,
   Replace, Skip All, Learn (Topica Words), with the dictionary in memory
   (Topica) and read a block at a time (Topica Lite).
+- Publish, in Basilisk II (System 7, MacTCP): run the bridge on this
+  machine against a bare repository standing in for the blog (see
+  `bridge/README.md`; `TOPICA_BRIDGE_BIND=127.0.0.1` is enough, since
+  slirp's 10.0.2.2 is the host's loopback), then Publish "Formatting" to
+  `10.0.2.2:8023`: the file on the drafts branch must be the fixture's
+  bytes. Also a draft, a wrong key (the bridge's refusal is shown) and the
+  bridge stopped (Topica says it couldn't reach it). Once per disk,
+  MacTCP's More… must say Obtain Address: Server, then restart. Run a
+  Basilisk II built from current macemu source (`BASILISK=… deploy.sh`):
+  older builds crash on a TCP close over slirp.
 - Opening a UTF-8 post with characters Mac Roman lacks, and saving it.
 - Saving to an AppleShare volume, and a full or locked disk.
-- Topica Lite on a 512K Mac.
+- Topica Lite on a 512K Mac; the `--talkip` build publishing over
+  LocalTalk through a MacIP gateway.

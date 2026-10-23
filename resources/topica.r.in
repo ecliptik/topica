@@ -65,7 +65,7 @@ resource 'MENU' (130, "Edit") {
 };
 
 resource 'MENU' (131, "Post") {
-	131, textMenuProc, 0x6D, enabled, "Post",
+	131, textMenuProc, 0x16D, enabled, "Post",
 	{
 		"Post Info\311", noIcon, "E", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
@@ -73,7 +73,9 @@ resource 'MENU' (131, "Post") {
 		"Insert Link\311", noIcon, "K", noMark, plain;
 		"-", noIcon, noKey, noMark, plain;
 		"Hide Formatting", noIcon, noKey, noMark, plain;
-		"Show Preview", noIcon, "R", noMark, plain
+		"Show Preview", noIcon, "R", noMark, plain;
+		"-", noIcon, noKey, noMark, plain;
+		"Publish\311", noIcon, noKey, noMark, plain
 	}
 };
 
@@ -360,4 +362,34 @@ resource 'SIZE' (-1) {
 	reserved,
 	@TOPICA_SIZE_PREFERRED@ * 1024,
 	@TOPICA_SIZE_MINIMUM@ * 1024
+};
+
+resource 'DLOG' (146, "Publish", purgeable) {
+	{ 0, 0, 216, 400 }, dBoxProc, invisible, noGoAway, 0x0, 146, "Publish", noAutoCenter
+};
+resource 'DITL' (146, "Publish", purgeable) {
+	{
+		{ 182, 318, 202, 386 }, Button { enabled, "Publish" };
+		{ 182, 234, 202, 302 }, Button { enabled, "Cancel" };
+		{ 178, 314, 206, 390 }, UserItem { disabled };
+		{ 72, 100, 88, 386 }, EditText { enabled, "" };
+		{ 94, 98, 112, 386 }, CheckBox { enabled, "Draft: in _drafts, without a date" };
+		{ 124, 100, 140, 386 }, EditText { enabled, "" };
+		{ 150, 100, 166, 386 }, EditText { enabled, "" };
+		{ 72, 14, 88, 94 }, StaticText { disabled, "Path:" };
+		{ 124, 14, 140, 94 }, StaticText { disabled, "Bridge:" };
+		{ 150, 14, 166, 94 }, StaticText { disabled, "Key:" };
+		{ 8, 14, 26, 300 }, StaticText { disabled, "Publish" };
+		{ 30, 14, 64, 386 }, StaticText { disabled, "" };
+	}
+};
+
+/* Publish's progress: one line that changes */
+resource 'DLOG' (147, "Publishing", purgeable) {
+	{ 0, 0, 64, 380 }, dBoxProc, invisible, noGoAway, 0x0, 147, "", noAutoCenter
+};
+resource 'DITL' (147, "Publishing", purgeable) {
+	{
+		{ 14, 16, 50, 364 }, StaticText { disabled, "" };
+	}
 };

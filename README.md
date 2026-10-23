@@ -31,6 +31,10 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   American words from [SCOWL](http://wordlist.aspell.net/).
 - **vi keys**, if you want them (Preferences): normal, insert and visual
   modes, counts, operators and text objects, undo, and `.` to repeat.
+- **Publish** sends the post to a small bridge on your LAN
+  ([`bridge/`](bridge/README.md)), which commits it to the blog's drafts
+  branch, for you to merge when you're ready. Over MacTCP, or over
+  LocalTalk on a 512Ke (the `--talkip` build).
 - **Undo and Redo** many steps (⌘Z, ⌘⇧Z): Typing, Delete, Cut, Paste,
   Clear, Post Info and Insert Image each undo as one step.
 - **Post Info** (⌘E) edits the front matter's title, description,
@@ -79,13 +83,17 @@ Topica is C, cross-compiled with [Retro68](https://github.com/autc04/Retro68).
 ```sh
 scripts/build.sh                 # Topica: build/full/
 scripts/build.sh --preset lite   # Topica Lite: build/lite/
+scripts/build.sh --preset lite --talkip   # Lite with TCP/IP over LocalTalk: build/lite-talkip/
 make -C tests test               # the portable core's tests, on the host
+python3 -m unittest discover -s bridge    # the bridge's tests
 ```
 
 Each build makes a MacBinary `.bin`, an 800K `.dsk` floppy image and a
 BinHex `.hqx`. The first build downloads SCOWL's word lists (and checks
 them) to make the spelling dictionary, Topica Dictionary, which goes on the
-floppy beside Topica with SCOWL's copyright notice. `RETRO68` points at the toolchain. [docs/TESTING.md](docs/TESTING.md)
+floppy beside Topica with SCOWL's copyright notice. `RETRO68` points at the toolchain. `--talkip` needs
+[talkip](https://github.com/ecliptik/talkip) cloned next to Topica (or
+`TALKIP_DIR`). [docs/TESTING.md](docs/TESTING.md)
 covers the emulators.
 
 ## Layout
@@ -93,10 +101,12 @@ covers the emulators.
 - `core/`: portable C89 with no Toolbox calls: UTF-8 and Mac Roman, front
   matter, undo, post names and word counts, a Markdown scanner for styling
   and headings, the post as page blocks, line breaking, HTML, vi, and the
-  dictionary and spelling. Tested on the host.
+  dictionary and spelling, and Publish's request and reply. Tested on the
+  host.
 - `app/`: the Macintosh application. Every edit goes through one call
   (`EdReplace` in `app/editor.h`), with TextEdit behind it today.
 - `resources/`: menus, dialogs, alerts and icons (Rez).
+- `bridge/`: topica-bridge, the server Publish sends posts to (Python).
 - `scripts/`, `tests/`, `tools/`: building, emulators, tests, icons, the
   dictionary maker.
 

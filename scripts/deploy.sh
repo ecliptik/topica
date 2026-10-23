@@ -4,7 +4,9 @@
 #   scripts/deploy.sh basilisk [--preset lite|full] [--launch]
 # Snow's disk must not change while Snow runs: this stops Snow first (by
 # PID, never pkill -f, which would match this very command line). Never run
-# Snow and Basilisk II at once: they share the display.
+# Snow and Basilisk II at once: they share the display. BASILISK picks
+# the Basilisk II to run: Publish needs one whose slirp networking works
+# (a build of current macemu source; older ones crash on a TCP close).
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 EMU=${EMU:-$HOME/emulators}
@@ -82,7 +84,7 @@ basilisk)
         [ -f "$prefs" ] || { echo "deploy: no $prefs (scripts/setup-emulators.sh)" >&2; exit 1; }
         pgrep -x snowemu >/dev/null && { echo "deploy: Snow is running; quit it first" >&2; exit 1; }
         pgrep -x BasiliskII >/dev/null && { echo "deploy: Basilisk II is already running" >&2; exit 0; }
-        DISPLAY=:0 BasiliskII --config "$prefs" >/tmp/topica-basilisk.log 2>&1 </dev/null &
+        DISPLAY=:0 "${BASILISK:-BasiliskII}" --config "$prefs" >/tmp/topica-basilisk.log 2>&1 </dev/null &
         echo "deploy: Basilisk II running (PID $!), log /tmp/topica-basilisk.log"
     fi
     ;;

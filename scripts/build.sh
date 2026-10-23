@@ -1,7 +1,9 @@
 #!/bin/bash
 # Builds Topica with Retro68.
-#   scripts/build.sh [--preset lite|full] [--debug]    (full is the default)
+#   scripts/build.sh [--preset lite|full] [--debug] [--talkip]    (full is the default)
 # --debug logs to a "Topica Log" file beside the application.
+# --talkip publishes over LocalTalk with talkip (../talkip, or TALKIP_DIR)
+# instead of MacTCP: for a 512K Mac, which has no room for MacTCP.
 # Lite is for 512K Macs (the Macintosh 512Ke); Full runs on everything else,
 # System 6 and 7. Output: build/<preset>/Topica-<preset>-<version>.{bin,dsk,hqx}
 # RETRO68 points at the toolchain (default: the emulator hub's).
@@ -13,10 +15,12 @@ toolchain="$RETRO68/m68k-apple-macos/cmake/retro68.toolchain.cmake"
 
 preset=full
 debug=OFF
+talkip=OFF
 while [ $# -gt 0 ]; do
     case $1 in
         --preset) preset=${2:-}; shift 2 ;;
         --debug) debug=ON; shift ;;
+        --talkip) talkip=ON; shift ;;
         *) echo "build.sh: unknown option $1" >&2; exit 2 ;;
     esac
 done
@@ -34,11 +38,13 @@ if ! git -C "$here" tag --points-at HEAD 2>/dev/null | grep -qx "v$version"; the
     [ -n "$sha" ] && display="$version-$sha"
 fi
 
-build="$here/build/$preset"
+flavor=$preset
+[ $talkip = ON ] && flavor=$preset-talkip
+build="$here/build/$flavor"
 mkdir -p "$build"
 rm -f "$build/CMakeCache.txt"
 cmake -S "$here" -B "$build" -DCMAKE_TOOLCHAIN_FILE="$toolchain" -DCMAKE_BUILD_TYPE=MinSizeRel \
-    -DTOPICA_LITE=$lite -DTOPICA_DEBUG=$debug -DTOPICA_VERSION_DISPLAY="$display" >/dev/null
+    -DTOPICA_LITE=$lite -DTOPICA_DEBUG=$debug -DTOPICA_TALKIP=$talkip ${TALKIP_DIR:+-DTALKIP_DIR="$TALKIP_DIR"} -DTOPICA_VERSION_DISPLAY="$display" >/dev/null
 cmake --build "$build" -- -j"$(nproc 2>/dev/null || echo 2)"
 
 # MacBinary's Finder flags: set hasBundle (0x2000) so the Finder reads the
@@ -84,7 +90,7 @@ fi
 
 # An 800K floppy with the application (from the MacBinary, keeping its flags),
 # the dictionary and the About file.
-name="Topica-$preset-$display"
+name="Topica-$flavor-$display"
 dsk="$build/$name.dsk"
 rm -f "$dsk"
 dd if=/dev/zero of="$dsk" bs=1024 count=800 status=none
@@ -109,7 +115,7 @@ if command -v binhex >/dev/null 2>&1; then
     binhex "$build/$name.bin" > "$build/$name.hqx"
 fi
 echo
-echo "build.sh: Topica $display ($preset)"
+echo "build.sh: Topica $display ($flavor)"
 for f in "$build/$name".*; do
     echo "  $(readlink -f "$f")"
 done

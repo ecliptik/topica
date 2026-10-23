@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0 (unreleased)
+
+Publish.
+
+- Post › Publish sends the post to topica-bridge, a small server on your
+  LAN (`bridge/`), which commits it to the blog's drafts branch and pushes.
+  A classic Mac has no TLS, so it can't push to a git host itself. The
+  dialog suggests the post's path (`_posts/2026-10-23-title.md`, or
+  `_drafts/title.md` for a draft, or `content/posts/title.md` for Hugo)
+  and remembers the bridge's address and key. The post goes as UTF-8 with
+  LF line ends, whatever the Preferences say for saving.
+- MacTCP on the Plus and System 7. A `--talkip` build of Topica Lite
+  carries [talkip](https://github.com/ecliptik/talkip), TCP/IP over
+  LocalTalk, for a 512K Mac that has no room for MacTCP.
+- The Edit menu's Preferences was dimmed in 0.5 (Retro68's Rez misreads
+  hex that starts `0xB`), and Check Spelling's suggestions could keep rows
+  from the word before.
+
 ## 0.5.0 (unreleased)
 
 vi keys and spelling.

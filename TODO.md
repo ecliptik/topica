@@ -12,7 +12,8 @@
 - [x] About box with the build's commit
 - [ ] Swap files in place on volumes that can (FSpExchangeFiles), keeping
       the Finder's comments and dates
-- [ ] A smaller application for the 512Ke (newlib's printf is most of it)
+- [ ] A smaller application for the 512Ke (newlib's printf is most of it;
+      sscanf alone would add 20K)
 - [ ] Undo back to the saved text leaves the post unchanged (no Save
       Changes alert)
 
@@ -50,11 +51,16 @@
 
 ## Publish
 
-- [ ] Publish a post over the network to a small bridge that commits it to
-      the blog's repository (MacTCP has no TLS), as a pull request or a
-      branch
-- [ ] TCP/IP over LocalTalk for Macs without MacTCP (the 512Ke)
-- [ ] Drafts, and a Hugo profile (TOML front matter, `draft: true`)
+- [x] Publish a post over the network to a small bridge that commits it to
+      the blog's drafts branch (MacTCP has no TLS)
+- [x] TCP/IP over LocalTalk for Macs without MacTCP (the 512Ke): the
+      `--talkip` build
+- [x] Drafts (`_drafts/`), and Hugo's `content/posts/`
+- [ ] Hugo's TOML front matter (`+++`)
+- [ ] Publish without stopping the Mac: asynchronous calls, and ⌘. to
+      cancel (each step waits now, at most 20-60 s)
+- [ ] Publish the post's images too
+- [ ] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
 
 ## Later
 
