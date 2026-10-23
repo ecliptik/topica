@@ -15,6 +15,11 @@ Publish's addresses, paths, request and reply.
 repository in a temporary folder. `tests/check-mactcp-layout.sh` compares
 `app/mactcp.h` with Apple's MacTCP.h (talkip carries a copy).
 
+`make -C tests text-fit` (part of `make test`) wraps every alert and dialog
+message the way the Mac does, in Chicago 12 with long sample names and
+addresses, and fails when one needs more lines than its box holds. A line
+exactly as wide as its box wraps on the Mac too.
+
 `make -C tests vi-oracle` runs the vi cases through vim itself and through
 `core/vi.c`, and compares the text and the cursor (it needs vim). The host
 tests keep vim's answers. `tests/spell_run "build/Topica Dictionary"

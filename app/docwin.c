@@ -655,8 +655,7 @@ static Boolean Load(Doc *d, const FileRef *f)
 	n = tc_to_mac(data, len, NULL, 0, utf8);
 	if (n > EdMaxLength()) {
 		DisposePtr(data);
-		sprintf(what, "\xD2%s\xD3 is too long to open. Topica opens posts of up to %ld characters.",
-			name, EdMaxLength());
+		sprintf(what, "\xD2%s\xD3 is too long to open: the most is %ld characters.", name, EdMaxLength());
 		ShowNote(what);
 		return false;
 	}
@@ -853,8 +852,7 @@ Boolean DocReplace(Doc *d, int kind, long start, long end, const char *text, lon
 
 	if (EdLength(d->ed) - (end - start) + len > EdMaxLength()) {
 		char msg[128];
-		sprintf(msg, "That would make the post longer than %ld characters, the most Topica can edit.",
-			EdMaxLength());
+		sprintf(msg, "A post can\xD5t be longer than %ld characters.", EdMaxLength());
 		ShowNote(msg);
 		return false;
 	}

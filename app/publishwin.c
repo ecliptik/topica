@@ -68,29 +68,27 @@ static void Problem(OSErr err, const char *bridge, char *out)
 {
 	switch (err) {
 	case netNoAddress:
-		strcpy(out, "Topica couldn\xD5t get an address from the MacIP gateway. Check that the gateway is running.");
+		strcpy(out, "No address from the MacIP gateway. Is it running?");
 		break;
 	case netNoNetwork:
 #ifdef TOPICA_TALKIP
-		strcpy(out, "Topica can\xD5t reach the network: AppleTalk is off, or there\xD5s no MacIP gateway on it.");
+		strcpy(out, "No network: AppleTalk is off, or there\xD5s no MacIP gateway.");
 #else
-		strcpy(out, "Topica can\xD5t reach the network: MacTCP isn\xD5t installed or isn\xD5t set up.");
+		strcpy(out, "No network: MacTCP isn\xD5t installed or set up.");
 #endif
 		break;
 	case memFullErr:
-		strcpy(out, "There isn\xD5t enough memory to publish the post. Close a window and try again.");
+		strcpy(out, "Not enough memory to publish. Close a window and try again.");
 		break;
 	case openFailed:
-		sprintf(out, "The bridge at %s refused the connection. Check its address and port, and that it\xD5s running.",
-				bridge);
+		sprintf(out, "The bridge at %s refused the connection. Is it running?", bridge);
 		break;
 	case commandTimeout:
 	case connectionTerminated:
-		sprintf(out, "Nothing answered at %s. Check the bridge\xD5s address, that it\xD5s running, and that no "
-				"firewall between this Mac and the bridge blocks its port.", bridge);
+		sprintf(out, "Nothing answered at %s. Is the bridge running, and its port open?", bridge);
 		break;
 	default:
-		sprintf(out, "The connection to the bridge at %s failed (error %d).", bridge, err);
+		sprintf(out, "The connection to %s failed (error %d).", bridge, err);
 		break;
 	}
 }
@@ -143,7 +141,7 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	Progress(p, line);
 	err = NetOpen(ip, port, kTimeout);
 	if (err == noErr) {
-		sprintf(line, "Sending \xD2%s\xD3 (%ldK)\xC9", path, (bodyLen + 1023) / 1024);
+		sprintf(line, "Sending the post (%ldK)\xC9", (bodyLen + 1023) / 1024);
 		Progress(p, line);
 		err = NetSend(*h, headLen + bodyLen);
 	}
@@ -171,11 +169,11 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	if (err != noErr) {
 		Problem(err, bridge, line);
 	} else if (done < 0) {
-		sprintf(line, "Something at %s answered, but not as Topica\xD5s bridge would.", bridge);
+		sprintf(line, "What answered at %s isn\xD5t Topica\xD5s bridge.", bridge);
 	} else if (status != 200) {
 		char said[256];
 		strcpy(said, line);
-		sprintf(line, "The bridge didn\xD5t publish the post: %s", said);
+		sprintf(line, "Not published: %s", said);
 	}
 	ShowNote(line);
 }
@@ -249,7 +247,9 @@ void PublishPost(Doc *d)
 		CStr(title, w);
 		title[120] = '\0';
 	}
-	sprintf(about, "Topica sends \xD2%s\xD3 to the bridge, which puts it on the blog\xD5s drafts branch.", title);
+	if (strlen(title) > 40)
+		strcpy(title + 39, "\xC9");
+	sprintf(about, "Sends \xD2%s\xD3 to the blog\xD5s drafts branch.", title);
 	SetItemText(dlg, kAbout, about);
 	SuggestPath(d, false, path, sizeof(path));
 	SetItemText(dlg, kPathField, path);
@@ -287,9 +287,9 @@ void PublishPost(Doc *d)
 			SelectDialogItemText(dlg, kKeyField, 0, 32767);
 		} else if (!pub_path_ok(path)) {
 			ShowNote(hugo
-				? "A post goes in content/posts, named like content/posts/title.md."
-				: "A post goes in _posts, named with its date: _posts/2026-10-23-title.md, or "
-				"_posts/2026/2026-10-23-title.md. A draft goes in _drafts.");
+				? "A post goes in content/posts, like content/posts/title.md."
+				: "A post goes in _posts, named with its date: _posts/2026-10-23-title.md. A draft goes in "
+				"_drafts.");
 			SelectDialogItemText(dlg, kPathField, 0, 32767);
 		} else {
 			break;

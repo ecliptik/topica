@@ -15,6 +15,8 @@ Publish.
   LF line ends, whatever the Preferences say for saving. The key shows
   as bullets. When the bridge can't be reached, Topica says whether it
   refused, didn't answer, or the Mac got no address from the gateway.
+- Shorter messages, and every one fits its alert: one about a slow bridge
+  ran past the bottom on a 512Ke. `make -C tests text-fit` checks them all.
 - MacTCP on the Plus and System 7. A `--talkip` build of Topica Lite
   carries [talkip](https://github.com/ecliptik/talkip), TCP/IP over
   LocalTalk, for a 512K Mac that has no room for MacTCP.

@@ -194,7 +194,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return 413, f"The post is over {c.max_bytes // 1024}K."
         path = valid_path(self.headers.get("X-Topica-Path", ""), c.dirs)
         if path is None:
-            return 400, f"A post goes in {', '.join(c.dirs)}, named like 2026-10-23-title.md."
+            return 400, f"A post goes in {', '.join(c.dirs)}."
         body = self.rfile.read(int(length))
         if len(body) != int(length):
             return 400, "The post was cut off."

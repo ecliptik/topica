@@ -235,14 +235,14 @@ static Boolean Load(void)
 		return true;
 	FileBesideApp(kDictName, &f);
 	if (FileOpenRead(&f, &ref) != noErr && (FilePrefsFolder(kDictName, &f) != noErr || FileOpenRead(&f, &ref) != noErr)) {
-		ShowNote("Topica can\xD5t check spelling without its dictionary. Put \xD2Topica Dictionary\xD3 in the same folder as Topica.");
+		ShowNote("To check spelling, put \xD2Topica Dictionary\xD3 in Topica\xD5s folder.");
 		return false;
 	}
 	SetCursor(*GetCursor(watchCursor));
 	if (FileReadAt(ref, 0, head, 16, &got) != noErr || got != 16 || memcmp(head, "TPSP", 4) != 0) {
 		FileClose(ref);
 		InitCursor();
-		ShowNote("Topica can\xD5t read \xD2Topica Dictionary\xD3: it may be damaged, or from another version of Topica.");
+		ShowNote("\xD2Topica Dictionary\xD3 is damaged, or from another version of Topica.");
 		return false;
 	}
 	commonLen = (long) Get32(head + 8);

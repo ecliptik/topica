@@ -463,8 +463,8 @@ static void Recover(void)
 		Update((WindowPtr) e.message);
 	if (n > 0)
 		ShowNote(n == 1
-			? "Topica found a post that wasn\xD5t saved when it last quit. It\xD5s open now: save it or close it."
-			: "Topica found posts that weren\xD5t saved when it last quit. They\xD5re open now: save them or close them.");
+			? "A post wasn\xD5t saved when Topica last quit. It\xD5s open now."
+			: "Posts weren\xD5t saved when Topica last quit. They\xD5re open now.");
 }
 
 static Boolean GetEvent(EventRecord *e, long sleep)

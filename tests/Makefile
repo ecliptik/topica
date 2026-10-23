@@ -3,8 +3,12 @@ CC ?= cc
 CFLAGS = -std=c89 -pedantic -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined
 CORE = ../core/textconv.c ../core/frontmatter.c ../core/undo.c ../core/post.c ../core/find.c ../core/prefs.c ../core/recovery.c ../core/mdscan.c ../core/mdpage.c ../core/layout.c ../core/mdhtml.c ../core/vi.c ../core/dict.c ../core/spell.c ../core/publish.c
 
-test: test_core
+test: test_core text-fit
 	./test_core
+
+# Every alert and dialog message fits its box (Chicago 12, as the Mac wraps it)
+text-fit:
+	python3 check-text-fit.py
 
 test_core: test_core.c $(CORE) ../core/*.h
 	$(CC) $(CFLAGS) -o $@ test_core.c $(CORE)
@@ -19,4 +23,4 @@ vi_run: vi_run.c ../core/vi.c ../core/undo.c ../core/*.h
 clean:
 	rm -rf test_core test_core.dSYM vi_run vi_run.dSYM
 
-.PHONY: test clean vi-oracle
+.PHONY: test clean vi-oracle text-fit
