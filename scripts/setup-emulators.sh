@@ -22,7 +22,7 @@ force=0; [ "${1:-}" = "--force" ] && force=1
 
 [ -f "$src" ] || { echo "setup-emulators: no System 6 disk at $src (set TOPICA_SYS6_IMAGE)" >&2; exit 1; }
 [ -f "$rom" ] || { echo "setup-emulators: no Mac Plus ROM at $rom (set TOPICA_PLUS_ROM)" >&2; exit 1; }
-if pgrep -x snowemu >/dev/null || pgrep -x BasiliskII >/dev/null; then
+if pgrep -x snowemu >/dev/null || pgrep -x snowemu-hd20 >/dev/null || pgrep -x snowemu-next >/dev/null || pgrep -x BasiliskII >/dev/null; then
     echo "setup-emulators: an emulator is running; quit it first (its disk is memory-mapped)" >&2; exit 1
 fi
 mkdir -p "$out"

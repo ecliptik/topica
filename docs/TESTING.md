@@ -95,3 +95,11 @@ file beside the application.
 - Saving to an AppleShare volume, and a full or locked disk.
 - Topica Lite on a 512K Mac; the `--talkip` build publishing over
   LocalTalk through a MacIP gateway.
+- The `--talkip` build in Snow, without the real Mac: a Snow build with
+  LocalTalk over UDP puts the emulated printer port on LToUDP, so an
+  AppleTalk router on the LAN (TashRouter, say) carries it to the MacIP
+  gateway and the bridge beside it:
+  `SNOW=/path/to/snowemu SNOW_ARGS="--serial-bridge-b localtalk"
+  scripts/deploy.sh snow --preset lite-talkip --launch`. Click into the
+  Key field before typing a key there: a dropped Tab puts it in another,
+  visible field.

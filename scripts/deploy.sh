@@ -7,6 +7,10 @@
 # Snow and Basilisk II at once: they share the display. BASILISK picks
 # the Basilisk II to run: Publish needs one whose slirp networking works
 # (a build of current macemu source; older ones crash on a TCP close).
+# SNOW picks Snow's binary and SNOW_ARGS adds to its command line: for the
+# talkip build (--preset lite-talkip) through a MacIP gateway, a Snow with
+# LocalTalk over UDP and SNOW_ARGS="--serial-bridge-b localtalk". SNOWW
+# picks the workspace (diskimages/topica.snoww).
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 EMU=${EMU:-$HOME/emulators}
@@ -25,13 +29,14 @@ bin="$here/build/$preset/Topica.bin"
 [ -f "$bin" ] || { echo "deploy: no build at $bin (scripts/build.sh --preset $preset)" >&2; exit 1; }
 fixtures="$here/tests/fixtures"
 
+snow_pids() { pgrep -x snowemu; pgrep -x snowemu-hd20; pgrep -x snowemu-next; true; }
 stop_snow() {
     local pid
-    pid=$(pgrep -x snowemu || true)
+    pid=$(snow_pids)
     [ -z "$pid" ] && return 0
-    kill $pid; for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x snowemu >/dev/null || return 0; sleep 0.5; done
+    kill $pid; for _ in $(seq 1 40); do [ -z "$(snow_pids)" ] && return 0; sleep 0.5; done
     kill -9 $pid 2>/dev/null || true; sleep 1
-    pgrep -x snowemu >/dev/null && { echo "deploy: Snow won't stop" >&2; exit 1; }
+    [ -n "$(snow_pids)" ] && { echo "deploy: Snow won't stop" >&2; exit 1; }
     return 0
 }
 
@@ -67,7 +72,8 @@ snow)
     humount >/dev/null
     echo "deploy: Topica ($preset) is on $img"
     if [ $launch = 1 ]; then
-        DISPLAY=:0 SDL_AUDIODRIVER=dummy "$EMU/snow/snowemu" "$here/diskimages/topica.snoww" >/tmp/topica-snow.log 2>&1 &
+        # shellcheck disable=SC2086
+        DISPLAY=:0 SDL_AUDIODRIVER=dummy "${SNOW:-$EMU/snow/snowemu}" ${SNOW_ARGS:-} "${SNOWW:-$here/diskimages/topica.snoww}" >/tmp/topica-snow.log 2>&1 &
         echo "deploy: Snow running (PID $!), log /tmp/topica-snow.log"
     fi
     ;;
@@ -82,7 +88,7 @@ basilisk)
     if [ $launch = 1 ]; then
         prefs="$here/diskimages/basilisk_prefs"
         [ -f "$prefs" ] || { echo "deploy: no $prefs (scripts/setup-emulators.sh)" >&2; exit 1; }
-        pgrep -x snowemu >/dev/null && { echo "deploy: Snow is running; quit it first" >&2; exit 1; }
+        [ -n "$(snow_pids)" ] && { echo "deploy: Snow is running; quit it first" >&2; exit 1; }
         pgrep -x BasiliskII >/dev/null && { echo "deploy: Basilisk II is already running" >&2; exit 0; }
         DISPLAY=:0 "${BASILISK:-BasiliskII}" --config "$prefs" >/tmp/topica-basilisk.log 2>&1 </dev/null &
         echo "deploy: Basilisk II running (PID $!), log /tmp/topica-basilisk.log"
