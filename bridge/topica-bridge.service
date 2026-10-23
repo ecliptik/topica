@@ -1,0 +1,20 @@
+# A systemd user unit for topica-bridge: copy it to ~/.config/systemd/user/,
+# change the paths and the address, then
+#   systemctl --user daemon-reload && systemctl --user enable --now topica-bridge
+# The key file should be readable by this user only (or rendered to a tmpfs
+# such as /run/user/<uid>/ by whatever keeps your secrets).
+[Unit]
+Description=topica-bridge: Topica's Publish, to the blog's drafts branch
+After=network-online.target
+
+[Service]
+Environment=TOPICA_BRIDGE_REPO=%h/topica-bridge/blog
+Environment=TOPICA_BRIDGE_KEY_FILE=%h/topica-bridge/key
+Environment=TOPICA_BRIDGE_BIND=0.0.0.0
+Environment=TOPICA_BRIDGE_PORT=8023
+ExecStart=/usr/bin/python3 %h/topica-bridge/topica_bridge.py
+Restart=on-failure
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target

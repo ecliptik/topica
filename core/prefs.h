@@ -20,6 +20,8 @@ typedef struct {
 	short format;               /* Markdown styled in place */
 	short vi;                   /* vi keys */
 	short viJk;                 /* jk in insert mode is Escape */
+	char bridge[64];            /* Publish's bridge: "192.0.2.10:8023" */
+	char bridgeKey[64];         /* the key it asks for */
 } TopicaPrefs;
 
 void prefs_default(TopicaPrefs *p);

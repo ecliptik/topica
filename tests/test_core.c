@@ -11,6 +11,7 @@
 #include "../core/mdpage.h"
 #include "../core/mdscan.h"
 #include "../core/prefs.h"
+#include "../core/publish.h"
 #include "../core/recovery.h"
 #include "../core/spell.h"
 #include "../core/post.h"
@@ -498,15 +499,15 @@ static void TestFind(void)
 static void TestPrefs(void)
 {
 	TopicaPrefs p, q;
-	char buf[512];
+	char buf[768];
 	long n;
 
 	prefs_default(&p);
 	CHECK_STR(p.font, "Monaco");
 	CHECK(p.size == 9 && p.utf8 && p.lf && p.autosaveMinutes == 2 && p.profile == kProfileJekyll && p.format);
-	CHECK(!p.vi && !p.viJk);
+	CHECK(!p.vi && !p.viJk && p.bridge[0] == '\0' && p.bridgeKey[0] == '\0');
 	{
-		const char *text = "# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
+		const char *text = "publish-bridge: 10.0.2.2:8023\rpublish-key: a b:c\r# a comment\rfont: Geneva\rsize: 12\rblog: hugo\rencoding: mac-roman\r"
 			"line-ends: cr\rautosave-minutes: 5\rimage-folder: /img/\rlayout: page\runknown: x\rformatting: off\rvi: on\r";
 		prefs_read(&p, text, (long) strlen(text));
 	}
@@ -515,6 +516,8 @@ static void TestPrefs(void)
 	CHECK(p.vi && !p.viJk);
 	CHECK_STR(p.imagePath, "/img/");
 	CHECK_STR(p.layout, "page");
+	CHECK_STR(p.bridge, "10.0.2.2:8023");
+	CHECK_STR(p.bridgeKey, "a b:c");
 	/* bad numbers keep what was there */
 	prefs_read(&p, "size: 99\nautosave-minutes: x\n", (long) strlen("size: 99\nautosave-minutes: x\n"));
 	CHECK(p.size == 12 && p.autosaveMinutes == 5);
@@ -525,6 +528,17 @@ static void TestPrefs(void)
 	prefs_read(&q, buf, n);
 	CHECK(memcmp(&p, &q, sizeof(p)) == 0);
 	CHECK(prefs_write(&p, '\r', buf, 10) == -1);
+	/* the longest values fit */
+	memset(p.font, 'f', sizeof(p.font) - 1);
+	memset(p.imagePath, 'i', sizeof(p.imagePath) - 1);
+	memset(p.layout, 'l', sizeof(p.layout) - 1);
+	memset(p.bridge, 'b', sizeof(p.bridge) - 1);
+	memset(p.bridgeKey, 'k', sizeof(p.bridgeKey) - 1);
+	n = prefs_write(&p, '\r', buf, sizeof(buf));
+	CHECK(n > 0);
+	prefs_default(&q);
+	prefs_read(&q, buf, n);
+	CHECK(memcmp(&p, &q, sizeof(p)) == 0);
 }
 
 /* ---- recovery ---- */
@@ -1681,6 +1695,104 @@ static void TestSpell(void)
 	}
 }
 
+static void TestPublish(void)
+{
+	unsigned long ip = 0;
+	unsigned short port = 0;
+	char out[600], msg[64];
+	int status = 0;
+	long n;
+	const char *ok = "HTTP/1.0 200 OK\r\nServer: x\r\nContent-Type: text/plain\r\nContent-Length: 39\r\n\r\n"
+		"Published _posts/a.md on drafts (abc).\n";
+
+	/* the bridge's address */
+	CHECK(pub_address("192.0.2.10", &ip, &port) && ip == 0xC000020AUL && port == PUB_PORT);
+	CHECK(pub_address("http://10.0.2.2:8080/", &ip, &port) && ip == 0x0A000202UL && port == 8080);
+	CHECK(pub_address("10.0.2.2:1", &ip, &port) && port == 1);
+	CHECK(!pub_address("", &ip, &port));
+	CHECK(!pub_address("example.com", &ip, &port));
+	CHECK(!pub_address("https://10.0.2.2/", &ip, &port));
+	CHECK(!pub_address("10.0.2", &ip, &port));
+	CHECK(!pub_address("10.0.2.256", &ip, &port));
+	CHECK(!pub_address("10.0.2.2:", &ip, &port));
+	CHECK(!pub_address("10.0.2.2:0", &ip, &port));
+	CHECK(!pub_address("10.0.2.2:65536", &ip, &port));
+	CHECK(!pub_address("10.0.2.2/x", &ip, &port));
+	CHECK(!pub_address("1.2.3.4 ", &ip, &port));
+
+	/* the post's path */
+	pub_path(0, 0, "2026-10-23-hello.md", "Other", "2026-01-01", out, sizeof(out));
+	CHECK_STR(out, "_posts/2026-10-23-hello.md");
+	pub_path(0, 0, "Hello World", "Hello, W\x9Arld!", "2026-10-23 09:00:00 -0700", out, sizeof(out));
+	CHECK_STR(out, "_posts/2026-10-23-hello-world.md");
+	pub_path(0, 0, "untitled", "", "", out, sizeof(out));
+	CHECK_STR(out, "_posts/untitled.md");                  /* no date: the dialog asks for one */
+	pub_path(0, 1, "2026-10-23-hello.md", "x", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_drafts/hello.md");
+	pub_path(0, 1, "notes.md", "x", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_drafts/notes.md");
+	pub_path(0, 1, "My Notes", "Caf\x8E Notes", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_drafts/cafe-notes.md");
+	pub_path(1, 0, "hello.md", "x", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "content/posts/hello.md");
+	pub_path(1, 1, "Hello", "Hugo Post", "", out, sizeof(out));
+	CHECK_STR(out, "content/posts/hugo-post.md");
+	pub_path(0, 0, "2026-10-23-hello.md", "x", "", out, 12);
+	CHECK_STR(out, "_posts/2026");
+	CHECK(pub_path_ok("_posts/2026-10-23-hello.md"));
+	CHECK(pub_path_ok("_drafts/a.markdown"));
+	CHECK(pub_path_ok("content/posts/A_b.c-d.md"));
+	CHECK(!pub_path_ok("_posts/../x.md"));
+	CHECK(!pub_path_ok("_posts/sub/x.md"));
+	CHECK(!pub_path_ok("_posts/.x.md"));
+	CHECK(!pub_path_ok("_posts/x.txt"));
+	CHECK(!pub_path_ok("_posts/.md"));
+	CHECK(!pub_path_ok("_config.yml"));
+	CHECK(!pub_path_ok("_posts/a b.md"));
+	CHECK(!pub_path_ok("_posts/untitled.md"));             /* Jekyll skips a post without a date */
+	CHECK(!pub_path_ok("_posts/2026-10-2-x.md"));
+
+	/* the request */
+	n = pub_request(out, sizeof(out), "10.0.2.2", 8023, "kkkkkkkkkkkkkkkk", "_posts/a.md", 1234);
+	CHECK(n == (long) strlen(out));
+	CHECK(strncmp(out, "POST /publish HTTP/1.0\r\nHost: 10.0.2.2:8023\r\n", 45) == 0);
+	CHECK(strstr(out, "\r\nX-Topica-Key: kkkkkkkkkkkkkkkk\r\n") != NULL);
+	CHECK(strstr(out, "\r\nX-Topica-Path: _posts/a.md\r\n") != NULL);
+	CHECK(n > 26 && strcmp(out + n - 26, "\r\nContent-Length: 1234\r\n\r\n") == 0);
+	CHECK(pub_request(out, 100, "10.0.2.2", 8023, "k", "_posts/a.md", 1) == -1);
+
+	/* the reply */
+	CHECK(pub_reply(ok, (long) strlen(ok), 0, &status, msg, sizeof(msg)) == 1);
+	CHECK(status == 200);
+	CHECK_STR(msg, "Published _posts/a.md on drafts (abc).");
+	CHECK(pub_reply(ok, (long) strlen(ok) - 1, 0, &status, msg, sizeof(msg)) == 0);
+	CHECK(pub_reply(ok, (long) strlen(ok) - 1, 1, &status, msg, sizeof(msg)) == 1);
+	CHECK(pub_reply(ok, 40, 0, &status, msg, sizeof(msg)) == 0);
+	CHECK(pub_reply(ok, 40, 1, &status, msg, sizeof(msg)) == -1);
+	CHECK(pub_reply(ok, 3, 0, &status, msg, sizeof(msg)) == 0);
+	CHECK(pub_reply("SSH-2.0-x\r\n", 11, 0, &status, msg, sizeof(msg)) == -1);
+	CHECK(pub_reply(ok, (long) strlen(ok), 0, &status, msg, 10) == 1);
+	CHECK_STR(msg, "Published");
+	{
+		const char *lf = "HTTP/1.0 401 Unauthorized\nContent-Length: 4\n\nNo.\nmore";
+		CHECK(pub_reply(lf, (long) strlen(lf), 0, &status, msg, sizeof(msg)) == 1);
+		CHECK(status == 401);
+		CHECK_STR(msg, "No.");
+	}
+	{
+		const char *empty = "HTTP/1.1 502 Bad Gateway\r\n\r\n";
+		CHECK(pub_reply(empty, (long) strlen(empty), 0, &status, msg, sizeof(msg)) == 0);
+		CHECK(pub_reply(empty, (long) strlen(empty), 1, &status, msg, sizeof(msg)) == 1);
+		CHECK(status == 502);
+		CHECK_STR(msg, "Bad Gateway");
+	}
+	{
+		const char *ctl = "HTTP/1.0 200 OK\r\n\r\nA\tB\x80" "C";
+		CHECK(pub_reply(ctl, (long) strlen(ctl), 1, &status, msg, sizeof(msg)) == 1);
+		CHECK_STR(msg, "A?B?C");
+	}
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -1697,6 +1809,7 @@ int main(void)
 	TestMdhtml();
 	TestVi();
 	TestSpell();
+	TestPublish();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

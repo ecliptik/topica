@@ -92,12 +92,16 @@ void prefs_read(TopicaPrefs *p, const char *text, long n)
 			p->vi = Is(text + vs, ve - vs, "on");
 		else if (Is(text + ks, ke - ks, "vi-jk"))
 			p->viJk = Is(text + vs, ve - vs, "on");
+		else if (Is(text + ks, ke - ks, "publish-bridge"))
+			Copy(p->bridge, sizeof(p->bridge), text + vs, ve - vs);
+		else if (Is(text + ks, ke - ks, "publish-key"))
+			Copy(p->bridgeKey, sizeof(p->bridgeKey), text + vs, ve - vs);
 	}
 }
 
 long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 {
-	char buf[512];
+	char buf[768];
 	long n;
 
 	n = sprintf(buf,
@@ -112,11 +116,14 @@ long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 		"autosave-minutes: %d%c"
 		"formatting: %s%c"
 		"vi: %s%c"
-		"vi-jk: %s%c",
+		"vi-jk: %s%c"
+		"publish-bridge: %s%c"
+		"publish-key: %s%c",
 		eol, p->font, eol, p->size, eol, p->imagePath, eol, p->layout, eol,
 		p->profile == kProfileHugo ? "hugo" : "jekyll", eol,
 		p->utf8 ? "utf-8" : "mac-roman", eol, p->lf ? "lf" : "cr", eol, p->autosaveMinutes, eol,
-		p->format ? "on" : "off", eol, p->vi ? "on" : "off", eol, p->viJk ? "on" : "off", eol);
+		p->format ? "on" : "off", eol, p->vi ? "on" : "off", eol, p->viJk ? "on" : "off", eol,
+		p->bridge, eol, p->bridgeKey, eol);
 	if (out != NULL) {
 		if (n > cap)
 			return -1;
