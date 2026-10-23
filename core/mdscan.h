@@ -28,6 +28,7 @@ typedef struct {
 	int front;                  /* 0: at the top, 1: in the front matter, 2: past it */
 	char fence;                 /* '`' or '~' inside a fenced code block, else 0 */
 	int fenceLen;
+	int quoteFace;              /* 1: a block quote's lines are MD_ITALIC (the default) */
 } MdState;
 
 /* At the top of the text */
@@ -44,6 +45,24 @@ long md_seek(MdState *s, const char *text, long n, long pos);
    or n: out[0] is text[s->pos]'s class, and out needs end - s->pos bytes.
    Line ends get 0. Leaves s at end. */
 void md_classify(MdState *s, const char *text, long n, long end, unsigned char *out);
+
+/* What a line is, as far as the blocks go */
+enum { MD_LINE_TEXT, MD_LINE_FRONT_DELIM, MD_LINE_FRONT, MD_LINE_FENCE, MD_LINE_CODE };
+
+/* The kind of the line at s->pos, and its end in *le; moves s to the next
+   line */
+int md_line(MdState *s, const char *text, long n, long *le);
+
+/* For a text line [ls, le): a heading's level (0 if it isn't one) and its
+   text [*ts, *te) without the #s */
+int md_heading(const char *text, long ls, long le, long *ts, long *te);
+
+/* 1 when the line is a thematic break (---, ***, ___) */
+int md_rule(const char *text, long ls, long le);
+
+/* Where a list item's text starts, after its marker (and a task box), or
+   ls when the line isn't a list item */
+long md_list_marker(const char *text, long ls, long le);
 
 /* A number that changes when the blocks do (the front matter's lines,
    code fences), which restyles the rest of the post */

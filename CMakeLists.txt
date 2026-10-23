@@ -50,6 +50,9 @@ set(TOPICA_SOURCES
     core/prefs.c
     core/recovery.c
     core/mdscan.c
+    core/mdpage.c
+    core/layout.c
+    core/mdhtml.c
 )
 
 add_application(Topica CREATOR "TPCA" ${TOPICA_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/topica.r)

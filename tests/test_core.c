@@ -5,6 +5,9 @@
 
 #include "../core/find.h"
 #include "../core/frontmatter.h"
+#include "../core/layout.h"
+#include "../core/mdhtml.h"
+#include "../core/mdpage.h"
 #include "../core/mdscan.h"
 #include "../core/prefs.h"
 #include "../core/recovery.h"
@@ -671,6 +674,347 @@ static void TestMdscan(void)
 	}
 }
 
+/* ---- mdpage ---- */
+
+/* The blocks as words: > per quote, then T title, Y byline, D lead,
+   P paragraph, H heading, I item, C code, B table, X HTML, R rule, M image;
+   a digit for a heading's level or a nesting depth, .n an item's number,
+   [ ] or [x] a task */
+static void Blocks(const char *text, const char *want, int line)
+{
+	MpScan p;
+	MpBlock b;
+	char got[512], *o = got;
+	int i;
+
+	mp_begin(&p, text, (long) strlen(text));
+	while (mp_next(&p, &b)) {
+		if (o > got)
+			*o++ = ' ';
+		for (i = 0; i < b.quote; i++)
+			*o++ = '>';
+		*o++ = "?TYDPHICBXRM"[b.kind];
+		if (b.kind == MP_HEADING)
+			*o++ = (char) ('0' + b.level);
+		else if (b.depth)
+			*o++ = (char) ('0' + b.depth);
+		if (b.number)
+			o += sprintf(o, ".%ld", b.number);
+		if (b.task)
+			o += sprintf(o, "[%c]", b.task);
+	}
+	*o = '\0';
+	CheckStr(got, want, line);
+}
+#define BLOCKS(text, want) Blocks((text), (want), __LINE__)
+
+static void LinkSeen(void *ctx, long at)
+{
+	char *seen = (char *) ctx;
+	sprintf(seen + strlen(seen), "%ld,", at);
+}
+
+/* Block k's display text (| for a break) and its styles: . plain, b bold,
+   i italic, B both, c code, l link, f meta, n note */
+static void Shown(const char *text, int k, const char *want, const char *wantSty, int line)
+{
+	MpScan p;
+	MpBlock b;
+	char out[512];
+	unsigned char sty[512], cls[512];
+	long n = (long) strlen(text), len, i;
+	char st[512];
+
+	mp_begin(&p, text, n);
+	do
+		(void) mp_next(&p, &b);
+	while (k-- > 0);
+	len = mp_text(text, n, &b, out, sty, sizeof(out), cls);
+	CHECK(mp_text(text, n, &b, NULL, NULL, 0, cls) == len);
+	for (i = 0; i < len; i++) {
+		int c = sty[i];
+		if (out[i] == MP_BREAK)
+			out[i] = '|';
+		st[i] = c & MS_NOTE ? 'n' : c & MS_META ? 'f' : c & MS_CODE ? 'c' : c & MS_LINK ? 'l'
+			: (c & (MS_BOLD | MS_ITALIC)) == (MS_BOLD | MS_ITALIC) ? 'B' : c & MS_BOLD ? 'b' : c & MS_ITALIC ? 'i' : '.';
+	}
+	out[len] = st[len] = '\0';
+	CheckStr(out, want, line);
+	if (wantSty != NULL)
+		CheckStr(st, wantSty, line);
+}
+#define SHOWN(text, k, want, sty) Shown((text), (k), (want), (sty), __LINE__)
+
+static void TestMdpage(void)
+{
+	static const char kPost[] =
+		"---\ntitle: \"Hello\"\ndate: 2026-10-22 10:00:00 -0700\ncategory: retro\n"
+		"description: A short one.\n---\n\nSome [text][r] and <https://a.b>.\n\n[r]: https://example.com/r \"T\"\n";
+	char url[64], buf[64], seen[64];
+	MpScan p;
+	MpBlock b;
+	unsigned char cls[256];
+	long n = (long) strlen(kPost);
+
+	BLOCKS("", "");
+	BLOCKS("One line\nand more\n\nTwo", "P P");
+	BLOCKS("# A\ntext\n## B ##\n---\n***", "H1 P H2 R R");
+	BLOCKS("- a\n- b\n  - c\n    - d\n- e", "I1 I1 I2 I3 I1");
+	BLOCKS("1. one\n2. two\n\n   more of two\n\nafter", "I1.1 I1.2 P1 P");
+	BLOCKS("- [ ] todo\n- [x] done", "I1[ ] I1[x]");
+	BLOCKS("- a\nlazy\n- b", "I1 I1");
+	BLOCKS("> quote\n> more\n>\n> > deeper\n\nout", ">P >>P P");
+	BLOCKS("> - in a quote\n> - two", ">I1 >I1");
+	BLOCKS("```c\nint x;\n\n```\ntext", "C P");
+	BLOCKS("- item\n  ```\n  code\n  ```", "I1 C1");
+	BLOCKS("```\nnever closed", "C");
+	BLOCKS("| a | b |\n|---|---|\n| 1 | 2 |\n\nx", "B P");
+	BLOCKS("<div>\n<p>x</p>\n</div>\n\n<em>inline</em> text", "X P");
+	BLOCKS("{% include image.html %}\nnext\n\npara", "X P");
+	BLOCKS("{% raw %} and text\n\n{%x%}", "P X");
+	BLOCKS("![A cat](/a/cat.png)\n\n![A](b.png) and text", "M P");
+	BLOCKS("Text\n[r]: http://x\n\nmore", "P P");
+	BLOCKS("para\n# heading\n- item\ntext", "P H1 I1");
+	BLOCKS(kPost, "T Y D P");
+	BLOCKS("---\ntitle:\n---\nbody", "P");
+
+	SHOWN(kPost, 0, "Hello", NULL);
+	SHOWN(kPost, 1, "Oct 22, 2026 \xE1 retro", NULL);
+	SHOWN(kPost, 2, "A short one.", NULL);
+	SHOWN(kPost, 3, "Some text and https://a.b.", ".....llll.....lllllllllll.");
+	SHOWN("Some **bold** and *it*\nnext  \nline\\\nend", 0, "Some bold and it next|line|end",
+			".....bbbb.....ii..............");
+	SHOWN("# A `code` title #", 0, "A code title", "..cccc......");
+	SHOWN("- [x] *done* now", 0, "done now", "iiii....");
+	SHOWN("3. three\n   carried on", 0, "three carried on", NULL);
+	SHOWN("> quoted *it*\n> more", 0, "quoted it more", ".......ii.....");
+	SHOWN("```\n\tx = 1;\n  y\n```", 0, "    x = 1;|  y", "cccccccccc.ccc");
+	SHOWN("Escaped \\*star\\* and \\\\", 0, "Escaped *star* and \\", NULL);
+	SHOWN("A &amp; B &mdash; &#x1F600; &#233; &bogus;", 0, "A & B \xD1 \xD7 \x8E &bogus;", NULL);
+	SHOWN("Liquid {{ site.url }} here {: .x}", 0, "Liquid {{ site.url }} here", ".......ffffffffffffff.....");
+	SHOWN("Tags <em>gone</em><br>next", 0, "Tags gone|next", NULL);
+	SHOWN("A note[^1] here.", 0, "A note1 here.", "......n......");
+	SHOWN("lots   of\t spaces", 0, "lots of spaces", NULL);
+	SHOWN("![A cat](/img/cat.png)", 0, "A cat", "lllll");
+	SHOWN("| a |\n|---|", 0, "| a |||---|", NULL);
+	SHOWN("> | a |\n> | b |", 0, "| a ||| b |", NULL);
+
+	/* links: where each one starts, its address and its text */
+	{
+		static const char kLinks[] = "A [one](http://1.x \"t\") [![img](i.png)](http://2.x) <http://3.x> [r][] [^n]\n\n[R]: <http://r.x>\n";
+		long k = (long) strlen(kLinks);
+		seen[0] = '\0';
+		mp_begin(&p, kLinks, k);
+		(void) mp_next(&p, &b);
+		(void) mp_text_links(kLinks, k, &b, buf, NULL, sizeof(buf), cls, LinkSeen, seen);
+		CHECK_STR(seen, "2,24,25,52,65,");
+		CHECK(mp_link_url(kLinks, k, 2, url, sizeof(url)) == 10);
+		CHECK_STR(url, "http://1.x");
+		CHECK(mp_link_text(kLinks, k, 2, buf, sizeof(buf)) == 3);
+		CHECK_STR(buf, "one");
+		(void) mp_link_url(kLinks, k, 24, url, sizeof(url));
+		CHECK_STR(url, "http://2.x");
+		(void) mp_link_text(kLinks, k, 24, buf, sizeof(buf));
+		CHECK_STR(buf, "![img](i.png)");
+		(void) mp_link_url(kLinks, k, 25, url, sizeof(url));
+		CHECK_STR(url, "i.png");
+		(void) mp_link_text(kLinks, k, 25, buf, sizeof(buf));
+		CHECK_STR(buf, "img");
+		(void) mp_link_url(kLinks, k, 52, url, sizeof(url));
+		CHECK_STR(url, "http://3.x");
+		(void) mp_link_url(kLinks, k, 65, url, sizeof(url));
+		CHECK_STR(url, "http://r.x");
+		CHECK(mp_link_url(kLinks, k, 71, url, sizeof(url)) == 0);
+		CHECK(mp_link_url(kLinks, k, 2, url, 5) == 10);
+		CHECK_STR(url, "http");
+	}
+	(void) mp_link_url(kPost, n, (long) (strstr(kPost, "[text]") - kPost), url, sizeof(url));
+	CHECK_STR(url, "https://example.com/r");
+
+	/* fonts */
+	b.kind = MP_HEADING;
+	b.level = 2;
+	CHECK(mp_font(&b, MS_BOLD) == MF_H2);
+	CHECK(mp_font(&b, MS_CODE) == MF_CODE);
+	b.kind = MP_PARA;
+	CHECK(mp_font(&b, MS_BOLD | MS_ITALIC | MS_LINK) == MF_BOLD_ITALIC);
+	CHECK(mp_font(&b, MS_NOTE) == MF_SMALL);
+	b.kind = MP_LEAD;
+	CHECK(mp_font(&b, 0) == MF_ITALIC);
+
+	/* any text at all */
+	{
+		static const char kChars[] = "*_`[]()!#>-~{}%<:/\\^&;| \n\tab1.x";
+		char text[160], out[200];
+		unsigned char sty[200], cl[160];
+		int round, len, i;
+		srand(2);
+		for (round = 0; round < 3000; round++) {
+			len = rand() % 150;
+			for (i = 0; i < len; i++)
+				text[i] = kChars[rand() % (int) (sizeof(kChars) - 1)];
+			text[len] = '\0';
+			mp_begin(&p, text, len);
+			while (mp_next(&p, &b)) {
+				CHECK(b.start <= b.end && b.end <= len);
+				if (mp_text(text, len, &b, out, sty, sizeof(out), cl) > (long) sizeof(out))
+					gFailed++;
+				(void) mp_link_url(text, len, b.at, url, sizeof(url));
+				(void) mp_link_text(text, len, b.at, buf, sizeof(buf));
+			}
+		}
+		CHECK(round == 3000);
+	}
+}
+
+/* ---- layout ---- */
+
+/* Lines of display text in a font where every character is 1 wide, bold
+   2, code 1 (taller); | between lines */
+static void Broken(const MpBlock *b, const char *text, const char *styles, int w, const char *want, int line)
+{
+	static LayFonts f;
+	unsigned char sty[256];
+	char got[512], *o = got;
+	long n = (long) strlen(text), at = 0, i;
+	LayLine l;
+	int font, guard = 0;
+
+	for (font = 0; font < MF_COUNT; font++) {
+		memset(f.width[font], font == MF_BOLD ? 2 : 1, 256);
+		f.ascent[font] = (short) (font == MF_CODE ? 9 : 7);
+		f.descent[font] = 2;
+		f.leading[font] = 1;
+	}
+	for (i = 0; i < n; i++)
+		sty[i] = (unsigned char) (styles != NULL && styles[i] == 'b' ? MS_BOLD : styles != NULL && styles[i] == 'c' ? MS_CODE : 0);
+	do {
+		at = lay_line(&f, b, text, sty, n, at, w, &l);
+		if (o > got)
+			*o++ = '|';
+		memcpy(o, text + l.start, (size_t) l.len);
+		o += l.len;
+		CHECK(l.width == lay_width(&f, b, text, sty, l.start, l.len));
+		CHECK(l.width <= w || l.len == 1);
+		CHECK(l.height == (b->kind == MP_CODE || memchr(sty + l.start, MS_CODE, (size_t) l.len) ? 12 : 10));
+	} while (at < n && ++guard < 100);
+	*o = '\0';
+	CheckStr(got, want, line);
+}
+
+static void TestLayout(void)
+{
+	MpBlock para, code;
+
+	memset(&para, 0, sizeof(para));
+	memset(&code, 0, sizeof(code));
+	para.kind = MP_PARA;
+	code.kind = MP_CODE;
+	Broken(&para, "one two three four", NULL, 9, "one two|three|four", __LINE__);
+	Broken(&para, "one two three four", NULL, 7, "one two|three|four", __LINE__);
+	Broken(&para, "one two three four", NULL, 6, "one|two|three|four", __LINE__);
+	Broken(&para, "abcdefghij", NULL, 4, "abcd|efgh|ij", __LINE__);
+	Broken(&para, "well-known words", NULL, 8, "well-|known|words", __LINE__);
+	Broken(&para, "a/b/c/d", NULL, 4, "a/b/|c/d", __LINE__);
+	Broken(&para, "aa bb", "bbbbb", 5, "aa|bb", __LINE__);
+	Broken(&para, "one\rtwo", NULL, 20, "one|two", __LINE__);
+	Broken(&para, "one  \r\rtwo", NULL, 20, "one  ||two", __LINE__);
+	Broken(&para, "aa   bb", NULL, 3, "aa|bb", __LINE__);
+	Broken(&para, "x code y", "..cccc..", 4, "x|code|y", __LINE__);
+	Broken(&code, "  if (x)\r    y;", NULL, 40, "  if (x)|    y;", __LINE__);
+	Broken(&code, "  a b c d", NULL, 5, "  a b| c d", __LINE__);
+	Broken(&para, "", NULL, 5, "", __LINE__);
+}
+
+/* ---- mdhtml ---- */
+
+/* The HTML between <div class="post-content"> and </div> */
+static void Html(const char *text, const char *want, int line)
+{
+	static char out[8192];
+	unsigned char cls[1024];
+	long n = (long) strlen(text), len;
+	char *a, *e;
+
+	len = mh_page(text, n, cls, NULL, 0);
+	CHECK(mh_page(text, n, cls, out, sizeof(out) - 1) == len);
+	CHECK(mh_page(text, n, cls, out, len - 1) == -1);
+	out[len] = '\0';
+	a = strstr(out, "<div class=\"post-content\">\n");
+	e = strstr(out, "</div>\n</article>");
+	if (a == NULL || e == NULL) {
+		CheckStr(out, want, line);
+		return;
+	}
+	a += strlen("<div class=\"post-content\">\n");
+	*e = '\0';
+	CheckStr(a, want, line);
+}
+#define HTML(text, want) Html((text), (want), __LINE__)
+
+static void TestMdhtml(void)
+{
+	static char out[4096];
+	unsigned char cls[512];
+	static const char kPost[] = "---\ntitle: A <post> & more\ndate: 2026-01-02\n---\nHi\n";
+	long len;
+
+	HTML("Some **bold** and *it*.\nNext line  \nbreak", "<p>Some <strong>bold</strong> and <em>it</em>.\nNext line<br>\nbreak</p>\n");
+	HTML("# One\n## Two `x` ##", "<h1>One</h1>\n<h2>Two <code>x</code></h2>\n");
+	HTML("A [link](http://x.y?a=1&b=\"2\") and <https://a.b>.",
+		"<p>A <a href=\"http://x.y?a=1&amp;b=&quot;2&quot;\">link</a> and <a href=\"https://a.b\">https://a.b</a>.</p>\n");
+	HTML("**[bold link](u)** x", "<p><a href=\"u\"><strong>bold link</strong></a> x</p>\n");
+	HTML("![A cat](/i/cat.png)", "<p><img src=\"/i/cat.png\" alt=\"A cat\"></p>\n");
+	HTML("[![img](i.png)](http://x)", "<p><a href=\"http://x\"><img src=\"i.png\" alt=\"img\"></a></p>\n");
+	HTML("See [it][r].\n\n[r]: http://r.x", "<p>See <a href=\"http://r.x\">it</a>.</p>\n");
+	HTML("A < B & C &amp; D &#233;", "<p>A &lt; B &amp; C &amp; D &#233;</p>\n");
+	HTML("`a < b && c`", "<p><code>a &lt; b &amp;&amp; c</code></p>\n");
+	HTML("x <em>raw</em> {{ site.url }} {: .c}", "<p>x <em>raw</em> {{ site.url }} </p>\n");
+	HTML("A note[^1].", "<p>A note<sup>1</sup>.</p>\n");
+	HTML("\\*not\\*", "<p>*not*</p>\n");
+	HTML("- a\n- b\n  - c\n- d", "<ul>\n<li>a</li>\n<li>b<ul>\n<li>c</li>\n</ul>\n</li>\n<li>d</li>\n</ul>\n");
+	HTML("1. a\n2. b\n\n   more\n\nafter", "<ol>\n<li>a</li>\n<li>b<p>more</p>\n</li>\n</ol>\n<p>after</p>\n");
+	HTML("3. c\n- d", "<ol start=\"3\">\n<li>c</li>\n</ol>\n<ul>\n<li>d</li>\n</ul>\n");
+	HTML("- [x] done\n- [ ] not", "<ul>\n<li><input type=\"checkbox\" disabled checked> done</li>\n"
+		"<li><input type=\"checkbox\" disabled> not</li>\n</ul>\n");
+	HTML("> quote\n>\n> > deep\n\nout", "<blockquote>\n<p>quote</p>\n<blockquote>\n<p>deep</p>\n</blockquote>\n</blockquote>\n<p>out</p>\n");
+	HTML("> - a\n> - b", "<blockquote>\n<ul>\n<li>a</li>\n<li>b</li>\n</ul>\n</blockquote>\n");
+	HTML("```c\nif (a < b)\n\treturn;\n```", "<pre><code class=\"language-c\">if (a &lt; b)\n\treturn;\n</code></pre>\n");
+	HTML("~~~\nplain\n~~~", "<pre><code>plain\n</code></pre>\n");
+	HTML("x\n\n---\n\n***", "<p>x</p>\n<hr>\n<hr>\n");
+	HTML("| a | *b* |\n|---|:-:|\n| `x|y` | 2 |", "<table>\n<tr><th>a</th><th><em>b</em></th></tr>\n"
+		"<tr><td><code>x|y</code></td><td>2</td></tr>\n</table>\n");
+	HTML("| no | delimiter |", "<p>| no | delimiter |</p>\n");
+	HTML("<div class=\"x\">\n<b>hi</b>\n</div>", "<div class=\"x\">\n<b>hi</b>\n</div>\n");
+	HTML("    - deep\n- shallow", "<ul>\n<li>deep</li>\n<li>shallow</li>\n</ul>\n");
+
+	len = mh_page(kPost, (long) strlen(kPost), cls, out, sizeof(out) - 1);
+	CHECK(len > 0);
+	out[len > 0 ? len : 0] = '\0';
+	CHECK(strstr(out, "<title>A &lt;post&gt; &amp; more</title>") != NULL);
+	CHECK(strstr(out, "<header class=\"post-header\">\n<h1 class=\"post-title\">A &lt;post&gt; &amp; more</h1>\n"
+		"<p class=\"post-meta\">Jan 2, 2026</p>\n</header>\n<div class=\"post-content\">\n<p>Hi</p>\n</div>\n") != NULL);
+	CHECK(strstr(out, "<meta charset=\"utf-8\">") != NULL);
+
+	/* any text at all */
+	{
+		static const char kChars[] = "*_`[]()!#>-~{}%<:/\\^&;| \n\tab1.x";
+		char text[200];
+		int round, n, i;
+		srand(3);
+		for (round = 0; round < 2000; round++) {
+			n = rand() % 180;
+			for (i = 0; i < n; i++)
+				text[i] = kChars[rand() % (int) (sizeof(kChars) - 1)];
+			text[n] = '\0';
+			len = mh_page(text, n, cls, NULL, 0);
+			if (mh_page(text, n, cls, out, sizeof(out)) != len)
+				gFailed++;
+		}
+		CHECK(round == 2000);
+	}
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -682,6 +1026,9 @@ int main(void)
 	TestPrefs();
 	TestRecovery();
 	TestMdscan();
+	TestMdpage();
+	TestLayout();
+	TestMdhtml();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

@@ -8,8 +8,10 @@
    don't start or end on them */
 #define kTaken (MD_CODE | MD_URL | MD_MARK | MD_META)
 
-/* What a line is, as far as the blocks go */
-enum { kText, kFrontDelim, kFront, kFenceDelim, kCode };
+enum {
+	kText = MD_LINE_TEXT, kFrontDelim = MD_LINE_FRONT_DELIM, kFront = MD_LINE_FRONT,
+	kFenceDelim = MD_LINE_FENCE, kCode = MD_LINE_CODE
+};
 
 static int IsSpace(char c)
 {
@@ -124,6 +126,7 @@ void md_begin(MdState *s)
 	s->front = 0;
 	s->fence = 0;
 	s->fenceLen = 0;
+	s->quoteFace = 1;
 }
 
 long md_line_after(const char *text, long n, long pos)
@@ -473,7 +476,8 @@ static void Line(MdState *s, const char *t, long ls, long le, unsigned char *c)
 		p = q + 1;
 		if (p < le && t[p] == ' ')
 			p++;
-		Fill(c, ls, le, MD_ITALIC);
+		if (s->quoteFace)
+			Fill(c, ls, le, MD_ITALIC);
 	}
 	if ((level = Heading(t, p, le, &ts, &te)) != 0) {
 		Fill(c, p, le, MD_HEADING);
@@ -510,6 +514,31 @@ void md_classify(MdState *s, const char *text, long n, long end, unsigned char *
 		Line(s, text + start, s->pos - start, le - start, out);
 		s->pos = le < n ? le + 1 : n;
 	}
+}
+
+int md_line(MdState *s, const char *text, long n, long *le)
+{
+	int kind;
+
+	*le = LineEnd(text, n, s->pos);
+	kind = Block(s, text, s->pos, *le);
+	s->pos = *le < n ? *le + 1 : n;
+	return kind;
+}
+
+int md_heading(const char *text, long ls, long le, long *ts, long *te)
+{
+	return Heading(text, ls, le, ts, te);
+}
+
+int md_rule(const char *text, long ls, long le)
+{
+	return Rule(text, ls, le);
+}
+
+long md_list_marker(const char *text, long ls, long le)
+{
+	return ListMarker(text, ls, le);
 }
 
 unsigned long md_blocks(const char *text, long n)
