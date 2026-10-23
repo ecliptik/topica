@@ -61,6 +61,11 @@
       cancel (each step waits now, at most 20-60 s)
 - [ ] Publish the post's images too
 - [ ] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
+- [ ] Hide the key in Publish as it's typed (bullets, like a password
+      field): it shows in clear now
+- [ ] Say which error a failed connection had (a lease that never came,
+      or a connection that timed out), so a firewall in between is easier
+      to tell from a bridge that isn't running
 
 ## Later
 
