@@ -741,6 +741,7 @@ Boolean PageLayout(Page *pg, const char *text, long n, short width, long from, l
 			DLOG(("PageLayout: MISMATCH %ld blocks differ, %ld vs %ld", bad, k, pg->count));
 	}
 #endif
+	(void) caught;                      /* only the debug log reads it */
 	pg->body = pg->count;
 	/* the old link list after the body, moved with the links, so that
 	   MakeLinkItems keeps the heights of links the edit didn't touch */
