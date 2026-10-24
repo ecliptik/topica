@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.0 (unreleased)
+
+The to-do list, before 1.0.
+
+- Option-[ and Option-] type straight quotes in code and the front matter,
+  where curly ones would break them; prose keeps the curly ones.
+- vi: registers "a to "z for y d c p ("A appends); marks (ma, 'a and `a,
+  as jumps and motions); a command line, :w :q :wq :x :q! and :N (ZZ and ZQ
+  too), shown in the status line as it's typed; and a block cursor in
+  normal mode. :q asks to save a changed post, as Close does.
+- Printing from the preview names the job after the post, and a window
+  says what's printing and that Command-period stops it.
+- Saving swaps the new post in where the volume can (System 7's HFS
+  disks), so it keeps its Finder comments, file ID and creation date.
+
 ## 0.7.0 (unreleased)
 
 Polish.

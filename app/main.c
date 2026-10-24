@@ -400,9 +400,11 @@ static void DoKey(EventRecord *e)
 		DoMenu(MenuKey(c));
 		return;
 	}
-	if (d != NULL)
+	if (d != NULL) {
 		DocKey(d, e);
-	else if (PreviewIsFront())
+		if (DocFront() != d)
+			AdjustMenus();              /* vi's :q closed it: the menus dim */
+	} else if (PreviewIsFront())
 		PreviewKey(e);
 }
 
@@ -546,6 +548,7 @@ int main(void)
 	while (!gQuit) {
 		Doc *front = DocFront();
 		if (GetEvent(&e, gInBackground ? 60 : 10)) {
+			DocBlocksOff();
 			switch (e.what) {
 			case mouseDown:
 				DoMouseDown(&e);

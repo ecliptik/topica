@@ -42,6 +42,10 @@ void EdClick(Editor *ed, Point local, Boolean extend);
    local coordinates, clipped to the view; empty with no selection) */
 long EdOffsetAt(Editor *ed, Point local);
 void EdCaretRect(Editor *ed, long offset, Rect *r);
+/* The character at offset, as a box (a space's width at a line end), for
+   vi's block cursor; EdRedrawRect draws the text in r again */
+void EdCharRect(Editor *ed, long offset, Rect *r);
+void EdRedrawRect(Editor *ed, const Rect *r);
 RgnHandle EdSelectionRgn(Editor *ed);
 /* Arrow, Home, End, Page Up and Page Down keys: 1 if it was one */
 Boolean EdNavigate(Editor *ed, char c, short modifiers);

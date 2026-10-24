@@ -399,3 +399,13 @@ resource 'DITL' (147, "Publishing", purgeable) {
 		{ 56, 292, 76, 364 }, Button { enabled, "Cancel" };
 	}
 };
+
+/* Printing's status: the driver's own idle procedure stops on Command-period */
+resource 'DLOG' (148, "Printing", purgeable) {
+	{ 0, 0, 62, 380 }, dBoxProc, invisible, noGoAway, 0x0, 148, "", noAutoCenter
+};
+resource 'DITL' (148, "Printing", purgeable) {
+	{
+		{ 14, 16, 50, 364 }, StaticText { disabled, "" };
+	}
+};

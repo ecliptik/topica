@@ -78,6 +78,8 @@ Boolean DocCanStyle(Doc *d);
 void DocShowLine(Doc *d, long offset);
 /* Recovery copies for every window, from the event loop */
 void DocIdleAll(void);
+/* Before an event: vi's block cursors off, back when idle */
+void DocBlocksOff(void);
 
 /* For the Post menu's dialogs */
 Editor *DocEditor(Doc *d);

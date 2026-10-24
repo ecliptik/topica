@@ -70,6 +70,16 @@ CASES = [
     ("|a\n\nb", "}dd"), ("|x", "rX~"),
     # escape cancels
     ("|abc", "d<Esc>x"), ("|abc", "3<Esc>x"),
+    # registers
+    ('|one two', '"ayw"bywP"aP'), ('|one two', '"ayw$"ap'), ('|l1\nl2', '"ayyj"ap'), ('|one two', '"adwP'),
+    ('|one two', '"ayww"Ayw0"aP'), ('|l1\nl2\nl3', '"ayyj"Ayyj"ap'), ('|ab cd', 'v"ay$"ap'),
+    ('|one two', '"aywp'), ('|ab', '"ax"ap'), ('|one two', '"a2yw$"ap'),
+    # marks
+    ("|l1\nl2\nl3", "majj'a"), ("l|1\nl2\nl3", "majj`a"), ("|l1\nl2\nl3", "jmakd'a"), ("|abc def", "wmb0d`b"),
+    ("|l1\nl2\nl3", "jjmaggOx<Esc>'a"), ("ab|cdef", "mb0x`b"), ("|l1\nl2\nl3", "jmaggy'aP"),
+    # the command line
+    ("|l1\nl2\nl3", ":3<CR>"), ("l1\nl2\n|l3", ":1<CR>"), ("|l1\n  l2", ":2<CR>"), ("|l1\nl2", ":$<CR>"),
+    ("|l1\nl2\nl3", ":2<BS>3<CR>")
 ]
 
 

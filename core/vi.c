@@ -105,6 +105,18 @@ static long LineAt(const Buf *b, long k)
 
 /* ---- words ---- */
 
+/* Where mark c is now, or -1 */
+static long Mark(const Vi *v, const Buf *b, int c)
+{
+	long ls, le;
+
+	if (c < 'a' || c > 'z' || v->markLine[c - 'a'] < 0)
+		return -1;
+	ls = LineAt(b, v->markLine[c - 'a']);
+	le = LineEnd(b, ls);
+	return ls + v->markCol[c - 'a'] < le ? ls + v->markCol[c - 'a'] : le;
+}
+
 /* 0 blank, 1 word characters (letters, digits, _, Mac Roman's own), 2
    punctuation; big words: anything not blank is 1. A line end is blank. */
 static int Kind(const Buf *b, long p, int big)
@@ -250,6 +262,18 @@ static int Motion(Vi *v, const Buf *b, int pend, int c, long count, long pos, in
 		v->findCh = (char) c;
 		m->to = FindChar(b, pos, pend, (char) c, n1);
 		m->how = pend == 'f' || pend == 't' ? kIncl : kExcl;
+		return 1;
+	}
+	if (pend == '\'' || pend == '`') {
+		/* 'a: the mark's line, as lines; `a: the mark itself */
+		long mk = Mark(v, b, c);
+		if (mk >= 0 && pend == '\'') {
+			mk = LineStart(b, mk);
+			m->to = op ? mk : FirstBlank(b, mk);
+			m->how = kLines;
+		} else {
+			m->to = mk;
+		}
 		return 1;
 	}
 	if (pend == 'g') {
@@ -501,6 +525,63 @@ static int Object(const Buf *b, long pos, int inner, int c, long *s, long *e, in
 
 /* ---- changes ---- */
 
+/* Every change goes through here. Marks keep their line and column, as
+   vim's do: lines added or taken out above one move it, and one on a line
+   taken out goes to the change's line. Only a change of line ends counts. */
+static int Edit(Vi *v, const ViHost *h, int kind, long s, long e, const char *ins, long len)
+{
+	Buf b;
+	long gone = 0, added = 0, first = -1, i;
+	int k;
+
+	for (k = 0; k < 26 && v->markLine[k] < 0; k++)
+		;
+	if (k < 26) {
+		Load(&b, h);
+		for (i = s; i < e && i < b.n; i++)
+			gone += IsEol(b.t[i]);
+		for (i = 0; i < len; i++)
+			added += IsEol(ins[i]);
+		if (gone != added || gone > 0)
+			first = LineOf(&b, s);
+	}
+	if (!h->replace(h->ctx, kind, s, e, ins, len))
+		return 0;
+	if (first < 0)
+		return 1;
+	for (k = 0; k < 26; k++) {
+		if (v->markLine[k] < 0 || v->markLine[k] <= first)
+			continue;
+		if (v->markLine[k] > first + gone)
+			v->markLine[k] += added - gone;
+		else
+			v->markLine[k] = first;
+	}
+	return 1;
+}
+
+
+/* The register this command names ("a), or NULL for the unnamed one */
+static ViReg *Named(Vi *v, const ViHost *h)
+{
+	int c = v->useReg;
+
+	if (c == 0)
+		return NULL;
+	if (c >= 'A' && c <= 'Z')
+		c += 'a' - 'A';
+	return h->named != NULL ? h->named(h->ctx, c) : NULL;
+}
+
+static void CopyReg(ViReg *to, const ViReg *from)
+{
+	long len = from->len < to->cap ? from->len : to->cap;
+
+	memcpy(to->buf, from->buf, (size_t) len);
+	to->len = len;
+	to->lines = from->lines;
+}
+
 static void Select(const ViHost *h, long s, long e)
 {
 	h->set_sel(h->ctx, s, e);
@@ -523,24 +604,40 @@ static void Group(Vi *v, const ViHost *h, int begin)
 		h->group(h->ctx, begin);
 }
 
-static void Yank(Vi *v, const Buf *b, long s, long e, int lines)
+/* [s, e) into r, after what's there when append */
+static void YankInto(ViReg *r, const Buf *b, long s, long e, int lines, int append)
 {
-	long len = e - s;
+	long at = append ? r->len : 0, len = e - s;
+	char *to = r->buf + at;
 
-	if (len + 1 > v->reg->cap)
-		len = v->reg->cap - 1;
+	if (at + len + 1 > r->cap)
+		len = r->cap - at - 1;
 	if (len < 0)
 		len = 0;
-	memcpy(v->reg->buf, b->t + s, (size_t) len);
-	if (lines && (len == 0 || !IsEol(v->reg->buf[len - 1])))
-		v->reg->buf[len++] = '\r';  /* the last line, which had no line end */
-	if (lines && len > 0 && IsEol(v->reg->buf[0]) && s > 0 && e >= b->n) {
+	memcpy(to, b->t + s, (size_t) len);
+	if (lines && (len == 0 || !IsEol(to[len - 1])))
+		to[len++] = '\r';          /* the last line, which had no line end */
+	if (lines && len > 0 && IsEol(to[0]) && s > 0 && e >= b->n) {
 		/* the last line, taken with the line end before it */
 		len--;
-		memmove(v->reg->buf, v->reg->buf + 1, (size_t) len);
+		memmove(to, to + 1, (size_t) len);
 	}
-	v->reg->len = len;
-	v->reg->lines = lines;
+	r->lines = at > 0 ? r->lines || lines : lines;
+	r->len = at + len;
+}
+
+/* Into the register named ("a, "A appends), which the unnamed one copies,
+   or the unnamed one */
+static void Yank(Vi *v, const Buf *b, long s, long e, int lines)
+{
+	ViReg *r = Named(v, b->h);
+
+	if (r == NULL) {
+		YankInto(v->reg, b, s, e, lines, 0);
+		return;
+	}
+	YankInto(r, b, s, e, lines, v->useReg >= 'A' && v->useReg <= 'Z');
+	CopyReg(v->reg, r);
 }
 
 /* The change the user typed is complete: . will repeat it */
@@ -608,7 +705,7 @@ static void Operate(Vi *v, const ViHost *h, int op, long s, long e, int lines)
 			else if (a < z && IsEol(b.t[a]))
 				a++;                /* the last line: its line end before it stays */
 			Group(v, h, 1);
-			if (!h->replace(h->ctx, VI_EDIT, a, z, "", 0)) {
+			if (!Edit(v, h, VI_EDIT, a, z, "", 0)) {
 				Group(v, h, 0);
 				Beep(h);
 				return;
@@ -617,7 +714,7 @@ static void Operate(Vi *v, const ViHost *h, int op, long s, long e, int lines)
 			return;
 		}
 		Group(v, h, 1);
-		if (e > s && !h->replace(h->ctx, VI_EDIT, s, e, "", 0)) {
+		if (e > s && !Edit(v, h, VI_EDIT, s, e, "", 0)) {
 			Group(v, h, 0);
 			Beep(h);
 			return;
@@ -627,7 +724,7 @@ static void Operate(Vi *v, const ViHost *h, int op, long s, long e, int lines)
 	}
 	/* d */
 	Group(v, h, 1);
-	if (!h->replace(h->ctx, VI_EDIT, s, e, "", 0)) {
+	if (!Edit(v, h, VI_EDIT, s, e, "", 0)) {
 		Group(v, h, 0);
 		Beep(h);
 		return;
@@ -651,8 +748,9 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	long pos, at, i, len;
 	char *ins;
 	int ok;
+	ViReg *r = v->useReg ? Named(v, h) : v->reg;
 
-	if (v->reg->len == 0) {
+	if (r == NULL || r->len == 0) {
 		Beep(h);
 		return;
 	}
@@ -660,7 +758,7 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	pos = Caret(h);
 	if (count < 1)
 		count = 1;
-	if (v->reg->lines) {
+	if (r->lines) {
 		if (after) {
 			at = LineEnd(&b, pos);
 			if (at < b.n)
@@ -674,18 +772,18 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	Group(v, h, 1);
 	for (i = 0, ok = 1; ok && i < count; i++) {
 		Load(&b, h);
-		ins = v->reg->buf;
-		len = v->reg->len;
-		if (v->reg->lines && after && at >= b.n && (b.n == 0 || !IsEol(b.t[b.n - 1]))) {
+		ins = r->buf;
+		len = r->len;
+		if (r->lines && after && at >= b.n && (b.n == 0 || !IsEol(b.t[b.n - 1]))) {
 			/* after the last line, which has no line end: give it one */
-			ok = h->replace(h->ctx, VI_EDIT, at, at, "\r", 1);
+			ok = Edit(v, h, VI_EDIT, at, at, "\r", 1);
 			at++;
-			ok = ok && h->replace(h->ctx, VI_EDIT, at, at, ins, len - 1);
+			ok = ok && Edit(v, h, VI_EDIT, at, at, ins, len - 1);
 			len--;
 		} else {
-			ok = h->replace(h->ctx, VI_EDIT, at, at, ins, len);
+			ok = Edit(v, h, VI_EDIT, at, at, ins, len);
 		}
-		if (ok && i == 0 && v->reg->lines)
+		if (ok && i == 0 && r->lines)
 			pos = at;
 		at += len;
 	}
@@ -693,7 +791,7 @@ static void Put(Vi *v, const ViHost *h, int after, long count)
 	if (!ok)
 		Beep(h);
 	Load(&b, h);
-	pos = v->reg->lines ? FirstBlank(&b, pos) : Clamp(&b, at - 1);
+	pos = r->lines ? FirstBlank(&b, pos) : Clamp(&b, at - 1);
 	Select(h, pos, pos);
 	Done(v);
 }
@@ -721,9 +819,9 @@ static void Join(Vi *v, const ViHost *h, long pos, long count)
 		while (keep > LineStart(&b, pos) && IsBlank(b.t[keep - 1]))
 			keep--;
 		if (next >= b.n || IsEol(b.t[next]) || b.t[next] == ')' || keep == LineStart(&b, pos))
-			(void) h->replace(h->ctx, VI_EDIT, keep, next, "", 0);
+			(void) Edit(v, h, VI_EDIT, keep, next, "", 0);
 		else
-			(void) h->replace(h->ctx, VI_EDIT, keep, next, " ", 1);
+			(void) Edit(v, h, VI_EDIT, keep, next, " ", 1);
 		pos = keep;
 	}
 	Group(v, h, 0);
@@ -759,7 +857,7 @@ static void ToggleCase(Vi *v, const ViHost *h, long s, long e)
 			for (i = 0; i < k; i++)
 				buf[i] = Toggle(buf[i]);
 		}
-		(void) h->replace(h->ctx, VI_EDIT, p, p + k, buf, k);
+		(void) Edit(v, h, VI_EDIT, p, p + k, buf, k);
 	}
 	Group(v, h, 0);
 	Done(v);
@@ -811,7 +909,7 @@ static void EndInsert(Vi *v, const ViHost *h)
 		if (len <= (long) sizeof(buf)) {
 			memcpy(buf, b.t + v->insStart, (size_t) len);
 			for (i = 1; i < v->insCount; i++) {
-				if (!h->replace(h->ctx, VI_EDIT, pos, pos, buf, len))
+				if (!Edit(v, h, VI_EDIT, pos, pos, buf, len))
 					break;
 				pos += len;
 			}
@@ -828,11 +926,15 @@ static void EndInsert(Vi *v, const ViHost *h)
 
 void vi_init(Vi *v, ViReg *reg)
 {
+	int i;
+
 	memset(v, 0, sizeof(*v));
 	v->mode = VI_NORMAL;
 	v->goal = -1;
 	v->jAt = -1;
 	v->reg = reg;
+	for (i = 0; i < 26; i++)
+		v->markLine[i] = -1;
 }
 
 void vi_clicked(Vi *v, const ViHost *h)
@@ -863,6 +965,8 @@ const char *vi_status(const Vi *v)
 {
 	if (!v->on)
 		return "";
+	if (v->lineLen > 0)
+		return v->line;             /* the command being typed */
 	switch (v->mode) {
 	case VI_INSERT: return "-- INSERT --";
 	case VI_VISUAL: return "-- VISUAL --";
@@ -894,7 +998,7 @@ static int Insert(Vi *v, const ViHost *h, int c, unsigned long ticks)
 	}
 	if (v->jk && c == 'k' && v->jAt >= 0 && s == e && s == v->jAt + 1 && ticks - v->jTicks <= kJkTicks) {
 		/* jk: the j goes, and so does insert mode */
-		(void) h->replace(h->ctx, VI_DELETE, v->jAt, s, "", 0);
+		(void) Edit(v, h, VI_DELETE, v->jAt, s, "", 0);
 		if (v->recLen > 0)
 			v->rec[v->recLen - 1] = VI_ESC;
 		v->jAt = -1;
@@ -904,15 +1008,15 @@ static int Insert(Vi *v, const ViHost *h, int c, unsigned long ticks)
 	if (c == VI_BACKSPACE) {
 		Record(v, c);
 		if (s != e)
-			(void) h->replace(h->ctx, VI_DELETE, s, e, "", 0);
+			(void) Edit(v, h, VI_DELETE, s, e, "", 0);
 		else if (s > 0)
-			(void) h->replace(h->ctx, VI_DELETE, s - 1, s, "", 0);
+			(void) Edit(v, h, VI_DELETE, s - 1, s, "", 0);
 		v->jAt = -1;
 		return 1;
 	}
 	if (c == VI_RETURN || c == '\t' || (c >= 0x20 && c != 0x7F)) {
 		Record(v, c);
-		if (!h->replace(h->ctx, VI_TYPE, s, e, &ch, 1)) {
+		if (!Edit(v, h, VI_TYPE, s, e, &ch, 1)) {
 			Beep(h);
 			return 1;
 		}
@@ -1055,21 +1159,78 @@ static long Total(const Vi *v, long count)
 	return (count > 0 ? count : 1) * (v->opCount > 0 ? v->opCount : 1);
 }
 
+/* :w :q and the rest are the host's */
+static void Command(const ViHost *h, const char *cmd)
+{
+	if (h->command == NULL || !h->command(h->ctx, cmd))
+		Beep(h);
+}
+
+/* A command line, run: :N goes to line N (:$ the last) */
+static void RunLine(Vi *v, const ViHost *h, const char *cmd)
+{
+	Buf b;
+	const char *q;
+	long n = 0, p;
+
+	while (*cmd == ' ')
+		cmd++;
+	if (*cmd == '\0')
+		return;
+	for (q = cmd; *q >= '0' && *q <= '9'; q++)
+		n = n * 10 + (*q - '0');
+	if ((q > cmd && *q == '\0') || (cmd[0] == '$' && cmd[1] == '\0')) {
+		Load(&b, h);
+		p = cmd[0] == '$' ? LineStart(&b, b.n) : LineAt(&b, n > 0 ? n - 1 : 0);
+		p = FirstBlank(&b, p);
+		v->goal = -1;
+		Select(h, p, p);
+		return;
+	}
+	Command(h, cmd);
+}
+
+/* A key while the command line is up: Return runs it, Escape (or deleting
+   the colon) puts it away */
+static int LineKey(Vi *v, const ViHost *h, int c)
+{
+	char cmd[sizeof(v->line)];
+
+	if (c == VI_ESC) {
+		v->lineLen = 0;
+	} else if (c == VI_BACKSPACE) {
+		v->line[--v->lineLen] = '\0';
+	} else if (c == VI_RETURN) {
+		strcpy(cmd, v->line + 1);
+		v->lineLen = 0;
+		RunLine(v, h, cmd);
+	} else if (c >= 0x20 && c < 0x7F && v->lineLen < (int) sizeof(v->line) - 1) {
+		v->line[v->lineLen++] = (char) c;
+		v->line[v->lineLen] = '\0';
+	}
+	return 1;
+}
+
 int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 {
 	Buf b;
 	Move m;
 	long pos, count, s, e;
-	int lines;
+	int lines, held;
 
 	if (!v->on)
 		return 0;
 	if (v->mode == VI_INSERT)
 		return Insert(v, h, c, ticks);
+	if (v->lineLen > 0)
+		return LineKey(v, h, c);
+	held = v->regHeld;
+	v->regHeld = 0;
 	/* a new command: start recording it for . */
-	if (v->op == 0 && v->pend == 0 && v->count == 0 && v->mode == VI_NORMAL) {
+	if (v->op == 0 && v->pend == 0 && v->count == 0 && v->mode == VI_NORMAL && !held) {
 		v->recLen = 0;
 		v->recOk = 1;
+		v->useReg = 0;
 	}
 	Record(v, c);
 	if (c == VI_ESC && v->mode == VI_NORMAL) {
@@ -1080,7 +1241,8 @@ int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 		return 1;
 	}
 	if (c >= '0' && c <= '9' && (c != '0' || v->count > 0) && v->pend != 'r'
-			&& v->pend != 'f' && v->pend != 'F' && v->pend != 't' && v->pend != 'T') {
+			&& v->pend != 'f' && v->pend != 'F' && v->pend != 't' && v->pend != 'T'
+			&& v->pend != 'm' && v->pend != '\'' && v->pend != '`') {
 		v->count = v->count * 10 + (c - '0');
 		if (v->count > 99999)
 			v->count = 99999;
@@ -1088,6 +1250,24 @@ int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 	}
 	count = v->count;
 	v->count = 0;
+	/* "a: the register for the command that follows */
+	if (v->pend == '"') {
+		v->pend = 0;
+		if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+			v->useReg = (char) c;
+			v->regHeld = 1;
+			v->count = count;
+		} else if (c != VI_ESC) {
+			Beep(h);
+		}
+		return 1;
+	}
+	if (c == '"' && v->pend == 0 && v->op == 0) {
+		v->pend = '"';
+		v->regHeld = 1;
+		v->count = count;
+		return 1;
+	}
 	if (v->mode == VI_VISUAL || v->mode == VI_VISUAL_LINE)
 		return Visual(v, h, c, count);
 	Load(&b, h);
@@ -1107,17 +1287,35 @@ int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 				return 1;
 			}
 			if (c == VI_RETURN) {
-				(void) h->replace(h->ctx, VI_EDIT, pos, pos + n1, "\r", 1);
+				(void) Edit(v, h, VI_EDIT, pos, pos + n1, "\r", 1);
 				Load(&b, h);
 				pos = pos + 1;
 			} else {
 				for (i = 0; i < n1; i++)
 					buf[i] = (char) c;
-				(void) h->replace(h->ctx, VI_EDIT, pos, pos + n1, buf, n1);
+				(void) Edit(v, h, VI_EDIT, pos, pos + n1, buf, n1);
 				pos += n1 - 1;
 			}
 			Select(h, pos, pos);
 			Done(v);
+			return 1;
+		}
+		if (pend == 'm') {
+			if (c >= 'a' && c <= 'z') {
+				v->markLine[c - 'a'] = LineOf(&b, pos);
+				v->markCol[c - 'a'] = pos - LineStart(&b, pos);
+			}
+			else if (c != VI_ESC)
+				Beep(h);
+			v->recOk = 0;
+			return 1;
+		}
+		if (pend == 'Z') {
+			v->recOk = 0;
+			if (c == 'Z' || c == 'Q')
+				Command(h, c == 'Z' ? "x" : "q!");
+			else if (c != VI_ESC)
+				Beep(h);
 			return 1;
 		}
 		if ((pend == 'i' || pend == 'a') && v->op) {
@@ -1139,7 +1337,8 @@ int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 	}
 
 	if (c == 'g' || c == 'f' || c == 'F' || c == 't' || c == 'T' || (c == 'r' && !v->op)
-			|| ((c == 'i' || c == 'a') && v->op)) {
+			|| ((c == 'i' || c == 'a') && v->op) || c == '\'' || c == '`'
+			|| ((c == 'm' || c == 'Z') && !v->op)) {
 		v->pend = (char) c;
 		v->count = count;           /* the count waits too */
 		return 1;
@@ -1256,7 +1455,7 @@ int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 	case 'o':
 		s = LineEnd(&b, pos);
 		Group(v, h, 1);
-		if (!h->replace(h->ctx, VI_EDIT, s, s, "\r", 1)) {
+		if (!Edit(v, h, VI_EDIT, s, s, "\r", 1)) {
 			Beep(h);
 			return 1;
 		}
@@ -1266,11 +1465,17 @@ int vi_key(Vi *v, const ViHost *h, int c, unsigned long ticks)
 	case 'O':
 		s = LineStart(&b, pos);
 		Group(v, h, 1);
-		if (!h->replace(h->ctx, VI_EDIT, s, s, "\r", 1)) {
+		if (!Edit(v, h, VI_EDIT, s, s, "\r", 1)) {
 			Beep(h);
 			return 1;
 		}
 		StartInsert(v, h, s, count);
+		return 1;
+	case ':':
+		v->recOk = 0;
+		v->line[0] = ':';
+		v->line[1] = '\0';
+		v->lineLen = 1;
 		return 1;
 	case 'v':
 	case 'V':

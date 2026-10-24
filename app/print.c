@@ -72,6 +72,19 @@ static void Footer(const Rect *r, short number)
 	DrawText(s, 0, (short) strlen(s));
 }
 
+/* Printing "the post": its window's title, cut short */
+static void PostName(Doc *d, char *out)
+{
+	Str255 title;
+	char name[64];
+
+	GetWTitle(DocWindow(d), title);
+	CStr(name, title);
+	if (strlen(name) > 40)
+		strcpy(name + 37, "\xC9");
+	sprintf(out, "Printing \xD2%s\xD3. To stop, press Command-period.", name);
+}
+
 void PrintDoc(Doc *d)
 {
 	Editor *ed = DocEditor(d);
@@ -85,19 +98,32 @@ void PrintDoc(Doc *d)
 	Boolean redraw;
 	short number = 1;
 	OSErr err;
+	WindowPtr front;
+	Str255 frontTitle, title;
+	DialogPtr showing;
+	char msg[120];
 
+	/* the job is named after the front window when printing begins: the
+	   post's, not the preview's */
+	front = FrontWindow();
+	GetWTitle(DocWindow(d), title);
+	if (front != NULL && front != DocWindow(d)) {
+		GetWTitle(front, frontTitle);
+		SetWTitle(front, title);
+	}
+	showing = NULL;
 	if (!OpenPrinting())
-		return;
+		goto done;
 	(void) PrValidate(gPrint);
 	if (!PrJobDialog(gPrint)) {
 		PrClose();
-		return;
+		goto done;
 	}
 	pg = PageNew();
 	if (pg == NULL) {
 		PrClose();
 		ErrorAlert("The post couldn\xD5t be printed.", memFullErr);
-		return;
+		goto done;
 	}
 	GetPort(&save);
 	SetCursor(*GetCursor(watchCursor));
@@ -105,6 +131,16 @@ void PrintDoc(Doc *d)
 	n = EdLength(ed);
 	port = PrOpenDoc(gPrint, NULL, NULL);
 	if (PrError() == noErr) {
+		/* what's happening, and how to stop it, while the pages go out */
+		NoDialogHelp();
+		showing = GetNewDialog(kPrintingDialog, NULL, (WindowPtr) -1);
+		if (showing != NULL) {
+			PostName(d, msg);
+			SetItemText(showing, 1, msg);
+			CenterWindow(showing);
+			ShowWindow(showing);
+			DrawDialog(showing);
+		}
 		SetPort(&port->gPort);
 		r = (**gPrint).prInfo.rPage;
 		InsetRect(&r, kMargin, kMargin / 2);
@@ -140,10 +176,15 @@ void PrintDoc(Doc *d)
 	PrClose();
 	EdUnlockText(ed);
 	PageDispose(pg);
+	if (showing != NULL)
+		DisposeDialog(showing);
 	SetPort(save);
 	InitCursor();
 	if (err != noErr && err != iPrAbort)
 		ErrorAlert("The post couldn\xD5t be printed.", err);
+done:
+	if (front != NULL && front != DocWindow(d))
+		SetWTitle(front, frontTitle);
 }
 
 /* ---- Export HTML ---- */

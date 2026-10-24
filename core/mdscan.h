@@ -64,6 +64,11 @@ int md_rule(const char *text, long ls, long le);
    ls when the line isn't a list item */
 long md_list_marker(const char *text, long ls, long le);
 
+/* 1 when a quote typed at offset at belongs straight ("), not curly: in
+   the front matter, a fenced code block or a code span. scratch holds a
+   line's classes (cap bytes); a longer line is judged by its block alone. */
+int md_straight_at(const char *text, long n, long at, unsigned char *scratch, long cap);
+
 /* A number that changes when the blocks do (the front matter's lines,
    code fences), which restyles the rest of the post */
 unsigned long md_blocks(const char *text, long n);

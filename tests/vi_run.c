@@ -117,6 +117,21 @@ static void Beep(void *ctx)
 	(void) ctx;
 }
 
+/* Registers a to z, 4K each */
+static ViReg *Named(void *ctx, int name)
+{
+	static ViReg regs[26];
+	static char bufs[26][4096];
+	ViReg *r = &regs[name - 'a'];
+
+	(void) ctx;
+	if (r->buf == NULL) {
+		r->buf = bufs[name - 'a'];
+		r->cap = sizeof(bufs[0]);
+	}
+	return r;
+}
+
 int main(int argc, char **argv)
 {
 	static char keys[4096], regBuf[65536];
@@ -145,6 +160,7 @@ int main(int argc, char **argv)
 	h.undo = Undo;
 	h.group = Group;
 	h.beep = Beep;
+	h.named = Named;
 	reg.buf = regBuf;
 	reg.cap = sizeof(regBuf);
 	reg.len = 0;

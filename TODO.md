@@ -9,9 +9,9 @@
 - [x] Recover posts after a crash: an autosave copy reopened at the next launch
 - [x] Preferences: font and size, the image folder, the new post's layout,
       Jekyll or Hugo, encoding and line ends, autosave
-- [ ] Straight quotes in code and front matter
+- [x] Straight quotes in code and front matter
 - [x] About box with the build's commit
-- [ ] Swap files in place on volumes that can (FSpExchangeFiles), keeping
+- [x] Swap files in place on volumes that can (FSpExchangeFiles), keeping
       the Finder's comments and dates
 - [ ] A smaller application for the 512Ke (newlib's printf is most of it;
       sscanf alone would add 20K)
@@ -34,8 +34,8 @@
 - [x] Print and Export HTML
 - [ ] After an edit, read the blocks again from the edit only (a long post
       takes most of a second on a 68000)
-- [ ] Name the print job after the post when the preview is in front
-- [ ] A "Printing" status dialog that says how to cancel (Command-period)
+- [x] Name the print job after the post when the preview is in front
+- [x] A "Printing" status dialog that says how to cancel (Command-period)
 - [ ] Measure fonts from the Font Manager's width table (1.5 s on a 68000),
       and keep them when the preview closes (reopening measures again)
 
@@ -48,7 +48,7 @@
       skipped
 - [x] Word Services on System 7 (Check Spelling With; Excalibur 2.6)
 - [ ] Faster suggestions on a 68000 (a second for most words)
-- [ ] vi: :w and :q, registers, marks, a block cursor in normal mode
+- [x] vi: :w and :q, registers, marks, a block cursor in normal mode
 
 ## Publish
 

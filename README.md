@@ -36,7 +36,10 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
   **Check Spelling With** hands the post to a Word Services checker such
   as Excalibur instead; its corrections undo as one step.
 - **vi keys**, if you want them (Preferences): normal, insert and visual
-  modes, counts, operators and text objects, undo, and `.` to repeat.
+  modes, counts, operators and text objects, undo, `.` to repeat,
+  registers, marks, and `:w` `:q` `:wq`, with a block cursor in normal mode.
+- **Straight quotes where they matter:** Option-[ types curly quotes in
+  prose and straight ones in code and front matter.
 - **Publish** sends the post to a small bridge on your LAN
   ([`bridge/`](bridge/README.md)), which commits it to the blog's drafts
   branch, for you to merge when you're ready. Over MacTCP, or over

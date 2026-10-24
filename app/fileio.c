@@ -294,6 +294,70 @@ void FileClose(short ref)
 	(void) FSClose(ref);
 }
 
+/* Files.h's FIDParam and GetVolParms's buffer, which Retro68 lacks */
+typedef struct {
+	QElemPtr qLink;
+	short qType, ioTrap;
+	Ptr ioCmdAddr;
+	void *ioCompletion;
+	OSErr ioResult;
+	StringPtr ioNamePtr;
+	short ioVRefNum;
+	long filler14;
+	StringPtr ioDestNamePtr;
+	long filler15;
+	long ioDestDirID;
+	long filler16, filler17;
+	long ioSrcDirID;
+	short filler18;
+	long ioFileID;
+} FIDBlock;
+
+typedef struct {
+	short vMVersion;
+	long vMAttrib;
+	Handle vMLocalHand;
+	long vMServerAdr;
+	long vMVolumeGrade;
+	short vMForeignPrivID;
+} VolParms;
+
+enum { kHasFileIDs = 6 };               /* vMAttrib (bHasFileIDs): the volume can exchange files */
+
+static Boolean CanExchange(short vRefNum)
+{
+	HParamBlockRec pb;
+	VolParms parms;
+
+	memset(&pb, 0, sizeof(pb));
+	memset(&parms, 0, sizeof(parms));
+	pb.ioParam.ioVRefNum = vRefNum;
+	pb.ioParam.ioBuffer = (Ptr) &parms;
+	pb.ioParam.ioReqCount = sizeof(parms);
+	return PBHGetVolParmsSync(&pb) == noErr && (parms.vMAttrib & (1L << kHasFileIDs)) != 0;
+}
+
+/* a and b trade contents; each keeps its name, Finder information,
+   comments and creation date */
+static OSErr Exchange(const FileRef *a, const FileRef *b)
+{
+	union {
+		ParamBlockRec pb;
+		FIDBlock fid;
+	} u;
+	Str63 an, bn;
+
+	CopyName(an, a->name);
+	CopyName(bn, b->name);
+	memset(&u, 0, sizeof(u));
+	u.fid.ioNamePtr = an;
+	u.fid.ioVRefNum = a->vRefNum;
+	u.fid.ioSrcDirID = a->dirID;
+	u.fid.ioDestNamePtr = bn;
+	u.fid.ioDestDirID = b->dirID;
+	return PBExchangeFilesSync(&u.pb);
+}
+
 static OSErr WriteNew(const FileRef *f, const char *data, long len, OSType type, OSType creator)
 {
 	short ref;
@@ -327,6 +391,14 @@ OSErr FileWrite(const FileRef *f, const char *data, long len, OSType type, OSTyp
 	if (err != noErr) {
 		(void) FileDelete(&temp);
 		return err;
+	}
+	/* swapped in where the volume can (System 7's HFS), so the post keeps
+	   its Finder comments and dates; else the old one goes, the new is renamed */
+	if (Exists(f) && f->vRefNum == temp.vRefNum && CanExchange(f->vRefNum)
+			&& Exchange(&temp, f) == noErr) {
+		(void) FileDelete(&temp);           /* now the old post */
+		(void) FlushVol(NULL, f->vRefNum);
+		return noErr;
 	}
 	if (Exists(f)) {
 		err = FileDelete(f);

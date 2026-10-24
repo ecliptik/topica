@@ -941,6 +941,29 @@ static void Shown(const char *text, int k, const char *want, const char *wantSty
 }
 #define SHOWN(text, k, want, sty) Shown((text), (k), (want), (sty), __LINE__)
 
+/* Where a typed quote stays straight */
+static void TestStraightQuotes(void)
+{
+	static const char t[] =
+		"---\ntitle: x\n---\n"   /* 0-17: front matter */
+		"Say `a b` now\n"          /* 18-31: a span at 22-26 */
+		"```\ncode\n```\n"        /* 32-45 */
+		"plain";                     /* 46- */
+	unsigned char buf[64];
+	long n = (long) strlen(t);
+
+	CHECK(md_straight_at(t, n, 5, buf, sizeof(buf)));          /* front matter */
+	CHECK(md_straight_at(t, n, 0, buf, sizeof(buf)));          /* its first --- */
+	CHECK(!md_straight_at(t, n, 19, buf, sizeof(buf)));        /* prose */
+	CHECK(md_straight_at(t, n, 24, buf, sizeof(buf)));         /* inside `a b` */
+	CHECK(md_straight_at(t, n, 23, buf, sizeof(buf)));         /* just after the backtick */
+	CHECK(!md_straight_at(t, n, 27, buf, sizeof(buf)));        /* just after the span */
+	CHECK(md_straight_at(t, n, 38, buf, sizeof(buf)));         /* in the fence */
+	CHECK(!md_straight_at(t, n, 48, buf, sizeof(buf)));        /* after it */
+	CHECK(!md_straight_at(t, n, n, buf, sizeof(buf)));         /* the end */
+	CHECK(!md_straight_at(t, n, 24, buf, 4));                  /* a line too long to look at */
+}
+
 static void TestMdpage(void)
 {
 	static const char kPost[] =
@@ -1294,6 +1317,20 @@ static void VhUndo(void *c, int redo)
 
 static ViReg gVreg;
 
+/* Registers a to z for the vi tests, emptied by VhInit */
+static ViReg gVnamed[26];
+static char gVnamedBuf[26][512];
+
+static ViReg *VhNamed(void *ctx, int name)
+{
+	ViReg *r = &gVnamed[name - 'a'];
+
+	(void) ctx;
+	r->buf = gVnamedBuf[name - 'a'];
+	r->cap = sizeof(gVnamedBuf[0]);
+	return r;
+}
+
 static void VhInit(ViHost *h, Vi *v, char *reg, long cap, const char *text)
 {
 	const char *bar = strchr(text, '|');
@@ -1307,6 +1344,8 @@ static void VhInit(ViHost *h, Vi *v, char *reg, long cap, const char *text)
 	h->undo = VhUndo;
 	h->group = VhGroup;
 	h->beep = VhBeep;
+	h->named = VhNamed;
+	memset(gVnamed, 0, sizeof(gVnamed));
 	gVn = (long) strlen(text) - 1;
 	memcpy(gVt, text, (size_t) (bar - text));
 	memcpy(gVt + (bar - text), bar + 1, strlen(bar + 1));
@@ -1360,6 +1399,59 @@ static void ViCase(const char *text, const char *keys, const char *want, int cr,
 				got[i] = '\n';     /* vi makes CR line ends, the editor's */
 	CheckStr(got, exp, line);
 	CHECK(v.mode == VI_NORMAL);
+}
+
+/* The command line and ZZ hand their commands to the host */
+static char gVcmd[40];
+static int gVcmdOk;
+
+static int VhCommand(void *ctx, const char *cmd)
+{
+	(void) ctx;
+	strcpy(gVcmd, cmd);
+	return gVcmdOk;
+}
+
+static void ViKeys(Vi *v, ViHost *h, const char *keys)
+{
+	while (*keys)
+		(void) vi_key(v, h, (unsigned char) *keys++, 0);
+}
+
+static void TestViCommands(void)
+{
+	ViHost h;
+	Vi v;
+	char reg[64];
+	static const char *const kWant[][2] = {
+		{ ":w\r", "w" }, { ":wq\r", "wq" }, { ":q!\r", "q!" }, { ":x\r", "x" }, { ": w\r", "w" },
+		{ "ZZ", "x" }, { "ZQ", "q!" }
+	};
+	size_t i;
+
+	for (i = 0; i < sizeof(kWant) / sizeof(kWant[0]); i++) {
+		VhInit(&h, &v, reg, sizeof(reg), "|ab");
+		h.command = VhCommand;
+		gVcmdOk = 1;
+		gVcmd[0] = '\0';
+		ViKeys(&v, &h, kWant[i][0]);
+		CHECK_STR(gVcmd, kWant[i][1]);
+		CHECK(gVbeeps == 0 && v.lineLen == 0);
+	}
+	/* the line shows in the status as it's typed */
+	VhInit(&h, &v, reg, sizeof(reg), "|ab");
+	ViKeys(&v, &h, ":wq");
+	CHECK_STR(vi_status(&v), ":wq");
+	ViKeys(&v, &h, "\033");
+	CHECK_STR(vi_status(&v), "");
+	/* a host that can't, or none: a beep */
+	h.command = VhCommand;
+	gVcmdOk = 0;
+	ViKeys(&v, &h, ":w\r");
+	CHECK(gVbeeps == 1);
+	h.command = NULL;
+	ViKeys(&v, &h, "ZZ");
+	CHECK(gVbeeps == 2);
 }
 
 static void TestVi(void)
@@ -1552,6 +1644,29 @@ static void TestVi(void)
 		{ "|x", "rX~", "|x" },
 		{ "|abc", "d\033x", "|bc" },
 		{ "|abc", "3\033x", "|bc" },
+		/* registers, marks and the command line */
+		{ "|one two", "\"ayw\"bywP\"aP", "oneone|  one two" },
+		{ "|one two", "\"ayw$\"ap", "one twoone| " },
+		{ "|l1\nl2", "\"ayyj\"ap", "l1\nl2\n|l1" },
+		{ "|one two", "\"adwP", "one| two" },
+		{ "|one two", "\"ayww\"Ayw0\"aP", "one tw|oone two" },
+		{ "|l1\nl2\nl3", "\"ayyj\"Ayyj\"ap", "l1\nl2\nl3\n|l1\nl2" },
+		{ "|ab cd", "v\"ay$\"ap", "ab cd|a" },
+		{ "|one two", "\"aywp", "oone| ne two" },
+		{ "|ab", "\"ax\"ap", "b|a" },
+		{ "|one two", "\"a2yw$\"ap", "one twoone tw|o" },
+		{ "|l1\nl2\nl3", "majj'a", "|l1\nl2\nl3" },
+		{ "l|1\nl2\nl3", "majj`a", "l|1\nl2\nl3" },
+		{ "|l1\nl2\nl3", "jmakd'a", "|l3" },
+		{ "|abc def", "wmb0d`b", "|def" },
+		{ "|l1\nl2\nl3", "jjmaggOx\033'a", "x\nl1\nl2\n|l3" },
+		{ "ab|cdef", "mb0x`b", "bc|def" },
+		{ "|l1\nl2\nl3", "jmaggy'aP", "|l1\nl2\nl1\nl2\nl3" },
+		{ "|l1\nl2\nl3", ":3\r", "l1\nl2\n|l3" },
+		{ "l1\nl2\n|l3", ":1\r", "|l1\nl2\nl3" },
+		{ "|l1\n  l2", ":2\r", "l1\n  |l2" },
+		{ "|l1\nl2", ":$\r", "l1\n|l2" },
+		{ "|l1\nl2\nl3", ":2\b3\r", "l1\nl2\n|l3" },
 	};
 
 	char reg[256], got[256];
@@ -2024,10 +2139,12 @@ int main(void)
 	TestPrefs();
 	TestRecovery();
 	TestMdscan();
+	TestStraightQuotes();
 	TestMdpage();
 	TestLayout();
 	TestMdhtml();
 	TestVi();
+	TestViCommands();
 	TestSpell();
 	TestPublish();
 	printf("%d checks, %d failed\n", gRun, gFailed);

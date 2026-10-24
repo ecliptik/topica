@@ -14,6 +14,10 @@
  * Y r J ~ p P; i a I A o O; v V; u, Control-R and U redo; . repeats the
  * last change; / ? n N search through the host. Escape leaves insert and
  * visual mode, and cancels what's half typed.
+ *
+ * Registers "a to "z for y d c p ("A appends), from the host; marks m{a-z},
+ * with ' and ` to go back (motions too); and a command line: :N goes to
+ * line N, and :w :q :wq :x :q! (and ZZ ZQ) are the host's.
  */
 #ifndef TOPICA_VI_H
 #define TOPICA_VI_H
@@ -33,6 +37,13 @@ enum { VI_EDIT, VI_TYPE, VI_DELETE };
 /* The host's find, for / ? n N */
 enum { VI_FIND_ASK, VI_FIND_NEXT, VI_FIND_PREVIOUS };
 
+/* The register y d c and p use: one for every window, as vi's is */
+typedef struct ViReg {
+	char *buf;
+	long len, cap;
+	int lines;                  /* it holds whole lines */
+} ViReg;
+
 typedef struct {
 	void *ctx;
 	/* the text; valid until the next replace */
@@ -49,16 +60,13 @@ typedef struct {
 	void (*group)(void *ctx, int begin);
 	void (*find)(void *ctx, int how);
 	void (*beep)(void *ctx);
+	/* register a to z, made when first asked for; NULL when it can't be */
+	ViReg *(*named)(void *ctx, int name);
+	/* :w :q :wq :x :q! and the like; 0 when it couldn't */
+	int (*command)(void *ctx, const char *cmd);
 } ViHost;
 
 #define VI_KEYS 256                 /* the longest change . repeats */
-
-/* The register y d c and p use: one for every window, as vi's is */
-typedef struct {
-	char *buf;
-	long len, cap;
-	int lines;                  /* it holds whole lines */
-} ViReg;
 
 typedef struct {
 	int mode;
@@ -81,6 +89,12 @@ typedef struct {
 	long insCount;
 	int insMoved;               /* the caret left the insert (arrow keys): no count repeat */
 	int grouped;                /* an undo group is open */
+	char useReg;                /* the register "x named for this command, or 0 */
+	int regHeld;                /* it was just named: the command hasn't begun */
+	long markLine[26];          /* m{a-z}: the line (-1 when unset) and column, as vim keeps them */
+	long markCol[26];
+	char line[34];              /* the command line, ":" and what's typed */
+	int lineLen;
 	/* jk */
 	long jAt;                   /* where the j went, -1 if the last key wasn't one */
 	unsigned long jTicks;

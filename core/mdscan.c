@@ -570,3 +570,21 @@ int md_headings(const char *text, long n, MdHeading *out, int max)
 	}
 	return count;
 }
+
+int md_straight_at(const char *text, long n, long at, unsigned char *scratch, long cap)
+{
+	MdState s, line;
+	long ls, le;
+	int kind;
+
+	md_begin(&s);
+	ls = md_seek(&s, text, n, at);
+	line = s;
+	kind = md_line(&line, text, n, &le);
+	if (kind != MD_LINE_TEXT)
+		return 1;               /* front matter, a fence or code */
+	if (le - ls > cap || at <= ls || at >= le)
+		return 0;               /* a span needs a character on each side */
+	md_classify(&s, text, n, le, scratch);
+	return (scratch[at - 1 - ls] & MD_CODE) && (scratch[at - ls] & MD_CODE);
+}

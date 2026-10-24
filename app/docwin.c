@@ -57,6 +57,10 @@ enum { kStylePause = 30 };              /* ticks of quiet before restyling */
 
 struct Doc {
 	WindowPtr w;
+	char viCmd;                         /* a :w :q ... for after the key: w W(q) x q Q(q!) */
+	Boolean blockOn;                    /* vi's block cursor is drawn, over block */
+	Boolean teOff;                      /* TextEdit deactivated for it (no caret) */
+	Rect block;
 	long id;                            /* for Apple events: unique while Topica runs */
 	Editor *ed;
 	ControlHandle vbar;
@@ -478,6 +482,8 @@ static void TouchAll(Doc *d)
 	d->styleAt = TickCount();
 }
 
+static void BlockOff(Doc *d);
+
 /* Classes for the lines that changed; all of the rest of the post when a
    code fence or the front matter's end moved */
 static void Restyle(Doc *d)
@@ -520,6 +526,7 @@ static void Restyle(Doc *d)
 	whole = to - from > 4096;
 	if (whole)
 		SetCursor(*GetCursor(watchCursor));
+	BlockOff(d);
 	EdSetClasses(ed, from, to, (unsigned char *) buf);
 	DisposePtr(buf);
 	if (whole)
@@ -990,6 +997,7 @@ Boolean DocClose(Doc *d, Boolean quitting)
 			return false;
 		}
 	}
+	d->blockOn = false;                 /* the window goes */
 	DiscardRecovery(d);
 	PreviewForget(d);
 	for (i = 0; i < TOPICA_MAX_DOCS; i++)
@@ -1116,6 +1124,7 @@ void DocEdit(Doc *d, short cmd)
 void DocUpdate(Doc *d)
 {
 	SetPort(d->w);
+	BlockOff(d);                        /* everywhere, not just in the update */
 	BeginUpdate(d->w);
 	EdDraw(d->ed);
 	ThemePlain();
@@ -1129,6 +1138,8 @@ void DocUpdate(Doc *d)
 void DocActivate(Doc *d, Boolean active)
 {
 	SetPort(d->w);
+	BlockOff(d);
+	d->teOff = false;
 	EdActivate(d->ed, active);
 	ThemePlain();
 	HiliteControl(d->vbar, active ? 0 : 255);
@@ -1138,10 +1149,60 @@ void DocActivate(Doc *d, Boolean active)
 		undo_seal(&d->undo);
 }
 
+/* ---- vi's block cursor ----
+   In normal mode the character under the cursor is shown inverted, in
+   place of TextEdit's caret. It's taken off before every event (DocBlocksOff),
+   by drawing that character again, and put back when idle. */
+
+static void BlockOff(Doc *d)
+{
+	GrafPtr save;
+
+	if (!d->blockOn)
+		return;
+	d->blockOn = false;
+	GetPort(&save);
+	SetPort(d->w);
+	EdRedrawRect(d->ed, &d->block);
+	SetPort(save);
+}
+
+void DocBlocksOff(void)
+{
+	short i;
+
+	for (i = 0; i < TOPICA_MAX_DOCS; i++)
+		if (gDocs[i] != NULL)
+			BlockOff(gDocs[i]);
+}
+
+/* The front post: the block in normal mode, TextEdit's caret otherwise */
+static void BlockSync(Doc *d)
+{
+	long s, e;
+	Boolean want;
+
+	EdGetSelection(d->ed, &s, &e);
+	want = d->vi.on && d->vi.mode == VI_NORMAL && s == e;
+	if (want != d->teOff) {
+		BlockOff(d);
+		EdActivate(d->ed, !want);
+		d->teOff = want;
+	}
+	if (!want || d->blockOn)
+		return;
+	EdCharRect(d->ed, s, &d->block);
+	if (EmptyRect(&d->block))
+		return;                         /* scrolled out of sight */
+	InvertRect(&d->block);
+	d->blockOn = true;
+}
+
 void DocIdle(Doc *d)
 {
 	SetPort(d->w);
 	EdIdle(d->ed);
+	BlockSync(d);
 	UpdateStatus(d, false);
 }
 
@@ -1301,9 +1362,65 @@ static void ViBeep(void *ctx)
 	SysBeep(1);
 }
 
+/* "a to "z, one set for every window as vi's register is, each made when
+   it's first used */
+static ViReg *ViNamed(void *ctx, int name)
+{
+	static ViReg named[26];
+	ViReg *r = &named[name - 'a'];
+
+	(void) ctx;
+	if (r->buf == NULL) {
+		r->buf = NewPtr(kViRegister);
+		if (r->buf == NULL)
+			return NULL;
+		r->cap = kViRegister;
+	}
+	return r;
+}
+
+/* :w :q :wq :x :q!, done after the key (ViDone): closing frees the post */
+static int ViCommand(void *ctx, const char *cmd)
+{
+	static const char *const kCmds[] = { "w", "wq", "x", "q", "q!" };
+	static const char kDo[] = "wWxqQ";
+	short i;
+
+	for (i = 0; i < (short) (sizeof(kCmds) / sizeof(kCmds[0])); i++)
+		if (strcmp(cmd, kCmds[i]) == 0) {
+			((Doc *) ctx)->viCmd = kDo[i];
+			return 1;
+		}
+	return 0;
+}
+
 static const ViHost kViHost = {
-	NULL, ViText, ViGetSel, ViSetSel, ViReplace, ViVertical, ViUndo, ViGroup, ViFind, ViBeep
+	NULL, ViText, ViGetSel, ViSetSel, ViReplace, ViVertical, ViUndo, ViGroup, ViFind, ViBeep, ViNamed, ViCommand
 };
+
+/* The command a key left: true when it closed the post. :q asks to save
+   a changed post, as Close does; :q! doesn't. */
+static Boolean ViDone(Doc *d)
+{
+	char cmd = d->viCmd;
+
+	d->viCmd = 0;
+	switch (cmd) {
+	case 'w':
+		(void) DocSave(d);
+		break;
+	case 'W':
+		return DocSave(d) && DocClose(d, false);
+	case 'x':
+		return (!d->dirty || DocSave(d)) && DocClose(d, false);
+	case 'q':
+		return DocClose(d, false);
+	case 'Q':
+		d->dirty = false;
+		return DocClose(d, false);
+	}
+	return false;
+}
 
 /* A key for vi: 1 when it used it */
 static Boolean ViKey(Doc *d, char c)
@@ -1372,6 +1489,22 @@ static void ViSettings(Doc *d)
 		ViClicked(d);                   /* start in normal mode */
 }
 
+/* Option-[ and Option-] type curly quotes, which break code and front
+   matter: there they come out straight */
+static Boolean Straight(Doc *d, long at)
+{
+	enum { kLine = 2048 };              /* a paragraph is one line */
+	Ptr line = NewPtr(kLine);
+	Boolean straight;
+
+	if (line == NULL)
+		return false;
+	straight = md_straight_at(EdLockText(d->ed), EdLength(d->ed), at, (unsigned char *) line, kLine);
+	EdUnlockText(d->ed);
+	DisposePtr(line);
+	return straight;
+}
+
 void DocKey(Doc *d, EventRecord *e)
 {
 	char c = (char) (e->message & charCodeMask);
@@ -1380,6 +1513,9 @@ void DocKey(Doc *d, EventRecord *e)
 	SetPort(d->w);
 	ObscureCursor();
 	if (ViKey(d, c)) {
+		if (ViDone(d))
+			return;                     /* :q closed it */
+		SetPort(d->w);
 		SyncScrollBar(d);
 		UpdateStatus(d, false);
 		return;
@@ -1401,6 +1537,8 @@ void DocKey(Doc *d, EventRecord *e)
 	} else if (c == 0x03 || c == '\r') {    /* Enter or Return */
 		(void) DocReplace(d, kUndoTyping, s, en, "\r", 1);
 	} else if (c == '\t' || (unsigned char) c >= 0x20) {
+		if ((unsigned char) c >= 0xD2 && (unsigned char) c <= 0xD5 && Straight(d, s))
+			c = (unsigned char) c <= 0xD3 ? '"' : '\'';
 		(void) DocReplace(d, kUndoTyping, s, en, &c, 1);
 	} else {
 		return;

@@ -219,6 +219,46 @@ void EdCaretRect(Editor *ed, long offset, Rect *r)
 	SetRect(r, p.h - 1, p.v - LineHeight(ed), p.h, p.v);
 }
 
+void EdCharRect(Editor *ed, long offset, Rect *r)
+{
+	Point a = PointOf(ed, offset), b;
+	TEPtr t = *ed->te;
+	short w = 0, font, size;
+	GrafPtr port;
+
+	if (offset < t->teLength && (*t->hText)[offset] != '\r' && (*t->hText)[offset] != '\n') {
+		b = PointOf(ed, offset + 1);
+		if (b.v == a.v && b.h > a.h)
+			w = (short) (b.h - a.h);
+	}
+	if (w == 0) {                       /* a line end, or the end */
+		GetPort(&port);
+		font = port->txFont;
+		size = port->txSize;
+		TextFont(ed->font);
+		TextSize(ed->size);
+		w = CharWidth(' ');
+		TextFont(font);
+		TextSize(size);
+	}
+	SetRect(r, a.h, (short) (a.v - LineHeight(ed)), (short) (a.h + w), a.v);
+	SectRect(r, &t->viewRect, r);
+}
+
+void EdRedrawRect(Editor *ed, const Rect *r)
+{
+	RgnHandle clip = NewRgn();
+
+	if (clip == NULL)
+		return;
+	GetClip(clip);
+	ClipRect((Rect *) r);
+	EraseRect(r);
+	TEUpdate(r, ed->te);
+	SetClip(clip);
+	DisposeRgn(clip);
+}
+
 RgnHandle EdSelectionRgn(Editor *ed)
 {
 	TEPtr t = *ed->te;
