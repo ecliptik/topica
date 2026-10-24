@@ -67,6 +67,8 @@ Boolean EdSetText(Editor *ed, const char *text, long len);
 /* Scrolling, in lines: the first line shown, the most it can be, and
    how many lines fit */
 void EdScrollInfo(Editor *ed, short *value, short *max, short *page);
+/* The text on the screen, [*start, *end) */
+void EdVisible(Editor *ed, long *start, long *end);
 void EdScrollTo(Editor *ed, short value);
 void EdShowSelection(Editor *ed);
 

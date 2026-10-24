@@ -41,6 +41,16 @@ typedef struct {
 	Boolean exact;              /* h is laid out, not guessed */
 } PgBlock;
 
+/* The block scanner as it was before block `block`: kept every 16 blocks,
+   so that a layout after an edit starts at the last one before it, and
+   stops once the scan is back in step with the old one after it */
+typedef struct {
+	long block;
+	MpScan scan;
+} PgMark;
+
+enum { kMarkEvery = 16 };
+
 struct Page {
 	LayFonts f;
 	short family[MF_COUNT], size[MF_COUNT];
@@ -60,6 +70,8 @@ struct Page {
 	long height;
 	short width;
 	Boolean measured;           /* the fonts, in the port it was first laid out in */
+	PgMark **marks;
+	long nmarks;
 };
 
 Page *PageNew(void)
@@ -71,7 +83,8 @@ Page *PageNew(void)
 	pg->blocks = (PgBlock **) NewHandle(0);
 	pg->links = (long **) NewHandle(0);
 	pg->found = (long **) NewHandle(0);
-	if (pg->blocks == NULL || pg->links == NULL || pg->found == NULL) {
+	pg->marks = (PgMark **) NewHandle(0);
+	if (pg->blocks == NULL || pg->links == NULL || pg->found == NULL || pg->marks == NULL) {
 		PageDispose(pg);
 		return NULL;
 	}
@@ -102,6 +115,8 @@ void PageDispose(Page *pg)
 		DisposeHandle((Handle) pg->links);
 	if (pg->found != NULL)
 		DisposeHandle((Handle) pg->found);
+	if (pg->marks != NULL)
+		DisposeHandle((Handle) pg->marks);
 	DisposePtr((Ptr) pg);
 }
 
@@ -145,6 +160,44 @@ static void Font(Page *pg, int mf, short family, short size, Style face)
 	pg->face[mf] = face;
 }
 
+/* A font's widths from the Font Manager's width table, which one
+   CharWidth fills for the port's font: much quicker than 256 CharWidths
+   on a 68000. Checked against CharWidth; false when they differ. */
+static Boolean TableWidths(unsigned char *out)
+{
+	static const char kCheck[] = "eWim .";
+	volatile long global = 0x0B2A;      /* WidthTabHandle (GCC frowns on LMGetWidthTabHandle) */
+	WidthTableHandle h;
+	long extra;
+	short c;
+	long w;
+	const char *s;
+
+	w = CharWidth('e');
+	h = *(WidthTableHandle *) global;
+	if (h == NULL || *h == NULL)
+		return false;
+	/* what bold and the like add to every character, in whole pixels */
+	extra = w - (((**h).tabData['e'] + 0x8000L) >> 16);
+	for (c = 0; c < 256; c++) {
+		w = (((**h).tabData[c] + 0x8000L) >> 16) + extra;
+		out[c] = (unsigned char) (w < 0 ? 0 : w > 255 ? 255 : w);
+	}
+	for (s = kCheck; *s; s++)
+		if (CharWidth(*s) != out[(unsigned char) *s])
+			return false;
+	return true;
+}
+
+/* The screen's fonts, kept once measured: the preview opens again without
+   measuring (a printer's port is measured each time) */
+typedef struct {
+	LayFonts f;
+	short avg[MF_COUNT];
+} Fonts;
+
+static Fonts *gScreenFonts;
+
 /* The fonts, measured in the current port */
 static void Measure(Page *pg)
 {
@@ -168,6 +221,12 @@ static void Measure(Page *pg)
 	Font(pg, MF_TITLE, body, RealFont(body, 24) ? 24 : 18, bold);
 	Font(pg, MF_SMALL, kGeneva, 9, 0);
 	GetPort(&port);
+	if (port->device == 0 && gScreenFonts != NULL) {
+		pg->f = gScreenFonts->f;
+		memcpy(pg->avg, gScreenFonts->avg, sizeof(pg->avg));
+		return;
+	}
+	DLOG(("Measure: start %lu", TickCount()));
 	oldFont = port->txFont;
 	oldSize = port->txSize;
 	oldFace = port->txFace;
@@ -179,9 +238,12 @@ static void Measure(Page *pg)
 		pg->f.ascent[mf] = fi.ascent;
 		pg->f.descent[mf] = fi.descent;
 		pg->f.leading[mf] = fi.leading;
-		for (c = 0; c < 256; c++) {
-			w = CharWidth((char) c);
-			pg->f.width[mf][c] = (unsigned char) (w < 0 ? 0 : w > 255 ? 255 : w);
+		if (!TableWidths(pg->f.width[mf])) {
+			DLOG(("Measure: font %d by CharWidth", mf));
+			for (c = 0; c < 256; c++) {
+				w = CharWidth((char) c);
+				pg->f.width[mf][c] = (unsigned char) (w < 0 ? 0 : w > 255 ? 255 : w);
+			}
 		}
 		for (sum = 0, s = kSample; *s; s++)
 			sum += pg->f.width[mf][(unsigned char) *s];
@@ -190,6 +252,11 @@ static void Measure(Page *pg)
 	TextFont(oldFont);
 	TextSize(oldSize);
 	TextFace(oldFace);
+	DLOG(("Measure: end %lu", TickCount()));
+	if (port->device == 0 && gScreenFonts == NULL && (gScreenFonts = (Fonts *) NewPtr(sizeof(Fonts))) != NULL) {
+		gScreenFonts->f = pg->f;
+		memcpy(gScreenFonts->avg, pg->avg, sizeof(pg->avg));
+	}
 }
 
 static short LineHeight(const Page *pg, int mf)
@@ -482,13 +549,52 @@ static Boolean Same(const PgBlock *old, const MpBlock *b, long delta)
 		&& o->quote == b->quote && o->number == b->number && o->task == b->task;
 }
 
+/* The scans are in the same state, b's moved by delta from a's */
+static Boolean SameScan(const MpScan *a, const MpScan *b, long delta)
+{
+	int i;
+
+	if (a->s.pos + delta != b->s.pos || a->s.front != b->s.front || a->s.fence != b->s.fence
+			|| a->s.fenceLen != b->s.fenceLen || a->s.quoteFace != b->s.quoteFace || a->head != b->head
+			|| a->depth != b->depth || a->listQuote != b->listQuote || a->blank != b->blank)
+		return false;
+	for (i = 0; i < 8; i++)
+		if (a->indents[i] != b->indents[i])
+			return false;
+	return true;
+}
+
+static Boolean AddMark(Page *pg, long block, const MpScan *scan)
+{
+	if (!Grow((Handle) pg->marks, pg->nmarks + 1, sizeof(PgMark)))
+		return false;
+	(*pg->marks)[pg->nmarks].block = block;
+	(*pg->marks)[pg->nmarks].scan = *scan;
+	pg->nmarks++;
+	return true;
+}
+
+/* The start of the line before the one that holds pos (0 at the top) */
+static long LineBefore(const char *text, long pos)
+{
+	while (pos > 0 && text[pos - 1] != '\r' && text[pos - 1] != '\n')
+		pos--;
+	if (pos > 0)
+		pos--;
+	while (pos > 0 && text[pos - 1] != '\r' && text[pos - 1] != '\n')
+		pos--;
+	return pos;
+}
+
 Boolean PageLayout(Page *pg, const char *text, long n, short width, long from, long to, long delta)
 {
 	MpScan scan;
 	PgBlock p, prev, *old = NULL;
-	Handle oldH;
-	long oldBody = pg->body, oldCount = pg->count, j = 0, i, keep, oldTo;
-	Boolean any = false;
+	Handle oldH, oldMarksH;
+	PgMark *om;
+	long oldBody = pg->body, oldCount = pg->count, j = 0, i, keep, oldTo, oldMarks = pg->nmarks;
+	long m, start = -1, lastMark = 0, before, ahead = 0;
+	Boolean any = false, caught = false;
 
 	if (!pg->measured) {
 		Measure(pg);
@@ -514,19 +620,88 @@ Boolean PageLayout(Page *pg, const char *text, long n, short width, long from, l
 			(*pg->links)[keep++] = at;
 	}
 	pg->nlinks = keep;
-	/* the old blocks, to keep their heights */
+	/* the old blocks, to keep their heights, and the old scan's marks */
 	oldH = (Handle) pg->blocks;
 	pg->blocks = (PgBlock **) NewHandle(0);
-	if (pg->blocks == NULL) {
+	oldMarksH = (Handle) pg->marks;
+	pg->marks = (PgMark **) NewHandle(0);
+	if (pg->blocks == NULL || pg->marks == NULL) {
+		if (pg->blocks != NULL)
+			DisposeHandle((Handle) pg->blocks);
+		if (pg->marks != NULL)
+			DisposeHandle((Handle) pg->marks);
 		pg->blocks = (PgBlock **) oldH;
+		pg->marks = (PgMark **) oldMarksH;
 		return false;
 	}
 	HLock(oldH);
+	HLock(oldMarksH);
 	old = (PgBlock *) *oldH;
-	pg->count = pg->body = 0;
+	om = (PgMark *) *oldMarksH;
+	pg->count = pg->body = pg->nmarks = 0;
 	memset(&p, 0, sizeof(p));
+	memset(&prev, 0, sizeof(prev));
 	mp_begin(&scan, text, n);
-	while (mp_next(&scan, &p.b)) {
+	/* the blocks before the edit stay as they were: start at the last mark
+	   a line or more before it (a block can end on the line after its text) */
+	if (from > 0) {
+		before = LineBefore(text, from);
+		for (m = 0; m < oldMarks && om[m].scan.s.pos <= before && om[m].block <= oldBody; m++)
+			start = m;
+	}
+	if (start > 0 && om[start].block > 0) {
+		for (i = 0; i < om[start].block; i++)
+			if (!Append(pg, &old[i]))
+				goto failed;
+		for (m = 0; m < start; m++)
+			if (!AddMark(pg, om[m].block, &om[m].scan))
+				goto failed;
+		scan = om[start].scan;
+		scan.text = text;
+		scan.n = n;
+		prev = old[pg->count - 1];
+		any = true;
+		j = pg->count;
+		lastMark = om[start - 1].block;
+		ahead = start;
+	}
+	for (;;) {
+		/* past the edit, and in step with the old scan: the rest is the old
+		   blocks, moved */
+		if (from > 0 && scan.s.pos >= to) {
+			while (ahead < oldMarks && om[ahead].scan.s.pos + delta < scan.s.pos)
+				ahead++;
+			if (ahead < oldMarks && om[ahead].scan.s.pos >= oldTo && om[ahead].block <= oldBody
+					&& SameScan(&om[ahead].scan, &scan, delta)) {
+				long shift = pg->count - om[ahead].block;
+				for (i = om[ahead].block; i < oldBody; i++) {
+					p = old[i];
+					if (p.b.at >= p.b.start)
+						p.b.at += delta;    /* code and tables have none (0) */
+					p.b.start += delta;
+					p.b.end += delta;
+					if (!Append(pg, &p))
+						goto failed;
+				}
+				for (m = ahead; m < oldMarks && om[m].block <= oldBody; m++) {
+					MpScan moved = om[m].scan;
+					moved.text = text;
+					moved.n = n;
+					moved.s.pos += delta;
+					if (!AddMark(pg, om[m].block + shift, &moved))
+						goto failed;
+				}
+				caught = true;
+				break;
+			}
+		}
+		if (pg->count == 0 || pg->count - lastMark >= kMarkEvery) {
+			if (!AddMark(pg, pg->count, &scan))
+				goto failed;
+			lastMark = pg->count;
+		}
+		if (!mp_next(&scan, &p.b))
+			break;
 		p.what = kBody;
 		p.gap = Gap(&p, any ? &prev : NULL);
 		p.exact = false;
@@ -541,14 +716,31 @@ Boolean PageLayout(Page *pg, const char *text, long n, short width, long from, l
 		}
 		if (!p.exact)
 			p.h = Estimate(pg, &p, text);
-		if (!Append(pg, &p)) {
-			HUnlock(oldH);
-			DisposeHandle(oldH);
-			return false;
-		}
+		if (!Append(pg, &p))
+			goto failed;
 		prev = p;
 		any = true;
 	}
+	DLOG(("PageLayout: %ld blocks, from block %ld, %s", pg->count,
+		start > 0 ? om[start].block : 0L, caught ? "caught up" : "to the end"));
+#ifdef TOPICA_DEBUG
+	{
+		/* the whole scan, to check the shortcut */
+		MpScan full;
+		MpBlock b;
+		long k = 0, bad = 0;
+		mp_begin(&full, text, n);
+		while (mp_next(&full, &b)) {
+			const MpBlock *o = k < pg->count ? &(*pg->blocks)[k].b : NULL;
+			if (o == NULL || o->start != b.start || o->end != b.end || o->at != b.at || o->kind != b.kind
+					|| o->depth != b.depth || o->quote != b.quote || o->number != b.number)
+				bad++;
+			k++;
+		}
+		if (bad > 0 || k != pg->count)
+			DLOG(("PageLayout: MISMATCH %ld blocks differ, %ld vs %ld", bad, k, pg->count));
+	}
+#endif
 	pg->body = pg->count;
 	/* the old link list after the body, moved with the links, so that
 	   MakeLinkItems keeps the heights of links the edit didn't touch */
@@ -565,8 +757,14 @@ Boolean PageLayout(Page *pg, const char *text, long n, short width, long from, l
 	}
 	HUnlock(oldH);
 	DisposeHandle(oldH);
+	DisposeHandle(oldMarksH);
 	MakeLinkItems(pg, text);
 	return true;
+failed:
+	HUnlock(oldH);
+	DisposeHandle(oldH);
+	DisposeHandle(oldMarksH);
+	return false;
 }
 
 Boolean PageRefine(Page *pg, const char *text, long n, long top, long bottom, long ticks,

@@ -80,6 +80,9 @@ struct Doc {
 	unsigned long changedAt, recAt;     /* ticks */
 	Boolean styleDue;                   /* [styleFrom, styleTo) needs restyling */
 	long styleFrom, styleTo;
+	long styleNext;                     /* a long restyle's next slice, -1: the screen's first */
+	long styleOrigin;                   /* where its first slice began */
+	MdState styleState;                 /* the scan at styleNext, kept between slices */
 	unsigned long styleAt;              /* not before this tick */
 	unsigned long blocks;               /* md_blocks when last restyled */
 	unsigned long changes;              /* counts every change, for the preview */
@@ -468,6 +471,7 @@ static void Touch(Doc *d, long start, long oldEnd, long newLen)
 {
 	Merge(d->styleDue, &d->styleFrom, &d->styleTo, start, oldEnd, newLen);
 	d->styleDue = true;
+	d->styleNext = -1;
 	d->styleAt = TickCount() + kStylePause;
 	Merge(d->editDue, &d->editFrom, &d->editTo, start, oldEnd, newLen);
 	d->editDelta += newLen - (oldEnd - start);
@@ -479,6 +483,7 @@ static void TouchAll(Doc *d)
 	d->styleFrom = 0;
 	d->styleTo = EdLength(d->ed);
 	d->styleDue = true;
+	d->styleNext = -1;
 	d->styleAt = TickCount();
 }
 
@@ -486,6 +491,8 @@ static void BlockOff(Doc *d);
 
 /* Classes for the lines that changed; all of the rest of the post when a
    code fence or the front matter's end moved */
+enum { kStyleSlice = 1024 };            /* characters restyled in one go while idle (~1 s on a 68000) */
+
 static void Restyle(Doc *d)
 {
 	Editor *ed = d->ed;
@@ -505,28 +512,75 @@ static void Restyle(Doc *d)
 	if (to > n)
 		to = n;
 	t = EdLockText(ed);
-	blocks = md_blocks(t, n);
-	if (blocks != d->blocks) {
-		d->blocks = blocks;
-		to = n;
+	if (d->styleNext >= 0 && d->styleState.pos == d->styleNext && gPrefs.format) {
+		/* the next slice of a long restyle: nothing changed since the last */
+		s = d->styleState;
+	} else {
+		blocks = md_blocks(t, n);
+		if (blocks != d->blocks) {
+			d->blocks = blocks;
+			to = n;
+		}
+		md_begin(&s);
+		d->styleState.pos = -1;
 	}
-	md_begin(&s);
-	from = md_seek(&s, t, n, from);
+	from = s.pos > from ? from : md_seek(&s, t, n, from);
 	to = md_line_after(t, n, to > from ? to - 1 : from);
+	if (to - from > kStyleSlice && gPrefs.format) {   /* plain text costs little: one go */
+		/* a long range (a post just opened, formatting turned on): the
+		   screen's lines first, then the rest a slice at a time while idle,
+		   so the post can be read and typed in meanwhile (styled TextEdit
+		   takes ~0.035 ticks a character on a 68000) */
+		long start = d->styleNext, end, vs, ve, want;
+		Boolean first = start < from || start >= to;
+		if (first) {
+			EdVisible(ed, &vs, &ve);
+			start = vs > from && vs < to ? vs : from;
+			want = ve - start > kStyleSlice ? ve - start : kStyleSlice;
+		} else {
+			want = kStyleSlice;
+		}
+		start = md_seek(&s, t, n, start);
+		if (first)
+			d->styleOrigin = start;
+		end = start + want < to ? md_line_after(t, n, start + want - 1) : to;
+		if (end > to)
+			end = to;
+		/* what's left: up to the end, then what was before the first slice */
+		if (end < to) {
+			d->styleFrom = from;
+			d->styleTo = to;
+			d->styleNext = end;
+			d->styleDue = true;
+		} else if (d->styleOrigin > from) {
+			d->styleFrom = from;
+			d->styleTo = d->styleOrigin;
+			d->styleNext = from;
+			d->styleOrigin = from;
+			d->styleDue = true;
+		}
+		d->styleAt = TickCount();
+		from = start;
+		to = end;
+	}
 	buf = to > from ? NewPtr(to - from) : NULL;
 	if (buf == NULL) {
 		EdUnlockText(ed);
 		return;
 	}
-	if (gPrefs.format)
+	if (gPrefs.format) {
 		md_classify(&s, t, n, to, (unsigned char *) buf);
-	else
+		if (d->styleDue && d->styleNext == to)
+			d->styleState = s;          /* the next slice goes on from here */
+	} else {
 		memset(buf, 0, (size_t) (to - from));
+	}
 	EdUnlockText(ed);
 	whole = to - from > 4096;
 	if (whole)
 		SetCursor(*GetCursor(watchCursor));
 	BlockOff(d);
+	DLOG(("Restyle: %ld-%ld at %lu", from, to, TickCount()));
 	EdSetClasses(ed, from, to, (unsigned char *) buf);
 	DisposePtr(buf);
 	if (whole)

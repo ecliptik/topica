@@ -14,6 +14,14 @@ The to-do list, before 1.0.
   says what's printing and that Command-period stops it.
 - Saving swaps the new post in where the volume can (System 7's HFS
   disks), so it keeps its Finder comments, file ID and creation date.
+- Faster on a 68000:
+  - Formatting a long post styles the lines on the screen first, then the
+    rest a slice at a time while you read or type.
+  - The preview measures its fonts from the Font Manager's width table
+    (44 ticks instead of 96 in Snow), once a session.
+  - After an edit, the preview reads the post again from just before the
+    edit, and stops once it's back in step after it, instead of from the
+    top.
 
 ## 0.7.0 (unreleased)
 

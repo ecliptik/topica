@@ -419,6 +419,20 @@ void EdScrollInfo(Editor *ed, short *value, short *max, short *page)
 		*max = *value;          /* scrolled past the end by a deletion */
 }
 
+void EdVisible(Editor *ed, long *start, long *end)
+{
+	TEPtr t = *ed->te;
+	short top = (short) ((t->viewRect.top - t->destRect.top) / t->lineHeight), bottom;
+
+	bottom = (short) (top + PageLines(ed) + 1);
+	if (top > t->nLines)
+		top = t->nLines;
+	if (bottom > t->nLines)
+		bottom = t->nLines;
+	*start = t->lineStarts[top < 0 ? 0 : top];
+	*end = t->lineStarts[bottom];
+}
+
 void EdScrollTo(Editor *ed, short value)
 {
 	short cur, max, page;
