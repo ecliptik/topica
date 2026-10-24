@@ -99,6 +99,28 @@ typedef struct {
 	int count;
 } Found;
 
+static int Slot(unsigned char c)
+{
+	if (c >= 'A' && c <= 'Z')
+		c = (unsigned char) (c + 'a' - 'A');
+	if (c >= 'a' && c <= 'z')
+		return c - 'a';
+	return c == '\'' ? 26 : 27;
+}
+
+int sp_may_exist(const Speller *s, const char *word, int len)
+{
+	long k;
+
+	if (s->prefixes == NULL || len < 2)
+		return 1;
+	k = Slot((unsigned char) word[0]) * 28 + Slot((unsigned char) word[1]);
+	if (len == 2)
+		return (s->prefixes[k >> 3] & (0x80 >> (k & 7))) != 0;
+	k = k * 28 + Slot((unsigned char) word[2]);
+	return (s->prefixes[98 + (k >> 3)] & (0x80 >> (k & 7))) != 0;
+}
+
 /* A word it might have been; known: it's from the dictionary already */
 static void Found1(Found *f, const char *word, int len, int how, int known)
 {
@@ -110,7 +132,8 @@ static void Found1(Found *f, const char *word, int len, int how, int known)
 		return;
 	/* the main section has every word: the common one only ranks them */
 	if (!known && !(f->s->user != NULL && f->s->user(f->s->ctx, w, len))
-			&& !(f->s->main != NULL ? dict_has(f->s->main, w, len) : InDicts(f->s, w, len))) {
+			&& !(sp_may_exist(f->s, w, len)
+				&& (f->s->main != NULL ? dict_has(f->s->main, w, len) : InDicts(f->s, w, len)))) {
 		if (how != kCase || !f->proper)
 			return;
 		memcpy(buf, word, (size_t) len);

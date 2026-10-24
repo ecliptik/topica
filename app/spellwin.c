@@ -40,6 +40,7 @@ enum { kSlots = 12, kSuggest = 8, kSkipMax = 32, kContext = 16 };
 static Boolean gLoaded;
 static Dict gCommon, gMain;
 static short gDictRef;                  /* the dictionary, open while it's read a block at a time */
+static unsigned char *gPrefixes;        /* its prefix table, or NULL */
 static char **gUser;                    /* the writer's words, each NUL-ended */
 static long **gUserAt;                  /* where each starts, in sorted order */
 static long gUserCount;
@@ -260,6 +261,14 @@ static Boolean Load(void)
 		ErrorAlert("The dictionary couldn\xD5t be opened.", memFullErr);
 		return false;
 	}
+	/* version 2's prefix table, after the sections: suggestions look up
+	   only what can be there (fewer blocks read) */
+	if (head[5] >= 2 && (gPrefixes = (unsigned char *) NewPtr(SP_PREFIXES)) != NULL
+			&& (FileReadAt(ref, 16 + commonLen + mainLen, gPrefixes, SP_PREFIXES, &got) != noErr
+				|| got != SP_PREFIXES)) {
+		DisposePtr((Ptr) gPrefixes);
+		gPrefixes = NULL;
+	}
 	DLOG(("Spelling: dictionary %s", whole ? "in memory" : "read a block at a time"));
 	if (whole)
 		FileClose(ref);
@@ -431,6 +440,7 @@ void SpellCheck(Doc *d)
 	sp.main = &gMain;
 	sp.user = UserKnows;
 	sp.ctx = NULL;
+	sp.prefixes = gPrefixes;
 	gSkippedCount = 0;
 	n = EdLength(ed);
 	cap = n + 1024;

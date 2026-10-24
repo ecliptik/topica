@@ -22,6 +22,10 @@ The to-do list, before 1.0.
   - After an edit, the preview reads the post again from just before the
     edit, and stops once it's back in step after it, instead of from the
     top.
+  - Suggestions read about half as many dictionary blocks: the dictionary
+    (version 2) carries a table of the two- and three-letter starts its
+    words have, and a guess that can't be a word isn't looked up. Older
+    Topicas read the new dictionary as before.
 
 ## 0.7.0 (unreleased)
 

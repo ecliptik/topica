@@ -1853,6 +1853,25 @@ static int UserWords(void *ctx, const char *w, int len)
 	return len == 6 && memcmp(w, "Topica", 6) == 0;
 }
 
+/* The prefix table: only starts it has are looked up */
+static void TestPrefixes(void)
+{
+	static unsigned char table[SP_PREFIXES];
+	Speller sp;
+	long k;
+
+	memset(&sp, 0, sizeof(sp));
+	CHECK(sp_may_exist(&sp, "zzz", 3));         /* no table: everything may */
+	sp.prefixes = table;
+	k = 19 * 28 + 7;                            /* "th" */
+	table[k >> 3] |= (unsigned char) (0x80 >> (k & 7));
+	k = k * 28 + 4;                             /* "the" */
+	table[98 + (k >> 3)] |= (unsigned char) (0x80 >> (k & 7));
+	CHECK(sp_may_exist(&sp, "the", 3) && sp_may_exist(&sp, "There", 5) && sp_may_exist(&sp, "th", 2));
+	CHECK(!sp_may_exist(&sp, "thx", 3) && !sp_may_exist(&sp, "tq", 2) && !sp_may_exist(&sp, "zebra", 5));
+	CHECK(sp_may_exist(&sp, "a", 1));           /* too short to tell */
+}
+
 static void TestSpell(void)
 {
 	static const char *const kCommon[] = { "a", "and", "is", "it's", "the", "word" };
@@ -1912,6 +1931,7 @@ static void TestSpell(void)
 	sp.main = &all;
 	sp.user = UserWords;
 	sp.ctx = NULL;
+	sp.prefixes = NULL;
 	CHECK(sp_correct(&sp, "word", 4));
 	CHECK(sp_correct(&sp, "Word", 4));          /* a sentence's start */
 	CHECK(sp_correct(&sp, "WORD", 4));
@@ -2145,6 +2165,7 @@ int main(void)
 	TestMdhtml();
 	TestVi();
 	TestViCommands();
+	TestPrefixes();
 	TestSpell();
 	TestPublish();
 	printf("%d checks, %d failed\n", gRun, gFailed);

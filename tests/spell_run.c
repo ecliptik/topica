@@ -94,6 +94,13 @@ int main(int argc, char **argv)
 	sp.main = &all;
 	sp.user = NULL;
 	sp.ctx = NULL;
+	sp.prefixes = NULL;
+	if (head[5] >= 2) {
+		static unsigned char prefixes[SP_PREFIXES];
+		fseek(gDictFile, 16 + (long) Get32(head + 8) + (long) Get32(head + 12), SEEK_SET);
+		if (fread(prefixes, 1, sizeof(prefixes), gDictFile) == sizeof(prefixes))
+			sp.prefixes = prefixes;
+	}
 	while ((at = sp_next(text, n, at, cls, &len)) >= 0) {
 		words++;
 		if (!sp_correct(&sp, text + at, len)) {

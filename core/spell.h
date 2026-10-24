@@ -16,12 +16,21 @@
 /* The writer's own words, and the ones skipped for this check */
 typedef int (*SpellUserFn)(void *ctx, const char *word, int len);
 
+/* The dictionary's prefix table (tools/mkdict.py): a bit for each two-
+   and three-character start a word has */
+enum { SP_PREFIXES = 98 + 2744 };
+
 typedef struct {
 	Dict *common;               /* the commonest words, checked first; may be NULL */
 	Dict *main;                 /* all of them */
 	SpellUserFn user;           /* may be NULL */
 	void *ctx;
+	const unsigned char *prefixes;  /* SP_PREFIXES bytes, or NULL (an older dictionary) */
 } Speller;
+
+/* 0 when no word starts as word does (len bytes): there's no need to look
+   it up. 1 when one may, or there's no table. */
+int sp_may_exist(const Speller *s, const char *word, int len);
 
 /* 1 when the word (len bytes, Mac Roman) is spelled right */
 int sp_correct(const Speller *s, const char *word, int len);

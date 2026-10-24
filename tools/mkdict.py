@@ -10,8 +10,10 @@ made with.
 
 The file is "TPSP", a version (2 bytes), 2 spare, the common words'
 section's length (4) and the main section's (4), then the two sections:
-the commonest words (kept in memory), and all of them. A section (core/dict.h
-reads one):
+the commonest words (kept in memory), and all of them. Version 2 adds the
+prefix table after them (core/spell.h's SP_PREFIXES bytes): a bit for every
+two- and three-character start a word has, so that suggestions look up only
+what can be there. A section (core/dict.h reads one):
   header   "TPDC", version (2 bytes), blocks (2), words (4), index length (4)
   index    per block: offset (4, from the end of the index), length (2),
            its first word: length (1) and bytes
@@ -83,6 +85,28 @@ def build(words, block):
     return head + index + b"".join(d for _, d in blocks), len(blocks), count, len(index)
 
 
+def slot(b):
+    """A character's place in the prefix table: a-z (either case), ', the rest"""
+    if 65 <= b <= 90:
+        b += 32
+    if 97 <= b <= 122:
+        return b - 97
+    return 26 if b == 39 else 27
+
+
+def prefixes(words):
+    """28 * 28 bits for two-character starts, then 28 ** 3 for three"""
+    two, three = bytearray(98), bytearray(2744)
+    for w in words:
+        if len(w) >= 2:
+            k = slot(w[0]) * 28 + slot(w[1])
+            two[k >> 3] |= 0x80 >> (k & 7)
+        if len(w) >= 3:
+            k = (slot(w[0]) * 28 + slot(w[1])) * 28 + slot(w[2])
+            three[k >> 3] |= 0x80 >> (k & 7)
+    return bytes(two + three)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("final")
@@ -98,7 +122,7 @@ def main():
     small, _, ccount, _ = build(common, a.block)
     data, nblocks, count, ilen = build(words, a.block)
     with open(a.out, "wb") as f:
-        f.write(b"TPSP" + struct.pack(">HHII", 1, 0, len(small), len(data)) + small + data)
+        f.write(b"TPSP" + struct.pack(">HHII", 2, 0, len(small), len(data)) + small + data + prefixes(words))
     print("mkdict: %d words (%d common), %d blocks, index %d bytes, %d bytes in all"
           % (count, ccount, nblocks, ilen, 16 + len(small) + len(data)))
 

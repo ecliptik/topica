@@ -47,7 +47,7 @@
       suggestions, a user dictionary; code, URLs and front matter keys
       skipped
 - [x] Word Services on System 7 (Check Spelling With; Excalibur 2.6)
-- [ ] Faster suggestions on a 68000 (a second for most words)
+- [x] Faster suggestions on a 68000: half the dictionary reads (a prefix table)
 - [x] vi: :w and :q, registers, marks, a block cursor in normal mode
 
 ## Publish
