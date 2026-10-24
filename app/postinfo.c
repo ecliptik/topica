@@ -88,6 +88,8 @@ Boolean PostInfo(Doc *d)
 	for (i = 0; i < kFieldCount; i++) {
 		if (Get(d, keys[i], values[i]) != kFmFound)
 			values[i][0] = '\0';
+		if (i == kFieldCount - 1 && values[i][0] == '\0')
+			Today(values[i]);           /* no date yet: today's, from the Mac's clock */
 		SetItemText(dlg, (short) (kFirstField + i), values[i]);
 	}
 	if (RunDialog(dlg, kFirstField, kInfoHeading) != kOK) {

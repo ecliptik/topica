@@ -12,6 +12,8 @@ The to-do list, before 1.0.
   normal mode. :q asks to save a changed post, as Close does.
 - Printing from the preview names the job after the post, and a window
   says what's printing and that Command-period stops it.
+- Post Info fills in today's date, from the Mac's clock, when the post has
+  none yet.
 - Saving swaps the new post in where the volume can (System 7's HFS
   disks), so it keeps its Finder comments, file ID and creation date.
 - Faster on a 68000:
