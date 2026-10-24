@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "fmt.h"
 #include "prefs.h"
 
 void prefs_default(TopicaPrefs *p)
@@ -111,7 +112,7 @@ long prefs_write(const TopicaPrefs *p, char eol, char *out, long cap)
 	char buf[1024];
 	long n;
 
-	n = sprintf(buf,
+	n = tp_sprintf(buf,
 		"# Topica Preferences%c"
 		"font: %s%c"
 		"size: %d%c"

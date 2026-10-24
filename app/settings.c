@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../core/fmt.h"
 #include "fileio.h"
 #include "settings.h"
 #include "util.h"
@@ -118,7 +119,7 @@ Boolean SettingsDialog(void)
 	Radio(d, kWebRadio, 2, p.utf8 ? kWebRadio : kMacRadio);
 	SetItemText(d, kImageField, p.imagePath);
 	SetItemText(d, kLayoutField, p.layout);
-	sprintf(num, "%d", p.autosaveMinutes);
+	tp_sprintf(num, "%d", p.autosaveMinutes);
 	SetItemText(d, kAutosaveField, num);
 	SetControl(d, kViBox, p.vi);
 	SetControl(d, kJkBox, p.viJk);

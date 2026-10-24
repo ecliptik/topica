@@ -19,6 +19,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "../core/fmt.h"
 #include "../core/frontmatter.h"
 #include "../core/mdscan.h"
 #include "../core/post.h"
@@ -252,12 +253,12 @@ static void DrawStatus(Doc *d)
 	TextFont(kGeneva);
 	TextSize(9);
 	if (words == 1)
-		sprintf(s, "1 word");
+		tp_sprintf(s, "1 word");
 	else
-		sprintf(s, "%ld words", words);
+		tp_sprintf(s, "%ld words", words);
 	if (words > 0)
-		sprintf(s + strlen(s), "   %ld min", post_minutes(words));   /* System 6's Geneva 9 has no middle dot */
-	sprintf(s + strlen(s), "   Line %ld", d->line + 1);
+		tp_sprintf(s + strlen(s), "   %ld min", post_minutes(words));   /* System 6's Geneva 9 has no middle dot */
+	tp_sprintf(s + strlen(s), "   Line %ld", d->line + 1);
 	PStr(p, s);
 	MoveTo((short) (r.left + 6), (short) (r.bottom - 4));
 	DrawString(p);
@@ -329,7 +330,7 @@ static void NameUntitled(Doc *d)
 	if (gUntitled <= 1)
 		strcpy(s, "untitled");
 	else
-		sprintf(s, "untitled %d", gUntitled);
+		tp_sprintf(s, "untitled %d", gUntitled);
 	PStr(p, s);
 	memcpy(d->untitled, p, (size_t) p[0] + 1);
 }
@@ -725,7 +726,7 @@ static void WriteRecovery(Doc *d)
 	if (!d->hasRec) {
 		if (FileSystemSubfolder(kRecoveryFolder, &dir) != noErr)
 			return;
-		sprintf(name, "Post %lu", (unsigned long) (TickCount() % 1000000UL));
+		tp_sprintf(name, "Post %lu", (unsigned long) (TickCount() % 1000000UL));
 		FileRefSibling(&dir, name, &d->rec);
 		d->hasRec = true;
 	}
@@ -829,7 +830,7 @@ static Boolean Load(Doc *d, const FileRef *f)
 	char what[200], name[64];
 
 	CStr(name, f->name);
-	sprintf(what, "\xD2%s\xD3 couldn\xD5t be opened.", name);
+	tp_sprintf(what, "\xD2%s\xD3 couldn\xD5t be opened.", name);
 	SetCursor(*GetCursor(watchCursor));
 	err = FileRead(f, &data, &len);
 	if (err != noErr) {
@@ -840,7 +841,7 @@ static Boolean Load(Doc *d, const FileRef *f)
 	n = tc_to_mac(data, len, NULL, 0, utf8);
 	if (n > EdMaxLength()) {
 		DisposePtr(data);
-		sprintf(what, "\xD2%s\xD3 is too long to open: the most is %ld characters.", name, EdMaxLength());
+		tp_sprintf(what, "\xD2%s\xD3 is too long to open: the most is %ld characters.", name, EdMaxLength());
 		ShowNote(what);
 		return false;
 	}
@@ -936,7 +937,7 @@ static Boolean Write(Doc *d, const FileRef *f)
 	char what[128], name[64];
 
 	CStr(name, f->name);
-	sprintf(what, "\xD2%s\xD3 couldn\xD5t be saved.", name);
+	tp_sprintf(what, "\xD2%s\xD3 couldn\xD5t be saved.", name);
 	t = EdLockText(d->ed);
 	n = tc_to_disk(t, len, NULL, 0, gPrefs.utf8, gPrefs.lf);
 	out = NewPtr(n > 0 ? n : 1);
@@ -1073,7 +1074,7 @@ Boolean DocReplace(Doc *d, int kind, long start, long end, const char *text, lon
 
 	if (EdLength(d->ed) - (end - start) + len > EdMaxLength()) {
 		char msg[128];
-		sprintf(msg, "A post can\xD5t be longer than %ld characters.", EdMaxLength());
+		tp_sprintf(msg, "A post can\xD5t be longer than %ld characters.", EdMaxLength());
 		ShowNote(msg);
 		return false;
 	}

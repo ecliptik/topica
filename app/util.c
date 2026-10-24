@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#include "../core/fmt.h"
 #include "editor.h"
 #include "util.h"
 
@@ -295,9 +296,9 @@ void ErrorAlert(const char *what, OSErr err)
 	Str255 p;
 
 	if (why != NULL)
-		sprintf(msg, "%s %s", what, why);
+		tp_sprintf(msg, "%s %s", what, why);
 	else
-		sprintf(msg, "%s (error %d)", what, (int) err);
+		tp_sprintf(msg, "%s (error %d)", what, (int) err);
 	PStr(p, msg);
 	ParamText(p, "\p", "\p", "\p");
 	InitCursor();
@@ -325,7 +326,7 @@ void DebugLog(const char *fmt, ...)
 	long n;
 
 	va_start(ap, fmt);
-	vsprintf(line, fmt, ap);
+	tp_vsprintf(line, fmt, ap);
 	va_end(ap);
 	strcat(line, "\r");
 	if (FSOpen("\pTopica Log", 0, &ref) != noErr) {
@@ -353,5 +354,5 @@ void Today(char out[16])
 	if (dt.year < 1990)
 		out[0] = '\0';
 	else
-		sprintf(out, "%04d-%02d-%02d", dt.year % 10000, dt.month % 100, dt.day % 100);
+		tp_sprintf(out, "%04d-%02d-%02d", dt.year % 10000, dt.month % 100, dt.day % 100);
 }

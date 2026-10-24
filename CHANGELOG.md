@@ -26,6 +26,10 @@ The to-do list, before 1.0.
     (version 2) carries a table of the two- and three-letter starts its
     words have, and a guess that can't be a word isn't looked up. Older
     Topicas read the new dictionary as before.
+- Smaller: Topica formats its text with a sprintf of its own (core/fmt.c,
+  under a K) instead of newlib's, which brought floating-point printing
+  along. Topica Lite's code is 31K smaller (149K to 118K), the rest
+  likewise.
 
 ## 0.7.0 (unreleased)
 

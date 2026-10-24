@@ -5,6 +5,7 @@
 
 #include "../core/dict.h"
 #include "../core/find.h"
+#include "../core/fmt.h"
 #include "../core/frontmatter.h"
 #include "../core/layout.h"
 #include "../core/mdhtml.h"
@@ -1854,6 +1855,26 @@ static int UserWords(void *ctx, const char *w, int len)
 }
 
 /* The prefix table: only starts it has are looked up */
+/* tp_sprintf against the C library's */
+static void TestFmt(void)
+{
+	char a[128], b[128];
+
+#define FMT1(f, x) (tp_sprintf(a, f, x), sprintf(b, f, x), CHECK_STR(a, b))
+	FMT1("%d", 0); FMT1("%d", -42); FMT1("%d", 32767); FMT1("%5d", 42); FMT1("%-5d|", 42);
+	FMT1("%05d", -42); FMT1("%02d", 7); FMT1("%04d", 2026);
+	FMT1("%ld", -2147483647L - 1); FMT1("%ld", 2147483647L); FMT1("%04ld", 3L); FMT1("%lu", 4294967295UL);
+	FMT1("%u", 65535U); FMT1("%x", 255U); FMT1("%lX", 0xBD7BUL); FMT1("%c", 'Z');
+	FMT1("%s", "plain"); FMT1("%.3s", "abcdef"); FMT1("%.60s", "short"); FMT1("[%8s]", "pad");
+	FMT1("[%-8s]", "pad"); FMT1("100%%%s", "");
+	tp_sprintf(a, "%.*s|%*d", 2, "xyz", 4, 5);
+	sprintf(b, "%.*s|%*d", 2, "xyz", 4, 5);
+	CHECK_STR(a, b);
+	CHECK(tp_sprintf(a, "\xD2%s\xD3 is %ld long.", "Post", 12L) == (int) strlen(a));
+	CHECK_STR(a, "\xD2Post\xD3 is 12 long.");
+#undef FMT1
+}
+
 static void TestPrefixes(void)
 {
 	static unsigned char table[SP_PREFIXES];
@@ -2165,6 +2186,7 @@ int main(void)
 	TestMdhtml();
 	TestVi();
 	TestViCommands();
+	TestFmt();
 	TestPrefixes();
 	TestSpell();
 	TestPublish();

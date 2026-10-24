@@ -65,6 +65,7 @@ set(TOPICA_SOURCES
     core/dict.c
     core/spell.c
     core/publish.c
+    core/fmt.c
 )
 
 # Publish's TCP: MacTCP, or talkip's stack in the application (a 512K Mac

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "fmt.h"
 #include "post.h"
 #include "publish.h"
 
@@ -164,7 +165,7 @@ long pub_request(char *out, long cap, const char *host, unsigned short port, con
 
 	if (strlen(host) + strlen(key) + strlen(path) > sizeof(head) - 160)
 		return -1;
-	sprintf(head, "POST /publish HTTP/1.0\r\nHost: %s:%u\r\nUser-Agent: Topica\r\nConnection: close\r\n"
+	tp_sprintf(head, "POST /publish HTTP/1.0\r\nHost: %s:%u\r\nUser-Agent: Topica\r\nConnection: close\r\n"
 			"Content-Type: text/markdown; charset=utf-8\r\nX-Topica-Key: %s\r\nX-Topica-Path: %s\r\n"
 			"Content-Length: %ld\r\n\r\n", host, (unsigned) port, key, path, bodyLen);
 	n = (long) strlen(head);

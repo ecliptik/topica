@@ -13,8 +13,8 @@
 - [x] About box with the build's commit
 - [x] Swap files in place on volumes that can (FSpExchangeFiles), keeping
       the Finder's comments and dates
-- [ ] A smaller application for the 512Ke (newlib's printf is most of it;
-      sscanf alone would add 20K)
+- [x] A smaller application for the 512Ke: core/fmt.c in place of newlib's
+      printf (31K less); sscanf stays out (20K)
 - [x] Undo back to the saved text leaves the post unchanged (no Save
       Changes alert)
 

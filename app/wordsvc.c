@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../core/fmt.h"
 #include "../core/undo.h"
 #include "editor.h"
 #include "settings.h"
@@ -574,6 +575,6 @@ void WordServicesItemText(Str255 s)
 	if (name == NULL || name[1] == '\0')
 		strcpy(text, "Check Spelling With\xC9");
 	else
-		sprintf(text, "Check Spelling with %.60s", name + 1);
+		tp_sprintf(text, "Check Spelling with %.60s", name + 1);
 	PStr(s, text);
 }

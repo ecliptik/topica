@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "../core/fmt.h"
 #include "../core/frontmatter.h"
 #include "../core/publish.h"
 #include "../core/textconv.h"
@@ -84,14 +85,14 @@ static void Problem(OSErr err, const char *bridge, char *out)
 		strcpy(out, "Not enough memory to publish. Close a window and try again.");
 		break;
 	case openFailed:
-		sprintf(out, "The bridge at %s refused the connection. Is it running?", bridge);
+		tp_sprintf(out, "The bridge at %s refused the connection. Is it running?", bridge);
 		break;
 	case commandTimeout:
 	case connectionTerminated:
-		sprintf(out, "Nothing answered at %s. Is the bridge running, and its port open?", bridge);
+		tp_sprintf(out, "Nothing answered at %s. Is the bridge running, and its port open?", bridge);
 		break;
 	default:
-		sprintf(out, "The connection to %s failed (error %d).", bridge, err);
+		tp_sprintf(out, "The connection to %s failed (error %d).", bridge, err);
 		break;
 	}
 }
@@ -158,7 +159,7 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	int status = 0, done = 0;
 
 	GetPort(&save);
-	sprintf(host, "%lu.%lu.%lu.%lu", (ip >> 24) & 255, (ip >> 16) & 255, (ip >> 8) & 255, ip & 255);
+	tp_sprintf(host, "%lu.%lu.%lu.%lu", (ip >> 24) & 255, (ip >> 16) & 255, (ip >> 8) & 255, ip & 255);
 	/* the request: its head, then the post as the web wants it (UTF-8, LF) */
 	t = EdLockText(ed);
 	n = EdLength(ed);
@@ -185,11 +186,11 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	gProgress = p;
 	NetSetCancel(Canceled);
 	SetCursor(*GetCursor(watchCursor));
-	sprintf(line, "Connecting to the bridge at %s\xC9", bridge);
+	tp_sprintf(line, "Connecting to the bridge at %s\xC9", bridge);
 	Progress(p, line);
 	err = NetOpen(ip, port, kTimeout);
 	if (err == noErr) {
-		sprintf(line, "Sending the post (%ldK)\xC9", (bodyLen + 1023) / 1024);
+		tp_sprintf(line, "Sending the post (%ldK)\xC9", (bodyLen + 1023) / 1024);
 		Progress(p, line);
 		err = NetSend(*h, headLen + bodyLen);
 	}
@@ -222,11 +223,11 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	if (err != noErr) {
 		Problem(err, bridge, line);
 	} else if (done < 0) {
-		sprintf(line, "What answered at %s isn\xD5t Topica\xD5s bridge.", bridge);
+		tp_sprintf(line, "What answered at %s isn\xD5t Topica\xD5s bridge.", bridge);
 	} else if (status != 200) {
 		char said[256];
 		strcpy(said, line);
-		sprintf(line, "Not published: %s", said);
+		tp_sprintf(line, "Not published: %s", said);
 	}
 	ShowNote(line);
 }
@@ -302,7 +303,7 @@ void PublishPost(Doc *d)
 	}
 	if (strlen(title) > 40)
 		strcpy(title + 39, "\xC9");
-	sprintf(about, "Sends \xD2%s\xD3 to the blog\xD5s drafts branch.", title);
+	tp_sprintf(about, "Sends \xD2%s\xD3 to the blog\xD5s drafts branch.", title);
 	SetItemText(dlg, kAbout, about);
 	SuggestPath(d, false, path, sizeof(path));
 	SetItemText(dlg, kPathField, path);

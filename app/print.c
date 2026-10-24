@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "../core/fmt.h"
 #include "../core/mdhtml.h"
 #include "../core/textconv.h"
 #include "editor.h"
@@ -63,7 +64,7 @@ static void Footer(const Rect *r, short number)
 	char s[16];
 	short w;
 
-	sprintf(s, "%d", number);
+	tp_sprintf(s, "%d", number);
 	TextFont(kGeneva);
 	TextSize(9);
 	TextFace(0);
@@ -82,7 +83,7 @@ static void PostName(Doc *d, char *out)
 	CStr(name, title);
 	if (strlen(name) > 40)
 		strcpy(name + 37, "\xC9");
-	sprintf(out, "Printing \xD2%s\xD3. To stop, press Command-period.", name);
+	tp_sprintf(out, "Printing \xD2%s\xD3. To stop, press Command-period.", name);
 }
 
 void PrintDoc(Doc *d)
@@ -245,7 +246,7 @@ void ExportHTML(Doc *d)
 	if (err != noErr) {
 		char what[128];
 		CStr(name, f.name);
-		sprintf(what, "\xD2%s\xD3 couldn\xD5t be saved.", name);
+		tp_sprintf(what, "\xD2%s\xD3 couldn\xD5t be saved.", name);
 		ErrorAlert(what, err);
 	}
 }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "fmt.h"
 #include "frontmatter.h"
 #include "post.h"
 
@@ -81,9 +82,9 @@ void post_filename(int year, int month, int day, const char *title, int maxLen, 
 	if (cap > 0) {
 		char name[96];
 		if (year > 0)
-			sprintf(name, "%04d-%02d-%02d-%s.md", year % 10000, month % 100, day % 100, slug);
+			tp_sprintf(name, "%04d-%02d-%02d-%s.md", year % 10000, month % 100, day % 100, slug);
 		else
-			sprintf(name, "%s.md", slug);
+			tp_sprintf(name, "%s.md", slug);
 		strncpy(out, name, (size_t) cap - 1);
 		out[cap - 1] = '\0';
 	}
@@ -94,20 +95,20 @@ long post_template(int hugo, const char *layout, const char *date, char eol, cha
 	char buf[256];
 	long n = 0;
 
-	n += sprintf(buf + n, "---%c", eol);
+	n += tp_sprintf(buf + n, "---%c", eol);
 	if (hugo) {
-		n += sprintf(buf + n, "title:%c", eol);
+		n += tp_sprintf(buf + n, "title:%c", eol);
 		if (date != NULL && date[0] != '\0' && strlen(date) < 32)
-			n += sprintf(buf + n, "date: %s%c", date, eol);
+			n += tp_sprintf(buf + n, "date: %s%c", date, eol);
 		else
-			n += sprintf(buf + n, "date:%c", eol);
-		n += sprintf(buf + n, "draft: true%cdescription:%ccategories:%ctags:%c", eol, eol, eol, eol);
+			n += tp_sprintf(buf + n, "date:%c", eol);
+		n += tp_sprintf(buf + n, "draft: true%cdescription:%ccategories:%ctags:%c", eol, eol, eol, eol);
 	} else {
 		if (layout != NULL && layout[0] != '\0' && strlen(layout) < 64)
-			n += sprintf(buf + n, "layout: %s%c", layout, eol);
-		n += sprintf(buf + n, "title:%cdescription:%ccategory:%ctags:%c", eol, eol, eol, eol);
+			n += tp_sprintf(buf + n, "layout: %s%c", layout, eol);
+		n += tp_sprintf(buf + n, "title:%cdescription:%ccategory:%ctags:%c", eol, eol, eol, eol);
 	}
-	n += sprintf(buf + n, "---%c%c", eol, eol);
+	n += tp_sprintf(buf + n, "---%c%c", eol, eol);
 	if (out != NULL) {
 		if (n > cap)
 			return -1;

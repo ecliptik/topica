@@ -18,6 +18,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "../core/fmt.h"
 #include "fileio.h"
 #include "util.h"
 
@@ -384,7 +385,7 @@ OSErr FileWrite(const FileRef *f, const char *data, long len, OSType type, OSTyp
 	char t[32];
 	OSErr err;
 
-	sprintf(t, "Topica Save %04ld", (long) (TickCount() % 10000));
+	tp_sprintf(t, "Topica Save %04ld", (long) (TickCount() % 10000));
 	FileRefSibling(f, t, &temp);
 	(void) FileDelete(&temp);               /* a left-over from a crash */
 	err = WriteNew(&temp, data, len, type, creator);
