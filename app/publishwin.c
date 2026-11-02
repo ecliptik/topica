@@ -87,6 +87,30 @@ static void Problem(OSErr err, const char *bridge, char *out)
 	case openFailed:
 		tp_sprintf(out, "The bridge at %s refused the connection. Is it running?", bridge);
 		break;
+	case netNoName: {
+		/* the name alone, without http:// or the port */
+		char name[64];
+		int n = 0;
+		if (strncmp(bridge, "http://", 7) == 0)
+			bridge += 7;
+		while (bridge[n] && bridge[n] != ':' && bridge[n] != '/' && n < (int) sizeof(name) - 1) {
+			name[n] = bridge[n];
+			n++;
+		}
+		name[n] = '\0';
+		tp_sprintf(out, "There\xD5s no %s. Is the name right?", name);
+		break;
+	}
+	case netNoNameServer:
+#ifdef TOPICA_TALKIP
+		strcpy(out, "The MacIP gateway gave no name server: give the bridge\xD5s IP address.");
+#else
+		strcpy(out, "There\xD5s no name server: give the bridge\xD5s IP address, or set one in MacTCP.");
+#endif
+		break;
+	case netNoAnswer:
+		strcpy(out, "The name server didn\xD5t answer. Try the bridge\xD5s IP address.");
+		break;
 	case commandTimeout:
 	case connectionTerminated:
 		tp_sprintf(out, "Nothing answered at %s. Is the bridge running, and its port open?", bridge);
@@ -146,11 +170,13 @@ static Boolean Canceled(void)
 }
 
 /* Sends the post and shows what the bridge said */
-static void Send(Doc *d, unsigned long ip, unsigned short port, const char *bridge, const char *path)
+/* Publishes to the bridge at ip, or at name (looked up first) when ip is 0 */
+static void Send(Doc *d, unsigned long ip, const char *name, unsigned short port, const char *bridge,
+		const char *path)
 {
 	Editor *ed = DocEditor(d);
 	const char *t;
-	char host[20], line[300], reply[kReplyCap];
+	char host[64], line[300], reply[kReplyCap];
 	long n, bodyLen, headLen, have = 0, got;
 	Handle h;
 	DialogPtr p;
@@ -159,7 +185,10 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	int status = 0, done = 0;
 
 	GetPort(&save);
-	tp_sprintf(host, "%lu.%lu.%lu.%lu", (ip >> 24) & 255, (ip >> 16) & 255, (ip >> 8) & 255, ip & 255);
+	if (ip == 0)
+		strcpy(host, name);
+	else
+		tp_sprintf(host, "%lu.%lu.%lu.%lu", (ip >> 24) & 255, (ip >> 16) & 255, (ip >> 8) & 255, ip & 255);
 	/* the request: its head, then the post as the web wants it (UTF-8, LF) */
 	t = EdLockText(ed);
 	n = EdLength(ed);
@@ -186,9 +215,17 @@ static void Send(Doc *d, unsigned long ip, unsigned short port, const char *brid
 	gProgress = p;
 	NetSetCancel(Canceled);
 	SetCursor(*GetCursor(watchCursor));
-	tp_sprintf(line, "Connecting to the bridge at %s\xC9", bridge);
-	Progress(p, line);
-	err = NetOpen(ip, port, kTimeout);
+	err = noErr;
+	if (ip == 0) {
+		tp_sprintf(line, "Looking up %s\xC9", name);
+		Progress(p, line);
+		err = NetResolve(name, &ip);
+	}
+	if (err == noErr) {
+		tp_sprintf(line, "Connecting to the bridge at %s\xC9", bridge);
+		Progress(p, line);
+		err = NetOpen(ip, port, kTimeout);
+	}
 	if (err == noErr) {
 		tp_sprintf(line, "Sending the post (%ldK)\xC9", (bodyLen + 1023) / 1024);
 		Progress(p, line);
@@ -281,7 +318,7 @@ static pascal Boolean PublishFilter(DialogPtr d, EventRecord *e, short *item)
 void PublishPost(Doc *d)
 {
 	DialogPtr dlg;
-	char path[PUB_PATH], bridge[64], key[64], about[400], title[256];
+	char path[PUB_PATH], bridge[64], name[64], key[64], about[400], title[256];
 	unsigned long ip = 0;
 	unsigned short port = 0;
 	short item, draft = 0, years;
@@ -333,8 +370,8 @@ void PublishPost(Doc *d)
 		GetItemText(dlg, kPathField, path, sizeof(path));
 		GetItemText(dlg, kBridgeField, bridge, sizeof(bridge));
 		strcpy(key, gKey);
-		if (!pub_address(bridge, &ip, &port)) {
-			ShowNote("The bridge\xD5s address is its IP address and port, like 192.0.2.10:8023.");
+		if (!pub_bridge(bridge, name, sizeof(name), &ip, &port)) {
+			ShowNote("The bridge is its address or name, and port, like 192.0.2.10:8023.");
 			SelectDialogItemText(dlg, kBridgeField, 0, 32767);
 		} else if (strlen(key) < 16) {
 			ShowNote("The key is the one the bridge was set up with: at least 16 characters.");
@@ -361,5 +398,5 @@ void PublishPost(Doc *d)
 		gPrefs.yearFolders = years;
 		SettingsSave();
 	}
-	Send(d, ip, port, bridge, path);
+	Send(d, ip, name, port, bridge, path);
 }

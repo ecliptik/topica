@@ -53,6 +53,59 @@ int pub_address(const char *s, unsigned long *ip, unsigned short *port)
 	return 1;
 }
 
+int pub_bridge(const char *s, char *host, int cap, unsigned long *ip, unsigned short *port)
+{
+	const char *h, *e;
+	unsigned long v = 0;
+	int digits = 0, letters = 0, label = 0;
+
+	if (pub_address(s, ip, port))
+		return 1;
+	if (strncmp(s, "http://", 7) == 0)
+		s += 7;
+	/* a host name: labels of letters, digits and hyphens, with dots between */
+	for (h = s; *s && *s != ':' && *s != '/'; s++) {
+		if (*s == '.') {
+			if (label == 0)
+				return 0;
+			label = 0;
+			continue;
+		}
+		if (!IS_DIGIT(*s) && *s != '-' && !((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')))
+			return 0;
+		if (!IS_DIGIT(*s) && *s != '-')
+			letters = 1;
+		if (++label > 63)
+			return 0;
+	}
+	e = s;
+	if (label == 0 && e > h && e[-1] != '.')
+		return 0;
+	if (e == h || !letters || e - h >= cap)
+		return 0;
+	*port = PUB_PORT;
+	if (*s == ':') {
+		for (s++; IS_DIGIT(*s); s++) {
+			v = v * 10 + (unsigned long) (*s - '0');
+			if (++digits > 5 || v > 65535)
+				return 0;
+		}
+		if (digits == 0 || v == 0)
+			return 0;
+		*port = (unsigned short) v;
+	}
+	if (*s == '/')
+		s++;
+	if (*s != '\0')
+		return 0;
+	memcpy(host, h, (size_t) (e - h));
+	host[e - h] = '\0';
+	if (host[e - h - 1] == '.')
+		host[e - h - 1] = '\0';         /* a name ending in a dot is the same name */
+	*ip = 0;
+	return 2;
+}
+
 /* The bridge's rule for a name: [A-Za-z0-9][A-Za-z0-9._-]*.md (or .markdown), no ".." */
 static int NameOk(const char *n)
 {

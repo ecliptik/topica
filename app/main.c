@@ -595,5 +595,6 @@ int main(void)
 			InitCursor();
 		}
 	}
+	NetShutdown();
 	return 0;
 }

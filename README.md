@@ -43,7 +43,8 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 - **Publish** sends the post to a small bridge on your LAN
   ([`bridge/`](bridge/README.md)), which commits it to the blog's drafts
   branch, for you to merge when you're ready. Over MacTCP, or over
-  LocalTalk on a 512Ke (the `--talkip` build).
+  LocalTalk on a 512Ke (the `--talkip` build). The bridge can be an
+  address or a name.
 - **Undo and Redo** many steps (⌘Z, ⌘⇧Z): Typing, Delete, Cut, Paste,
   Clear, Post Info and Insert Image each undo as one step.
 - **Post Info** (⌘E) edits the front matter's title, description,

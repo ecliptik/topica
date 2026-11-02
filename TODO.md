@@ -66,7 +66,7 @@
       real Plus with MacTCP doesn't (refused, unanswered and canceled
       connections all come back cleanly): it's the emulator
 - [ ] Publish the post's images too
-- [ ] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
+- [x] A bridge name instead of an address (MacTCP's resolver; talkip's DNS)
 - [x] Hide the key in Publish as it's typed (bullets, like a password
       field)
 - [x] Say why a connection failed: no address from the MacIP gateway, a

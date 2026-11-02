@@ -9,9 +9,13 @@
 enum { PUB_PORT = 8023, PUB_PATH = 160 };
 
 /* "192.0.2.10", "192.0.2.10:8023" or "http://192.0.2.10:8023/" -> the
-   address and port (8023 when not given). 0 for anything else: a Mac has
-   no names to look up, so the bridge is an address. */
+   address and port (8023 when not given). 0 for anything else. */
 int pub_address(const char *text, unsigned long *ip, unsigned short *port);
+
+/* The same, or a name to look up ("bridge.example.com:8023"): 1 with the
+   address in *ip, 2 with the name in host (cap bytes), 0 when it's
+   neither */
+int pub_bridge(const char *text, char *host, int cap, unsigned long *ip, unsigned short *port);
 
 /*
  * The post's path in the blog's repository:

@@ -14,6 +14,7 @@
 
 #include <MacTCP.h>
 #include <talkip.h>
+#include "dns.h"                        /* talkip's resolver (its src/, for this file only) */
 
 #include "net.h"
 
@@ -155,4 +156,50 @@ void NetIdle(void)
 {
 	if (gStarted)
 		talkip_idle();
+}
+
+/* talkip's resolver asks the name server the MacIP gateway handed out */
+OSErr NetResolve(const char *name, unsigned long *ip)
+{
+	DNSResult r;
+	OSErr err;
+
+	if (!gStarted) {
+		if (_TCPInit() != noErr)
+			return netNoNetwork;
+		gStarted = true;
+	}
+	if (talkip_local_ip() == 0)
+		return netNoAddress;
+	err = dns_begin(name);
+	if (err == noErr) {
+		while (dns_poll(&r) == DNS_PENDING)
+			if (Wait()) {
+				dns_cancel();
+				return netCanceled;
+			}
+		err = r.err;
+		if (err == noErr && r.naddrs == 0)
+			err = DNS_ERR_NODATA;
+	}
+	switch (err) {
+	case noErr:
+		*ip = r.addr[0];
+		return noErr;
+	case DNS_ERR_NXDOMAIN:
+	case DNS_ERR_NODATA:
+	case DNS_ERR_FORMAT:
+		return netNoName;
+	case DNS_ERR_NOSERVER:
+		return netNoNameServer;
+	case DNS_ERR_TIMEOUT:
+	case DNS_ERR_SERVFAIL:
+		return netNoAnswer;
+	}
+	return err;
+}
+
+void NetShutdown(void)
+{
+	NetClose();                         /* talkip's ExitToShell patch does the rest */
 }

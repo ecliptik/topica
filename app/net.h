@@ -12,8 +12,19 @@
 #include <MacTypes.h>
 
 /* Results are MacTCP's (app/mactcp.h: talkip's are the same), or our own:
-   no network at all, or (talkip) no address from the MacIP gateway */
-enum { netNoNetwork = -30101, netNoAddress = -30102, netCanceled = -128 /* userCanceledErr */ };
+   no network at all, or (talkip) no address from the MacIP gateway; and
+   for a name, no such name, no name server, or no answer from it */
+enum {
+	netNoNetwork = -30101, netNoAddress = -30102, netNoName = -30103, netNoNameServer = -30104,
+	netNoAnswer = -30105, netCanceled = -128 /* userCanceledErr */
+};
+
+/* The address of a host name: MacTCP's resolver (the name servers its
+   control panel lists, and its Hosts file), or talkip's (the server the
+   MacIP gateway hands out) */
+OSErr NetResolve(const char *name, unsigned long *ip);
+/* Before quitting: MacTCP's resolver must be closed, or the Mac crashes later */
+void NetShutdown(void);
 
 /* Connects to ip:port, giving up after timeoutSecs */
 OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs);

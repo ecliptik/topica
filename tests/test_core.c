@@ -2060,6 +2060,25 @@ static void TestPublish(void)
 		"Published _posts/a.md on drafts (abc).\n";
 
 	/* the bridge's address */
+	{
+		char host[64];
+		CHECK(pub_bridge("192.0.2.10:8023", host, sizeof(host), &ip, &port) == 1 && ip == 0xC000020AUL);
+		CHECK(pub_bridge("bridge.example.com", host, sizeof(host), &ip, &port) == 2 && port == PUB_PORT && ip == 0);
+		CHECK_STR(host, "bridge.example.com");
+		CHECK(pub_bridge("http://my-mac.local:9000/", host, sizeof(host), &ip, &port) == 2 && port == 9000);
+		CHECK_STR(host, "my-mac.local");
+		CHECK(pub_bridge("bridge.", host, sizeof(host), &ip, &port) == 2);
+		CHECK_STR(host, "bridge");
+		CHECK(pub_bridge("mybridge", host, sizeof(host), &ip, &port) == 2);
+		CHECK(!pub_bridge("bad name", host, sizeof(host), &ip, &port));
+		CHECK(!pub_bridge("a..b", host, sizeof(host), &ip, &port));
+		CHECK(!pub_bridge(".a", host, sizeof(host), &ip, &port));
+		CHECK(!pub_bridge("1.2.3", host, sizeof(host), &ip, &port));       /* digits only: not a name */
+		CHECK(!pub_bridge("host:0", host, sizeof(host), &ip, &port));
+		CHECK(!pub_bridge("host:x", host, sizeof(host), &ip, &port));
+		CHECK(!pub_bridge("", host, sizeof(host), &ip, &port));
+		CHECK(!pub_bridge("a-very-long-name.example.com", host, 8, &ip, &port));
+	}
 	CHECK(pub_address("192.0.2.10", &ip, &port) && ip == 0xC000020AUL && port == PUB_PORT);
 	CHECK(pub_address("http://10.0.2.2:8080/", &ip, &port) && ip == 0x0A000202UL && port == 8080);
 	CHECK(pub_address("10.0.2.2:1", &ip, &port) && port == 1);

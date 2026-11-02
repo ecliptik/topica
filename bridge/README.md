@@ -41,9 +41,10 @@ docstring lists every setting and reply.
 
    `topica-bridge.service` is a systemd user unit to start from.
 
-4. In Topica, Post › Publish asks for the bridge (`192.0.2.10:8023`: an
-   IP address, since a classic Mac has no name lookup for it) and the key,
-   and remembers both.
+4. In Topica, Post › Publish asks for the bridge, by address
+   (`192.0.2.10:8023`) or by name (`bridge.example.com:8023`, looked up by
+   MacTCP's name servers or Hosts file, or by the name server the MacIP
+   gateway hands out on LocalTalk), and the key, and remembers both.
 
 The drafts branch starts from `main` the first time (`TOPICA_BRIDGE_BASE`);
 after that each post is a new commit on it. Posting the same text again

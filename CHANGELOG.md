@@ -12,6 +12,10 @@ The to-do list, before 1.0.
   normal mode. :q asks to save a changed post, as Close does.
 - Printing from the preview names the job after the post, and a window
   says what's printing and that Command-period stops it.
+- Publish takes the bridge by name too (`bridge.example.com:8023`):
+  MacTCP's resolver looks it up (its name servers, or its Hosts file), or
+  on LocalTalk the name server the MacIP gateway hands out. A name that
+  isn't there, or no name server, says so.
 - Post Info fills in today's date, from the Mac's clock, when the post has
   none yet.
 - Saving swaps the new post in where the volume can (System 7's HFS

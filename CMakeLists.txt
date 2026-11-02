@@ -86,6 +86,9 @@ if(TOPICA_TALKIP)
     endif()
     add_subdirectory(${TALKIP_DIR} talkip)
     list(APPEND TOPICA_SOURCES app/net_talkip.c)
+    # its resolver's header is in talkip's src/, for net_talkip.c alone:
+    # talkip's other internal names (fmt.h) would shadow Topica's
+    set_source_files_properties(app/net_talkip.c PROPERTIES INCLUDE_DIRECTORIES ${TALKIP_DIR}/src)
 else()
     list(APPEND TOPICA_SOURCES app/net_mactcp.c)
 endif()
