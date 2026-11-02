@@ -12,6 +12,12 @@ The to-do list, before 1.0.
   normal mode. :q asks to save a changed post, as Close does.
 - Printing from the preview names the job after the post, and a window
   says what's printing and that Command-period stops it.
+- Publish goes on in the background: the post is sent as it was when you
+  chose Publish, while you go on writing (or close it). Its status line
+  says what's happening (looking up, connecting, sending, waiting); Post ›
+  Publish becomes Stop Publishing; the result comes in a note, or, with
+  Topica in the background, through the Notification Manager and then the
+  note. Quitting while it's at work asks first.
 - Publish takes the bridge by name too (`bridge.example.com:8023`):
   MacTCP's resolver looks it up (its name servers, or its Hosts file), or
   on LocalTalk the name server the MacIP gateway hands out. A name that

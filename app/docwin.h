@@ -29,6 +29,7 @@ Doc *DocFromWindow(WindowPtr w);   /* NULL if it isn't a document window */
 long DocId(Doc *d);                 /* a number for Apple events, unique while Topica runs */
 Doc *DocFromId(long id);            /* NULL when there's none */
 Doc *DocNth(short n);               /* the nth post window from the front, 1-based */
+void DocShowStatus(Doc *d);         /* its status line drawn again (what Publish is doing) */
 Doc *DocFront(void);               /* the front document window, or NULL */
 short DocCount(void);
 short DocMaxCount(void);

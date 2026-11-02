@@ -60,7 +60,7 @@
 - [x] Hugo's TOML front matter (`+++`)
 - [x] Cancel Publish while it waits: ⌘., Escape or Cancel (asynchronous
       MacTCP calls; talkip's open and a receive that asks TCPStatus)
-- [ ] Publish in the background, while you go on writing
+- [x] Publish in the background, while you go on writing
 - [x] MacTCP in Basilisk II crashes (an error of type 3) a few seconds into
       a connection nothing answers. Flynn crashes the same way there; a
       real Plus with MacTCP doesn't (refused, unanswered and canceled

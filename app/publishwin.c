@@ -25,9 +25,6 @@ enum {
 };
 
 enum { kHeadCap = 600, kReplyCap = 1024, kTimeout = 20 };
-enum { kProgressCancel = 2 };   /* the progress dialog's Cancel button */
-
-static DialogPtr gProgress;
 
 /* The key as typed: its field shows a bullet for each character */
 static char gKey[64];
@@ -121,70 +118,201 @@ static void Problem(OSErr err, const char *bridge, char *out)
 	}
 }
 
-static void Progress(DialogPtr p, const char *text)
+/* ---- the publishing, in the background ----
+   One post at a time. The request (the post as it was when Publish was
+   chosen) is made at once; then PublishIdle takes it a step further each
+   time round the event loop, and the writer goes on writing. */
+
+enum { kLookup = 1, kConnect, kSend, kWait };
+
+typedef struct {
+	int step;
+	long doc;                       /* the post's DocId, for its status line */
+	Handle request;
+	long len;
+	unsigned long ip;
+	unsigned short port;
+	char name[64], bridge[64], title[48];
+	char reply[kReplyCap];
+	long have;
+} Job;
+
+static Job *gJob;
+
+static const char *const kSteps[] = { "", "Looking up the bridge\xC9", "Connecting\xC9", "Sending\xC9",
+	"Waiting for the bridge\xC9" };
+
+static void ShowStep(int step)
 {
-	if (p == NULL)
-		return;
-	SetItemText(p, 1, text);
-	DrawDialog(p);
+	Doc *d;
+
+	gJob->step = step;
+	if ((d = DocFromId(gJob->doc)) != NULL)
+		DocShowStatus(d);
 }
 
-/* Asked while the network waits: Command-period, Escape or Cancel ends
-   the publishing. Windows are redrawn meanwhile. */
-static Boolean Canceled(void)
-{
-	EventRecord e;
-	DialogPtr d;
-	WindowPtr w;
-	short item;
-	char c;
+/* A note now, or (Topica in the background) a notification, and the note
+   when the writer comes back */
+static NMRec gNotice;
+static char gPending[300];
+static Str255 gNoticeText;
 
-	if (!GetNextEvent(keyDownMask | mDownMask | updateMask, &e))
+static void Tell(const char *line)
+{
+	if (AppInBackground() && HasNotifications()) {
+		strcpy(gPending, line);
+		memset(&gNotice, 0, sizeof(gNotice));
+		gNotice.qType = 8;              /* nmType */
+		gNotice.nmMark = 1;             /* Topica's mark in the Application menu */
+		gNotice.nmSound = (Handle) -1;  /* the system's beep */
+		PStr(gNoticeText, "Topica has finished publishing.");
+		gNotice.nmStr = gNoticeText;
+		if (NMInstall(&gNotice) == noErr)
+			return;
+		gPending[0] = '\0';
+	}
+	ShowNote(line);
+}
+
+/* Done: what happened, in a note (through the Notification Manager when
+   Topica is in the background) */
+static void Finish(OSErr err, int done, int status, const char *said)
+{
+	char line[300];
+	Doc *d;
+
+	NetClose();
+	if (gJob->request != NULL)
+		DisposeHandle(gJob->request);
+	if (err == netCanceled) {
+		line[0] = '\0';                /* the writer said so: nothing to tell */
+	} else if (err != noErr) {
+		Problem(err, gJob->bridge, line);
+	} else if (done < 0) {
+		tp_sprintf(line, "What answered at %s isn\xD5t Topica\xD5s bridge.", gJob->bridge);
+	} else if (status != 200) {
+		tp_sprintf(line, "Not published: %s", said);
+	} else {
+		strcpy(line, said);
+	}
+	gJob->step = 0;
+	if ((d = DocFromId(gJob->doc)) != NULL)
+		DocShowStatus(d);
+	DisposePtr((Ptr) gJob);
+	gJob = NULL;
+	if (line[0] != '\0')
+		Tell(line);
+}
+
+Boolean PublishBusy(void)
+{
+	return gJob != NULL;
+}
+
+Boolean PublishMayQuit(void)
+{
+	Str255 title;
+
+	if (gJob == NULL)
+		return true;
+	PStr(title, gJob->title);
+	ParamText(title, "\p", "\p", "\p");
+	InitCursor();
+	NoDialogHelp();
+	if (CautionAlert(kPublishingAlert, (ModalFilterUPP) StandardFilter) != 1)
 		return false;
-	switch (e.what) {
-	case keyDown:
-		c = (char) (e.message & charCodeMask);
-		if (c == 0x1B || ((e.modifiers & cmdKey) && c == '.')) {
-			if (gProgress != NULL)
-				FlashButton(gProgress, kProgressCancel);
-			return true;
+	PublishStop();
+	return true;
+}
+
+const char *PublishStatus(long doc)
+{
+	return gJob != NULL && gJob->doc == doc ? kSteps[gJob->step] : NULL;
+}
+
+void PublishStop(void)
+{
+	if (gJob == NULL)
+		return;
+	NetCancel();
+	Finish(netCanceled, 0, 0, "");
+}
+
+void PublishIdle(void)
+{
+	OSErr err;
+	int status = 0, done;
+	char said[256];
+
+	if (gPending[0] != '\0' && !AppInBackground()) {
+		(void) NMRemove(&gNotice);
+		ShowNote(gPending);
+		gPending[0] = '\0';
+	}
+	if (gJob == NULL)
+		return;
+	err = NetPoll();
+	if (err == netBusy)
+		return;
+	switch (gJob->step) {
+	case kLookup:
+		if (err == noErr) {
+			gJob->ip = NetAddress();
+			ShowStep(kConnect);
+			err = NetOpenStart(gJob->ip, gJob->port, kTimeout);
 		}
 		break;
-	case mouseDown:
-		if (gProgress != NULL && FindWindow(e.where, &w) == inContent && w == gProgress
-				&& DialogSelect(&e, &d, &item) && item == kProgressCancel)
-			return true;
+	case kConnect:
+		if (err == noErr) {
+			ShowStep(kSend);
+			HLock(gJob->request);
+			err = NetSendStart(*gJob->request, gJob->len);
+		}
 		break;
-	case updateEvt:
-		w = (WindowPtr) e.message;
-		if (w == gProgress) {
-			BeginUpdate(w);
-			DrawDialog(w);
-			EndUpdate(w);
-		} else if (gUpdateHook != NULL) {
-			gUpdateHook(w);
+	case kSend:
+		if (err == noErr) {
+			ShowStep(kWait);
+			err = NetRecvStart(gJob->reply, kReplyCap, 60);
+		}
+		break;
+	case kWait:
+		gJob->have += NetGot();
+		if (((err == connectionClosing || err == connectionTerminated) && gJob->have > 0)
+				|| gJob->have == kReplyCap) {
+			done = pub_reply(gJob->reply, gJob->have, 1, &status, said, sizeof(said));
+			Finish(noErr, done == 0 ? -1 : done, status, said);
+			return;
+		}
+		if (err == noErr) {
+			done = pub_reply(gJob->reply, gJob->have, 0, &status, said, sizeof(said));
+			if (done) {
+				Finish(noErr, done, status, said);
+				return;
+			}
+			err = NetRecvStart(gJob->reply + gJob->have, kReplyCap - gJob->have, 60);
 		}
 		break;
 	}
-	return false;
+	if (err != noErr)
+		Finish(err, 0, 0, "");
 }
 
-/* Sends the post and shows what the bridge said */
-/* Publishes to the bridge at ip, or at name (looked up first) when ip is 0 */
+/* Starts publishing d to the bridge at ip, or at name (looked up first) when ip is 0 */
 static void Send(Doc *d, unsigned long ip, const char *name, unsigned short port, const char *bridge,
-		const char *path)
+		const char *path, const char *title)
 {
 	Editor *ed = DocEditor(d);
 	const char *t;
-	char host[64], line[300], reply[kReplyCap];
-	long n, bodyLen, headLen, have = 0, got;
-	Handle h;
-	DialogPtr p;
-	GrafPtr save;
+	char host[64], line[300];
+	long n, bodyLen, headLen;
 	OSErr err;
-	int status = 0, done = 0;
 
-	GetPort(&save);
+	gJob = (Job *) NewPtrClear(sizeof(Job));
+	if (gJob == NULL) {
+		Problem(memFullErr, bridge, line);
+		ShowNote(line);
+		return;
+	}
 	if (ip == 0)
 		strcpy(host, name);
 	else
@@ -193,80 +321,36 @@ static void Send(Doc *d, unsigned long ip, const char *name, unsigned short port
 	t = EdLockText(ed);
 	n = EdLength(ed);
 	bodyLen = tc_to_disk(t, n, NULL, 0, 1, 1);
-	h = bodyLen >= 0 ? NewHandle(kHeadCap + bodyLen) : NULL;
-	if (h == NULL) {
+	gJob->request = bodyLen >= 0 ? NewHandle(kHeadCap + bodyLen) : NULL;
+	if (gJob->request == NULL) {
 		EdUnlockText(ed);
+		DisposePtr((Ptr) gJob);
+		gJob = NULL;
 		Problem(memFullErr, bridge, line);
 		ShowNote(line);
 		return;
 	}
-	HLock(h);
-	headLen = pub_request(*h, kHeadCap, host, port, gPrefs.bridgeKey, path, bodyLen);
-	(void) tc_to_disk(t, n, *h + headLen, bodyLen, 1, 1);
+	HLock(gJob->request);
+	headLen = pub_request(*gJob->request, kHeadCap, host, port, gPrefs.bridgeKey, path, bodyLen);
+	(void) tc_to_disk(t, n, *gJob->request + headLen, bodyLen, 1, 1);
 	EdUnlockText(ed);
-
-	NoDialogHelp();
-	p = GetNewDialog(kProgressDialog, NULL, (WindowPtr) -1);
-	if (p != NULL) {
-		CenterWindow(p);
-		ShowWindow(p);
-		SetPort(p);
-	}
-	gProgress = p;
-	NetSetCancel(Canceled);
-	SetCursor(*GetCursor(watchCursor));
-	err = noErr;
+	HUnlock(gJob->request);
+	gJob->len = headLen + bodyLen;
+	gJob->doc = DocId(d);
+	gJob->ip = ip;
+	gJob->port = port;
+	strcpy(gJob->name, name);
+	strcpy(gJob->bridge, bridge);
+	strncpy(gJob->title, title, sizeof(gJob->title) - 1);
 	if (ip == 0) {
-		tp_sprintf(line, "Looking up %s\xC9", name);
-		Progress(p, line);
-		err = NetResolve(name, &ip);
+		ShowStep(kLookup);
+		err = NetResolveStart(name);
+	} else {
+		ShowStep(kConnect);
+		err = NetOpenStart(ip, port, kTimeout);
 	}
-	if (err == noErr) {
-		tp_sprintf(line, "Connecting to the bridge at %s\xC9", bridge);
-		Progress(p, line);
-		err = NetOpen(ip, port, kTimeout);
-	}
-	if (err == noErr) {
-		tp_sprintf(line, "Sending the post (%ldK)\xC9", (bodyLen + 1023) / 1024);
-		Progress(p, line);
-		err = NetSend(*h, headLen + bodyLen);
-	}
-	if (err == noErr) {
-		Progress(p, "Waiting for the bridge to push the post\xC9");
-		while (!done && err == noErr) {
-			err = NetRecv(reply + have, kReplyCap - have, &got, 60);
-			have += got;
-			if (((err == connectionClosing || err == connectionTerminated) && have > 0) || have == kReplyCap) {
-				done = pub_reply(reply, have, 1, &status, line, 256);
-				err = noErr;
-				if (done == 0)
-					done = -1;
-			} else if (err == noErr) {
-				done = pub_reply(reply, have, 0, &status, line, 256);
-			}
-		}
-	}
-	NetClose();
-	NetSetCancel(NULL);
-	gProgress = NULL;
-	DisposeHandle(h);
-	if (p != NULL)
-		DisposeDialog(p);
-	SetPort(save);                  /* not the dialog just disposed of */
-	InitCursor();
-
-	if (err == netCanceled)
-		return;                     /* the writer said so: nothing to tell */
-	if (err != noErr) {
-		Problem(err, bridge, line);
-	} else if (done < 0) {
-		tp_sprintf(line, "What answered at %s isn\xD5t Topica\xD5s bridge.", bridge);
-	} else if (status != 200) {
-		char said[256];
-		strcpy(said, line);
-		tp_sprintf(line, "Not published: %s", said);
-	}
-	ShowNote(line);
+	if (err != noErr)
+		Finish(err, 0, 0, "");
 }
 
 static void ShowKey(DialogPtr dlg)
@@ -398,5 +482,5 @@ void PublishPost(Doc *d)
 		gPrefs.yearFolders = years;
 		SettingsSave();
 	}
-	Send(d, ip, name, port, bridge, path);
+	Send(d, ip, name, port, bridge, path, title);
 }

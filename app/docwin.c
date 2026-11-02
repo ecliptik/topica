@@ -33,6 +33,7 @@
 #include "preview.h"
 #include "settings.h"
 #include "textdrag.h"
+#include "publishwin.h"
 #include "theme.h"
 #include "util.h"
 
@@ -246,6 +247,7 @@ static void DrawStatus(Doc *d)
 	char s[80];
 	Str255 p;
 	long words = d->words;
+	const char *step;
 
 	StatusRect(d, &r);
 	ThemePort();                        /* TextEdit leaves its last run's color */
@@ -259,6 +261,8 @@ static void DrawStatus(Doc *d)
 	if (words > 0)
 		tp_sprintf(s + strlen(s), "   %ld min", post_minutes(words));   /* System 6's Geneva 9 has no middle dot */
 	tp_sprintf(s + strlen(s), "   Line %ld", d->line + 1);
+	if ((step = PublishStatus(d->id)) != NULL)
+		tp_sprintf(s + strlen(s), "   %s", step);     /* Publish, in the background */
 	PStr(p, s);
 	MoveTo((short) (r.left + 6), (short) (r.bottom - 4));
 	DrawString(p);
@@ -279,6 +283,16 @@ static void CountWords(Doc *d)
 	d->words = post_words(t, EdLength(d->ed));
 	EdUnlockText(d->ed);
 	d->countDue = false;
+}
+
+void DocShowStatus(Doc *d)
+{
+	GrafPtr save;
+
+	GetPort(&save);
+	SetPort(d->w);
+	DrawStatus(d);
+	SetPort(save);
 }
 
 /* Redraws the status line if what it shows has changed */

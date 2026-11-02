@@ -3,9 +3,9 @@
  * application), through its MacTCP-style calls. talkip starts with the
  * first connection: it opens AppleTalk socket 72 and leases an address
  * from the MacIP gateway; from then on NetIdle gives it the time it needs.
- * The connection is opened asynchronously and a receive waits by asking
- * TCPStatus, so the cancel routine is asked while they wait (a send is
- * copied at once). Its own ExitToShell patch closes the socket when Topica
+ * The connection opens asynchronously, a send is copied at once, and a
+ * receive waits for TCPStatus to say there's something to read; NetPoll
+ * asks after each. Its own ExitToShell patch closes the socket when Topica
  * quits.
  */
 #include <Memory.h>
@@ -36,25 +36,38 @@ OSErr _TCPRelease(TCPiopb *pb, StreamPtr stream, Ptr userData, TCPIOCompletionUP
 
 enum { kRcvBuffer = 4096, kSendChunk = 1024 };
 
+enum { kIdle, kResolving, kOpening, kReceiving };
+
 static Boolean gStarted;
 static StreamPtr gStream;
 static Ptr gRcvBuf;
-static Boolean (*gCancel)(void);
+static int gOp;
+static OSErr gResult;
+static Boolean gHaveResult;
+static unsigned long gAddress, gUntil;
+static long gGot, gCap;
+static char *gBuf;
+static TCPiopb gOpenPB;                 /* not on the stack: the open runs on */
 
-void NetSetCancel(Boolean (*cancel)(void))
+static OSErr Finished(OSErr err)
 {
-	gCancel = cancel;
+	gResult = err;
+	gHaveResult = true;
+	gOp = kIdle;
+	return noErr;
 }
 
-/* A wait's turn: the stack runs, desk accessories run, the user may cancel */
-static Boolean Wait(void)
+static OSErr Started(void)
 {
-	talkip_idle();
-	SystemTask();
-	return gCancel != NULL && gCancel();
+	if (!gStarted) {
+		if (_TCPInit() != noErr)
+			return netNoNetwork;
+		gStarted = true;
+	}
+	return noErr;
 }
 
-OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
+OSErr NetOpenStart(unsigned long ip, unsigned short port, short timeoutSecs)
 {
 	TCPiopb pb;
 	ip_addr localIP;
@@ -62,11 +75,9 @@ OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
 	OSErr err;
 
 	NetClose();
-	if (!gStarted) {
-		if (_TCPInit() != noErr)
-			return netNoNetwork;
-		gStarted = true;
-	}
+	gHaveResult = false;
+	if ((err = Started()) != noErr)
+		return err;
 	if ((gRcvBuf = NewPtr(kRcvBuffer)) == NULL)
 		return memFullErr;
 	if ((err = _TCPCreate(&pb, &gStream, gRcvBuf, kRcvBuffer, NULL, NULL, NULL, false)) != noErr) {
@@ -75,31 +86,22 @@ OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
 		return err;
 	}
 	(void) timeoutSecs;             /* talkip's own: 20 s for a lease, 30 s to connect */
-	err = _TCPActiveOpen(&pb, gStream, ip, port, &localIP, &localPort, NULL, NULL, true);
-	while (err == noErr && pb.ioResult > 0) {
-		if (Wait()) {
-			TCPiopb abort;
-			(void) _TCPAbort(&abort, gStream, NULL, NULL, false);   /* ends the open */
-			NetClose();
-			return netCanceled;
-		}
-	}
-	if (err == noErr)
-		err = pb.ioResult;
+	err = _TCPActiveOpen(&gOpenPB, gStream, ip, port, &localIP, &localPort, NULL, NULL, true);
 	if (err != noErr) {
 		NetClose();
-		if (talkip_local_ip() == 0)
-			err = netNoAddress;     /* the gateway never leased one */
+		return talkip_local_ip() == 0 ? netNoAddress : err;
 	}
-	return err;
+	gOp = kOpening;
+	return noErr;
 }
 
-OSErr NetSend(const char *data, long len)
+OSErr NetSendStart(const char *data, long len)
 {
 	TCPiopb pb;
 	wdsEntry wds[2];
 	OSErr err = noErr;
 
+	/* talkip copies what it's given: done at once */
 	while (len > 0 && err == noErr) {
 		unsigned short n = (unsigned short) (len > kSendChunk ? kSendChunk : len);
 		wds[0].length = n;
@@ -110,30 +112,104 @@ OSErr NetSend(const char *data, long len)
 		data += n;
 		len -= n;
 	}
-	return err;
+	return Finished(err);
 }
 
-OSErr NetRecv(char *buf, long cap, long *got, short timeoutSecs)
+OSErr NetRecvStart(char *buf, long cap, short timeoutSecs)
+{
+	gBuf = buf;
+	gCap = cap > 65535L ? 65535L : cap;
+	gGot = 0;
+	gUntil = TickCount() + timeoutSecs * 60L;
+	gHaveResult = false;
+	gOp = kReceiving;
+	return noErr;
+}
+
+OSErr NetPoll(void)
 {
 	TCPiopb pb;
-	unsigned short n = (unsigned short) (cap > 65535L ? 65535L : cap);
-	unsigned long until = TickCount() + timeoutSecs * 60L;
+	DNSResult r;
+	unsigned short n;
 	OSErr err;
 
-	*got = 0;
-	/* until there's something to read, or the other end has finished: then TCPRcv doesn't wait */
-	for (;;) {
-		if (_TCPStatus(&pb, gStream, NULL, NULL, NULL, false) != noErr || pb.csParam.status.amtUnreadData > 0
-				|| pb.csParam.status.connectionState > 8)    /* past established */
-			break;
-		if (TickCount() > until)
-			return commandTimeout;
-		if (Wait())
-			return netCanceled;
+	if (gHaveResult) {
+		gHaveResult = false;
+		return gResult;
 	}
-	err = _TCPRcv(&pb, gStream, buf, &n, NULL, NULL, false);
-	*got = err == noErr ? n : 0;
-	return err;
+	switch (gOp) {
+	case kResolving:
+		if (dns_poll(&r) == DNS_PENDING)
+			return netBusy;
+		gOp = kIdle;
+		err = r.err;
+		if (err == noErr && r.naddrs == 0)
+			err = DNS_ERR_NODATA;
+		switch (err) {
+		case noErr:
+			gAddress = r.addr[0];
+			return noErr;
+		case DNS_ERR_NXDOMAIN:
+		case DNS_ERR_NODATA:
+		case DNS_ERR_FORMAT:
+			return netNoName;
+		case DNS_ERR_NOSERVER:
+			return netNoNameServer;
+		case DNS_ERR_TIMEOUT:
+		case DNS_ERR_SERVFAIL:
+			return netNoAnswer;
+		}
+		return err;
+	case kOpening:
+		if (gOpenPB.ioResult > 0)
+			return netBusy;
+		gOp = kIdle;
+		err = gOpenPB.ioResult;
+		if (err != noErr) {
+			NetClose();
+			if (talkip_local_ip() == 0)
+				err = netNoAddress;     /* the gateway never leased one */
+		}
+		return err;
+	case kReceiving:
+		/* something to read, or the other end has finished: then TCPRcv doesn't wait */
+		if (_TCPStatus(&pb, gStream, NULL, NULL, NULL, false) == noErr && pb.csParam.status.amtUnreadData == 0
+				&& pb.csParam.status.connectionState <= 8) {    /* not past established */
+			if (TickCount() <= gUntil)
+				return netBusy;
+			gOp = kIdle;
+			return commandTimeout;
+		}
+		gOp = kIdle;
+		n = (unsigned short) gCap;
+		err = _TCPRcv(&pb, gStream, gBuf, &n, NULL, NULL, false);
+		gGot = err == noErr ? n : 0;
+		return err;
+	}
+	return noErr;
+}
+
+unsigned long NetAddress(void)
+{
+	return gAddress;
+}
+
+long NetGot(void)
+{
+	return gGot;
+}
+
+void NetCancel(void)
+{
+	TCPiopb abort;
+
+	if (gOp == kResolving)
+		dns_cancel();
+	if (gOp == kOpening && gStream != 0)
+		(void) _TCPAbort(&abort, gStream, NULL, NULL, false);   /* ends the open */
+	gOp = kIdle;
+	gHaveResult = false;
+	NetClose();
 }
 
 void NetClose(void)
@@ -159,47 +235,22 @@ void NetIdle(void)
 }
 
 /* talkip's resolver asks the name server the MacIP gateway handed out */
-OSErr NetResolve(const char *name, unsigned long *ip)
+OSErr NetResolveStart(const char *name)
 {
-	DNSResult r;
 	OSErr err;
 
-	if (!gStarted) {
-		if (_TCPInit() != noErr)
-			return netNoNetwork;
-		gStarted = true;
-	}
+	gHaveResult = false;
+	if ((err = Started()) != noErr)
+		return err;
 	if (talkip_local_ip() == 0)
 		return netNoAddress;
-	err = dns_begin(name);
-	if (err == noErr) {
-		while (dns_poll(&r) == DNS_PENDING)
-			if (Wait()) {
-				dns_cancel();
-				return netCanceled;
-			}
-		err = r.err;
-		if (err == noErr && r.naddrs == 0)
-			err = DNS_ERR_NODATA;
-	}
-	switch (err) {
-	case noErr:
-		*ip = r.addr[0];
-		return noErr;
-	case DNS_ERR_NXDOMAIN:
-	case DNS_ERR_NODATA:
-	case DNS_ERR_FORMAT:
-		return netNoName;
-	case DNS_ERR_NOSERVER:
-		return netNoNameServer;
-	case DNS_ERR_TIMEOUT:
-	case DNS_ERR_SERVFAIL:
-		return netNoAnswer;
-	}
-	return err;
+	if ((err = dns_begin(name)) != noErr)
+		return Finished(err == DNS_ERR_NOSERVER ? netNoNameServer : err == DNS_ERR_FORMAT ? netNoName : err);
+	gOp = kResolving;
+	return noErr;
 }
 
 void NetShutdown(void)
 {
-	NetClose();                         /* talkip's ExitToShell patch does the rest */
+	NetCancel();                        /* talkip's ExitToShell patch does the rest */
 }

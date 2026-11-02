@@ -53,6 +53,11 @@ static Boolean gQuit;
 static Boolean gInBackground;
 static Boolean gHaveAE, gHaveWordSvc;
 
+Boolean AppInBackground(void)
+{
+	return gInBackground;
+}
+
 #ifndef TOPICA_LITE
 /* The Option key, held now (a menu choice's variant) */
 static Boolean OptionDown(void)
@@ -163,7 +168,8 @@ static void AdjustMenus(void)
 	SetMenuItemText(post, kFormattingItem, gPrefs.format ? "\pHide Formatting" : "\pShow Formatting");
 	SetMenuItemText(post, kPreviewItem, PreviewIsFront() ? "\pHide Preview" : "\pShow Preview");
 	Enable(post, kPreviewItem, target != NULL);
-	Enable(post, kPublishItem, d != NULL);
+	SetMenuItemText(post, kPublishItem, PublishBusy() ? "\pStop Publishing" : "\pPublish\311");
+	Enable(post, kPublishItem, d != NULL || PublishBusy());
 	{
 		MenuHandle theme = GetMenuHandle(kThemeMenu);
 		short i;
@@ -173,7 +179,7 @@ static void AdjustMenus(void)
 		}
 	}
 	/* whole menus */
-	if (EnableMenu(post, target != NULL) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
+	if (EnableMenu(post, target != NULL || PublishBusy()) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
 		DrawMenuBar();
 }
 
@@ -181,6 +187,8 @@ static Boolean DoQuit(void)
 {
 	Doc *d;
 
+	if (!PublishMayQuit())
+		return false;
 	/* close the documents front to back; a Cancel stops the quit */
 	while ((d = DocFront()) != NULL || DocCount() > 0) {
 		if (d == NULL) {
@@ -292,6 +300,10 @@ static void DoMenu(long choice)
 				PreviewClose();
 			else if (d != NULL)
 				PreviewShow(d);
+			break;
+		}
+		if (item == kPublishItem && PublishBusy()) {
+			PublishStop();              /* Stop Publishing, with or without a post in front */
 			break;
 		}
 		if (d == NULL)
@@ -547,7 +559,7 @@ int main(void)
 	OpenFinderFiles();
 	while (!gQuit) {
 		Doc *front = DocFront();
-		if (GetEvent(&e, gInBackground ? 60 : 10)) {
+		if (GetEvent(&e, PublishBusy() ? 1 : gInBackground ? 60 : 10)) {
 			DocBlocksOff();
 			switch (e.what) {
 			case mouseDown:
@@ -587,6 +599,7 @@ int main(void)
 		DocIdleAll();
 		PreviewIdle();
 		NetIdle();
+		PublishIdle();
 		front = DocFront();
 		if (front != NULL && !gInBackground) {
 			DocIdle(front);

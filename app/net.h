@@ -1,10 +1,10 @@
 /*
- * net.h: one TCP connection at a time, for Publish. Each call waits until
- * it's done or its time is up (Publish sends one post and reads one line
- * back), asking the cancel routine (NetSetCancel) now and then so that
- * Command-period can end it. Two builds: MacTCP's .IPP driver (net_mactcp.c), or talkip's
- * stack linked into the application for a 512K Mac on LocalTalk
- * (net_talkip.c, scripts/build.sh --talkip).
+ * net.h: one TCP connection at a time, for Publish, which runs in the
+ * background: each operation is started, then asked after (NetPoll) from
+ * the event loop until it's done, so the writer can go on writing. Two
+ * builds: MacTCP's .IPP driver (net_mactcp.c), or talkip's stack linked
+ * into the application for a 512K Mac on LocalTalk (net_talkip.c,
+ * scripts/build.sh --talkip).
  */
 #ifndef TOPICA_NET_H
 #define TOPICA_NET_H
@@ -19,26 +19,31 @@ enum {
 	netNoAnswer = -30105, netCanceled = -128 /* userCanceledErr */
 };
 
-/* The address of a host name: MacTCP's resolver (the name servers its
-   control panel lists, and its Hosts file), or talkip's (the server the
-   MacIP gateway hands out) */
-OSErr NetResolve(const char *name, unsigned long *ip);
-/* Before quitting: MacTCP's resolver must be closed, or the Mac crashes later */
-void NetShutdown(void);
+/* NetPoll's answer while the operation goes on */
+enum { netBusy = 1 };
 
-/* Connects to ip:port, giving up after timeoutSecs */
-OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs);
-/* Sends all of [data, data+len) */
-OSErr NetSend(const char *data, long len);
-/* Receives what has come, up to cap bytes, into buf: *got of them.
-   connectionClosing once the other end has finished. */
-OSErr NetRecv(char *buf, long cap, long *got, short timeoutSecs);
+/* Starts looking up a host name: MacTCP's resolver (the name servers its
+   control panel lists, and its Hosts file), or talkip's (the server the
+   MacIP gateway hands out). NetAddress has the answer. */
+OSErr NetResolveStart(const char *name);
+/* Starts connecting to ip:port, giving up after timeoutSecs */
+OSErr NetOpenStart(unsigned long ip, unsigned short port, short timeoutSecs);
+/* Starts sending [data, data+len), which must stay where it is until done */
+OSErr NetSendStart(const char *data, long len);
+/* Starts receiving up to cap bytes into buf (which must stay put):
+   NetGot says how many. connectionClosing once the other end has finished. */
+OSErr NetRecvStart(char *buf, long cap, short timeoutSecs);
+/* netBusy while the operation goes on; then its result, once */
+OSErr NetPoll(void);
+unsigned long NetAddress(void);
+long NetGot(void);
+/* Abandons the operation and the connection */
+void NetCancel(void);
 /* Closes the connection (or abandons it), and frees the stream. Always safe. */
 void NetClose(void);
 /* From the event loop: talkip runs in the application and needs the time */
 void NetIdle(void);
-/* While a call waits, it asks cancel (when not NULL) now and then: true
-   abandons the connection, and the call returns netCanceled */
-void NetSetCancel(Boolean (*cancel)(void));
+/* Before quitting: MacTCP's resolver must be closed, or the Mac crashes later */
+void NetShutdown(void);
 
 #endif

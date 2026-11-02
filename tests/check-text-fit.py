@@ -31,7 +31,6 @@ LINE = 16
 
 # The boxes (resources/topica.r.in): width, lines
 ALERT = (274, 4)            # DITL 130, ^0 of ShowNote and ErrorAlert
-PROGRESS = (348, 2)         # DITL 147, Publish's progress
 ABOUT = (372, 2)            # DITL 146 item 12, Publish's first line
 
 # Long but likely values for the arguments, by the name the code passes
@@ -98,7 +97,7 @@ def literal(s):
 
 def calls(src):
     """(function, the whole argument text) for the calls that put text in a box."""
-    pat = re.compile(r"\b(ShowNote|ErrorAlert|Progress|strcpy|sprintf)\s*\(")
+    pat = re.compile(r"\b(ShowNote|ErrorAlert|strcpy|tp_sprintf)\s*\(")
     for m in pat.finditer(src):
         depth, i = 1, m.end()
         while depth and i < len(src):
@@ -111,7 +110,7 @@ def calls(src):
             elif src[i] == ")":
                 depth -= 1
             i += 1
-        yield m.group(1), src[m.end():i - 1], src.count("\n", 0, m.start()) + 1
+        yield m.group(1).replace("tp_", ""), src[m.end():i - 1], src.count("\n", 0, m.start()) + 1
 
 
 def messages(args):
@@ -163,9 +162,7 @@ def main():
                 continue
             for text in messages(args):
                 box = ALERT
-                if fn == "Progress" or (fn == "sprintf" and target == "line" and text.endswith("\xc9")):
-                    box = PROGRESS
-                elif target == "about":
+                if target == "about":
                     box = ABOUT
                 elif fn == "ErrorAlert" or (target == "what" and "couldn\xd5t" in text):
                     text += " " + LONGEST_REASON

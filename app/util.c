@@ -78,6 +78,15 @@ Boolean HasGWorlds(void)
 	return has;
 }
 
+Boolean HasNotifications(void)
+{
+	static short has = -1;
+
+	if (has < 0)
+		has = TrapExists(0xA05E, kOSTrapType);   /* _NMInstall */
+	return has;
+}
+
 Boolean HasWaitNextEvent(void)
 {
 	static short has = -1;

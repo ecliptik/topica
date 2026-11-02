@@ -1,6 +1,6 @@
 /* net_mactcp.c: net.h on MacTCP's .IPP driver. Opening, sending and
-   receiving are asynchronous calls waited on here, asking the cancel
-   routine as they wait; the rest are synchronous. */
+   receiving are asynchronous calls that NetPoll asks after; names go to
+   MacTCP's resolver, whose answer comes to a completion routine. */
 #include <Devices.h>
 #include <Files.h>
 #include <Gestalt.h>
@@ -15,19 +15,24 @@
 
 enum { kRcvBuffer = 8192, kSendChunk = 4096 };
 
+/* What's going on */
+enum { kIdle, kResolving, kOpening, kSending, kReceiving };
+
 static short gIPP;              /* the driver's refnum, once opened */
 static StreamPtr gStream;
 static Ptr gRcvBuf;
-static Boolean (*gCancel)(void);
+static int gOp;
+static OSErr gResult;           /* an operation that finished as it started */
+static Boolean gHaveResult;
+static unsigned long gAddress, gOpenStart;
+static short gOpenTimeout;
+static long gGot;
+static const char *gSendData;
+static long gSendLeft;
 /* The asynchronous calls' parameter blocks, and the send's buffer list: not
    on the stack, since MacTCP may still write to a call it has aborted */
 static TCPiopb gOpenPB, gSendPB, gRcvPB;
 static wdsEntry gWds[2];
-
-void NetSetCancel(Boolean (*cancel)(void))
-{
-	gCancel = cancel;
-}
 
 static OSErr Call(TCPiopb *pb, short csCode)
 {
@@ -37,44 +42,47 @@ static OSErr Call(TCPiopb *pb, short csCode)
 	return PBControlSync((ParmBlkPtr) pb);
 }
 
-/* A call that may take a while: asynchronous, waited on here. A cancel
-   aborts the connection, which ends the call. */
-static OSErr CallWait(TCPiopb *pb, short csCode)
+/* A call that may take a while: started here, asked after by NetPoll */
+static void Start(TCPiopb *pb, short csCode)
 {
-	Boolean canceled = false;
-
 	pb->ioCRefNum = gIPP;
 	pb->csCode = csCode;
 	pb->tcpStream = gStream;
 	pb->ioCompletion = NULL;
 	(void) PBControlAsync((ParmBlkPtr) pb);
-	while (pb->ioResult > 0) {
-		SystemTask();
-		if (!canceled && gCancel != NULL && gCancel()) {
-			TCPiopb abort;
-			memset(&abort, 0, sizeof(abort));
-			(void) Call(&abort, TCPAbort);
-			canceled = true;
-		}
-	}
-	return canceled ? netCanceled : pb->ioResult;
 }
 
-OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
+static OSErr Driver(void)
+{
+	ParamBlockRec open;
+
+	if (gIPP != 0)
+		return noErr;
+	memset(&open, 0, sizeof(open));
+	open.ioParam.ioNamePtr = (StringPtr) "\p.IPP";
+	if (PBOpenSync(&open) != noErr)
+		return netNoNetwork;
+	gIPP = open.ioParam.ioRefNum;
+	return noErr;
+}
+
+/* An operation done already: NetPoll gives its result next */
+static OSErr Finished(OSErr err)
+{
+	gResult = err;
+	gHaveResult = true;
+	gOp = kIdle;
+	return noErr;
+}
+
+OSErr NetOpenStart(unsigned long ip, unsigned short port, short timeoutSecs)
 {
 	TCPiopb pb;
 	OSErr err;
-	unsigned long start;
 
 	NetClose();
-	if (gIPP == 0) {
-		ParamBlockRec open;
-		memset(&open, 0, sizeof(open));
-		open.ioParam.ioNamePtr = (StringPtr) "\p.IPP";
-		if (PBOpenSync(&open) != noErr)
-			return netNoNetwork;
-		gIPP = open.ioParam.ioRefNum;
-	}
+	if ((err = Driver()) != noErr)
+		return err;
 	if ((gRcvBuf = NewPtr(kRcvBuffer)) == NULL)
 		return memFullErr;
 	memset(&pb, 0, sizeof(pb));
@@ -93,54 +101,127 @@ OSErr NetOpen(unsigned long ip, unsigned short port, short timeoutSecs)
 	gOpenPB.csParam.open.commandTimeoutValue = (byte) timeoutSecs;
 	gOpenPB.csParam.open.remoteHost = ip;
 	gOpenPB.csParam.open.remotePort = port;
-	start = TickCount();
-	if ((err = CallWait(&gOpenPB, TCPActiveOpen)) != noErr) {
-		NetClose();
-		/* MacTCP says openFailed for a refusal and for its timeout alike
-		   (seen on a Plus): one that took the whole timeout was nothing
-		   answering */
-		if (err == openFailed && TickCount() - start >= (unsigned long) (timeoutSecs - 2) * 60)
-			err = commandTimeout;
-	}
-	return err;
+	gOpenStart = TickCount();
+	gOpenTimeout = timeoutSecs;
+	gOp = kOpening;
+	gHaveResult = false;
+	Start(&gOpenPB, TCPActiveOpen);
+	return noErr;
 }
 
-OSErr NetSend(const char *data, long len)
+static void SendChunk(void)
 {
-	OSErr err = noErr;
+	unsigned short n = (unsigned short) (gSendLeft > kSendChunk ? kSendChunk : gSendLeft);
 
-	while (len > 0 && err == noErr) {
-		unsigned short n = (unsigned short) (len > kSendChunk ? kSendChunk : len);
-		gWds[0].length = n;
-		gWds[0].ptr = (Ptr) data;
-		gWds[1].length = 0;
-		gWds[1].ptr = NULL;
-		memset(&gSendPB, 0, sizeof(gSendPB));
-		gSendPB.csParam.send.ulpTimeoutValue = 30;
-		gSendPB.csParam.send.ulpTimeoutAction = 1;
-		gSendPB.csParam.send.validityFlags = timeoutValue | timeoutAction;
-		gSendPB.csParam.send.pushFlag = n == len;
-		gSendPB.csParam.send.wdsPtr = (Ptr) gWds;
-		err = CallWait(&gSendPB, TCPSend);
-		data += n;
-		len -= n;
-	}
-	return err;
+	gWds[0].length = n;
+	gWds[0].ptr = (Ptr) gSendData;
+	gWds[1].length = 0;
+	gWds[1].ptr = NULL;
+	memset(&gSendPB, 0, sizeof(gSendPB));
+	gSendPB.csParam.send.ulpTimeoutValue = 30;
+	gSendPB.csParam.send.ulpTimeoutAction = 1;
+	gSendPB.csParam.send.validityFlags = timeoutValue | timeoutAction;
+	gSendPB.csParam.send.pushFlag = n == gSendLeft;
+	gSendPB.csParam.send.wdsPtr = (Ptr) gWds;
+	gSendData += n;
+	gSendLeft -= n;
+	Start(&gSendPB, TCPSend);
 }
 
-OSErr NetRecv(char *buf, long cap, long *got, short timeoutSecs)
+OSErr NetSendStart(const char *data, long len)
 {
-	OSErr err;
+	gSendData = data;
+	gSendLeft = len;
+	gHaveResult = false;
+	if (len <= 0)
+		return Finished(noErr);
+	gOp = kSending;
+	SendChunk();
+	return noErr;
+}
 
-	*got = 0;
+OSErr NetRecvStart(char *buf, long cap, short timeoutSecs)
+{
+	gGot = 0;
+	gHaveResult = false;
 	memset(&gRcvPB, 0, sizeof(gRcvPB));
 	gRcvPB.csParam.receive.commandTimeoutValue = (byte) timeoutSecs;
 	gRcvPB.csParam.receive.rcvBuff = buf;
 	gRcvPB.csParam.receive.rcvBuffLen = (unsigned short) (cap > 65535L ? 65535L : cap);
-	err = CallWait(&gRcvPB, TCPRcv);
-	if (err == noErr)
-		*got = gRcvPB.csParam.receive.rcvBuffLen;
-	return err;
+	gOp = kReceiving;
+	Start(&gRcvPB, TCPRcv);
+	return noErr;
+}
+
+static OSErr Resolved(void);
+
+OSErr NetPoll(void)
+{
+	OSErr err;
+
+	if (gHaveResult) {
+		gHaveResult = false;
+		return gResult;
+	}
+	switch (gOp) {
+	case kResolving:
+		return Resolved();
+	case kOpening:
+		if (gOpenPB.ioResult > 0)
+			return netBusy;
+		gOp = kIdle;
+		err = gOpenPB.ioResult;
+		if (err != noErr) {
+			NetClose();
+			/* MacTCP says openFailed for a refusal and for its timeout alike
+			   (seen on a Plus): one that took the whole timeout was nothing
+			   answering */
+			if (err == openFailed && TickCount() - gOpenStart >= (unsigned long) (gOpenTimeout - 2) * 60)
+				err = commandTimeout;
+		}
+		return err;
+	case kSending:
+		if (gSendPB.ioResult > 0)
+			return netBusy;
+		if (gSendPB.ioResult == noErr && gSendLeft > 0) {
+			SendChunk();
+			return netBusy;
+		}
+		gOp = kIdle;
+		return gSendPB.ioResult;
+	case kReceiving:
+		if (gRcvPB.ioResult > 0)
+			return netBusy;
+		gOp = kIdle;
+		if (gRcvPB.ioResult == noErr)
+			gGot = gRcvPB.csParam.receive.rcvBuffLen;
+		return gRcvPB.ioResult;
+	}
+	return noErr;
+}
+
+unsigned long NetAddress(void)
+{
+	return gAddress;
+}
+
+long NetGot(void)
+{
+	return gGot;
+}
+
+void NetCancel(void)
+{
+	TCPiopb pb;
+
+	if (gOp == kOpening || gOp == kSending || gOp == kReceiving) {
+		/* aborting the connection ends the call */
+		memset(&pb, 0, sizeof(pb));
+		(void) Call(&pb, TCPAbort);
+	}
+	gOp = kIdle;                    /* a lookup's answer lands later, harmlessly */
+	gHaveResult = false;
+	NetClose();
 }
 
 void NetClose(void)
@@ -194,15 +275,16 @@ typedef OSErr (*CloseFn)(long selector);
 typedef OSErr (*StrToAddrFn)(long selector, char *host, HostInfo *info, ResultProc done, char *user);
 
 static Handle gDnr;
-/* The answer: the resolver writes it when it's done, maybe after a cancel */
-static HostInfo gHost;
-static volatile Boolean gHostDone;
+/* Two answers, used in turn: one a cancel left behind can still land in
+   the other without touching the lookup that's going on */
+static HostInfo gHosts[2];
+static volatile Boolean gHostDone[2];
+static short gHost;
 
 static pascal void HostDone(HostInfo *info, char *user)
 {
-	(void) info;
 	(void) user;
-	gHostDone = true;
+	gHostDone[info == &gHosts[1]] = true;
 }
 
 /* A file of creator in folder (vRefNum, dirID) with a 'dnrp' resource:
@@ -273,40 +355,13 @@ static OSErr OpenResolver(void)
 	return noErr;
 }
 
-OSErr NetResolve(const char *name, unsigned long *ip)
+/* The answer, as net.h's results */
+static OSErr Answer(OSErr err, const HostInfo *h)
 {
-	char host[256];
-	OSErr err;
-
-	if (gIPP == 0) {
-		ParamBlockRec open;
-		memset(&open, 0, sizeof(open));
-		open.ioParam.ioNamePtr = (StringPtr) "\p.IPP";
-		if (PBOpenSync(&open) != noErr)
-			return netNoNetwork;
-		gIPP = open.ioParam.ioRefNum;
-	}
-	if ((err = OpenResolver()) != noErr)
-		return err;
-	strncpy(host, name, sizeof(host) - 1);
-	host[sizeof(host) - 1] = '\0';
-	memset(&gHost, 0, sizeof(gHost));
-	gHostDone = false;
-	err = ((StrToAddrFn) *gDnr)(kStrToAddr, host, &gHost, HostDone, NULL);
-	if (err == kCacheFault) {
-		/* asked the name server: wait for the answer */
-		while (!gHostDone) {
-			SystemTask();
-			if (gCancel != NULL && gCancel())
-				return netCanceled;     /* the answer lands in gHost later, harmlessly */
-		}
-		err = (OSErr) gHost.rtnCode;
-		DLOG(("NetResolve: %s: %d, %lx", host, err, gHost.addr[0]));
-	}
 	switch (err) {
 	case noErr:
-		*ip = gHost.addr[0];
-		return *ip != 0 ? noErr : netNoName;
+		gAddress = h->addr[0];
+		return gAddress != 0 ? noErr : netNoName;
 	case kCacheFault:                   /* still, after the answer: MacTCP 2.0 found no such name */
 	case kNameSyntax:
 	case kAuthName:
@@ -319,9 +374,41 @@ OSErr NetResolve(const char *name, unsigned long *ip)
 	return err;
 }
 
+OSErr NetResolveStart(const char *name)
+{
+	char host[256];
+	OSErr err;
+
+	gHaveResult = false;
+	if ((err = Driver()) != noErr || (err = OpenResolver()) != noErr)
+		return err;
+	if (gOp == kResolving || !gHostDone[gHost])
+		gHost ^= 1;                     /* the last lookup may still answer into the other */
+	strncpy(host, name, sizeof(host) - 1);
+	host[sizeof(host) - 1] = '\0';
+	memset(&gHosts[gHost], 0, sizeof(HostInfo));
+	gHostDone[gHost] = false;
+	err = ((StrToAddrFn) *gDnr)(kStrToAddr, host, &gHosts[gHost], HostDone, NULL);
+	if (err != kCacheFault) {
+		gHostDone[gHost] = true;
+		return Finished(Answer(err, &gHosts[gHost]));
+	}
+	gOp = kResolving;                   /* asked the name server: HostDone says when */
+	return noErr;
+}
+
+static OSErr Resolved(void)
+{
+	if (!gHostDone[gHost])
+		return netBusy;
+	gOp = kIdle;
+	DLOG(("NetResolve: %d, %lx", (short) gHosts[gHost].rtnCode, gHosts[gHost].addr[0]));
+	return Answer((OSErr) gHosts[gHost].rtnCode, &gHosts[gHost]);
+}
+
 void NetShutdown(void)
 {
-	NetClose();
+	NetCancel();
 	if (gDnr != NULL) {
 		(void) ((CloseFn) *gDnr)(kCloseResolver);
 		DisposeHandle(gDnr);

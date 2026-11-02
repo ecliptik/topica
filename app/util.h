@@ -22,6 +22,7 @@ enum {
 	kSaveChangesAlert = 129,    /* Save, Cancel, Don't Save */
 	kErrorAlert = 130,          /* OK */
 	kRevertAlert = 131,         /* Revert, Cancel */
+	kPublishingAlert = 132,     /* Quit, Cancel */
 	kPostInfoDialog = 140,
 	kImageDialog = 141,
 	kFindDialog = 142,
@@ -29,7 +30,6 @@ enum {
 	kLinkDialog = 144,
 	kSpellDialog = 145,
 	kPublishDialog = 146,
-	kProgressDialog = 147,
 	kPrintingDialog = 148
 };
 
@@ -39,6 +39,10 @@ void CStr(char *out, const unsigned char *p);
 
 /* System facts, read once */
 Boolean HasWaitNextEvent(void);
+/* The Notification Manager (System 6 and later) */
+Boolean HasNotifications(void);
+/* MultiFinder has another application in front (main.c's) */
+Boolean AppInBackground(void);
 Boolean HasColorQD(void);
 Boolean ColorScreen(void);          /* the main screen shows 16 colors or more */
 Boolean HasGWorlds(void);           /* 32-bit QuickDraw's offscreen worlds */
