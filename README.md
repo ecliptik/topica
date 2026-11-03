@@ -11,7 +11,49 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 > Topica is nearly 1.0. [docs/LIMITS.md](docs/LIMITS.md) says what it
 > doesn't do, and [TODO.md](TODO.md) what's coming.
 
-## What it does today
+![Topica on System 7 in the TokyoNight theme: a post on the left with
+its Markdown formatted as it's written, and its preview on the
+right](docs/images/color.png)
+
+| | | |
+|---|---|---|
+| ![A post in Topica on a Mac Plus, with headings and strong text in bold, emphasis in italics and the link underlined](docs/images/editor.png) | ![The preview: the post laid out like its web page, with the title, date and category, lists, a quote and a code block](docs/images/preview.png) | ![Check Spelling stopped at "teh", suggesting "the"](docs/images/spelling.png) |
+| Writing on a Mac Plus (System 6): the formatting shows as you type. | The preview lays the post out like its web page. | Check Spelling, with suggestions from an 89,000-word dictionary. |
+
+*Above: System 7.6.1 in 256 colors in Basilisk II. Below it: System 6.0.8
+on a Mac Plus in Snow, pixel for pixel.*
+
+## Download
+
+Get the [latest release](https://github.com/ecliptik/topica/releases/latest).
+There are three builds, each as a floppy image (`.dsk`), a StuffIt archive
+(`.sit`) and BinHex (`.hqx`):
+
+| File | For |
+|---|---|
+| `Topica-full-…` | the Mac Plus and later, on System 6.0.8 to 7.6.1 |
+| `Topica-lite-…` | 512K Macs (the Macintosh 512Ke) |
+| `Topica-lite-talkip-…` | 512K Macs that publish over LocalTalk, through a MacIP gateway |
+
+The `.dsk` is an 800K disk image for an emulator or a floppy emulator, or
+to write to a real floppy. The `.sit` and
+`.hqx` hold the same files for a Mac that's already on a network.
+
+## Getting started
+
+1. Copy **Topica** and **Topica Dictionary** to the same folder on your
+   Mac. The dictionary is for Check Spelling; Topica runs without it.
+2. Open Topica, then File › New Post (⌘N), or File › Open a Markdown
+   file. Posts from a file server open too, typed or not.
+3. Post › Post Info (⌘E) fills in the front matter; File › Save suggests a
+   `YYYY-MM-DD-title.md` name.
+4. To publish from the Mac, set up the bridge on a computer on your
+   network ([bridge/README.md](bridge/README.md)) and choose Post ›
+   Publish.
+
+**About Topica**, on the disk, is the short guide.
+
+## What it does
 
 - **Edits posts** in windows that fit a 512×342 screen, in Monaco 9 with
   the text wrapped to the window. Several windows at once.
@@ -87,9 +129,10 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 | Topica Lite | 512K Macs (the Macintosh 512Ke) | 2 windows, 8 KB of undo per window |
 | Topica | the Mac Plus and later, System 6.0.8 to 7.6.1 | 6 windows, 32 KB of undo per window |
 
-Both run on a 68000. Topica opens posts of up to 32,000 characters (it uses
-the Toolbox's TextEdit for now); [docs/LIMITS.md](docs/LIMITS.md) has the
-rest of the limits.
+Both run on a 68000. Publishing needs MacTCP, or for the talkip build
+LocalTalk and a MacIP gateway, and the bridge on your network. Topica
+opens posts of up to 32,000 characters (it uses the Toolbox's TextEdit for
+now); [docs/LIMITS.md](docs/LIMITS.md) has the rest of the limits.
 
 ## Building
 

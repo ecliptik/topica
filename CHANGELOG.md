@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0 (unreleased)
+
+- The preview's byline puts a bullet between the date and the category:
+  System 6's Geneva has no middle dot, which showed as a box.
+- docs/LIMITS.md: what Topica doesn't do, and what it's been tried on.
+- The README shows Topica at work, and says which download is which.
+- Releases are on GitHub.
+
 ## 0.8.0 (2026-11-02)
 
 The to-do list, before 1.0.
