@@ -180,7 +180,8 @@ static void AdjustMenus(void)
 		}
 	}
 	/* whole menus */
-	if (EnableMenu(post, target != NULL || PublishBusy()) | EnableMenu(GetMenuHandle(kHeadingsMenu), target != NULL))
+	/* Post stays on for Theme, which needs no post */
+	if (EnableMenu(post, true) | EnableMenu(GetMenuHandle(kHeadingsMenu), target != NULL))
 		DrawMenuBar();
 }
 

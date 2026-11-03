@@ -150,8 +150,9 @@ static void Found1(Found *f, const char *word, int len, int how, int known)
 	common = f->s->common != NULL && dict_has(f->s->common, w, len);
 	memcpy(f->hits[f->count].word, w, (size_t) len);
 	f->hits[f->count].word[len] = '\0';
-	/* common words first, then by the kind of slip */
-	f->hits[f->count].rank = (common ? 0 : 10) + how;
+	/* the word itself with a capital before anything (macintosh: Macintosh,
+	   not mackintosh); then common words, then by the kind of slip */
+	f->hits[f->count].rank = how == kCase ? -1 : (common ? 0 : 10) + how;
 	f->count++;
 }
 

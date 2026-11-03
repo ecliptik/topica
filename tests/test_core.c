@@ -1898,11 +1898,13 @@ static void TestSpell(void)
 {
 	static const char *const kCommon[] = { "a", "and", "is", "it's", "the", "word" };
 	static const char *const kMain[] = {
-		"Apple", "Paris", "a", "and", "apple", "cat", "cats", "dog", "don't", "is", "it's", "quick",
+		"Apple", "Macintosh", "Paris", "a", "and", "apple", "cat", "cats", "dog", "don't", "is", "it's",
+		"mackintosh", "quick",
 		"the", "they", "word", "words", "world", "writer", "writers"
 	};
 	static const char *const kAll[] = {
-		"Apple", "Paris", "a", "and", "apple", "cat", "cats", "dog", "don't", "is", "it's", "quick",
+		"Apple", "Macintosh", "Paris", "a", "and", "apple", "cat", "cats", "dog", "don't", "is", "it's",
+		"mackintosh", "quick",
 		"the", "they", "word", "words", "world", "writer", "writers"
 	};
 	unsigned char f1[4096], f2[4096], cache[2 * 64];
@@ -1984,6 +1986,8 @@ static void TestSpell(void)
 	CHECK(n >= 1 && strcmp(sug[0], "world") == 0);
 	n = sp_suggest(&sp, "paris", 5, sug, 8);
 	CHECK(n >= 1 && strcmp(sug[0], "Paris") == 0);
+	n = sp_suggest(&sp, "macintosh", 9, sug, 8);
+	CHECK(n >= 2 && strcmp(sug[0], "Macintosh") == 0);  /* only its capital wrong: before mackintosh */
 	n = sp_suggest(&sp, "Pariss", 6, sug, 8);
 	CHECK(n >= 1 && strcmp(sug[0], "Paris") == 0);
 	n = sp_suggest(&sp, "dont", 4, sug, 8);

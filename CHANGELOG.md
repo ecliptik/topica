@@ -36,6 +36,9 @@
     beeping, for a Mac with its sound turned down.
   - In Dark without color, a post window redrawn under an alert stays
     dark (it was drawn in Light where a dialog had just closed).
+  - Post › Theme works with no post open, from the empty preview too.
+  - Check Spelling offers a word with only its capital missing first
+    (macintosh: Macintosh before mackintosh).
   - Find, Check Spelling and Post Info keep the scroll bar and the status
     line's Line with the selection they move.
   - The Headings menu works with the preview's window in front: it brings
