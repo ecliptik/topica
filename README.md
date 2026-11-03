@@ -8,8 +8,8 @@ front matter, Markdown, and UTF-8 files a blog can use as they are.
 The name is Aristotle's *Topics*, his book on finding things to say: the
 *topoi*, the "places" a writer goes for material.
 
-> Topica is new and unfinished (0.7). See [TODO.md](TODO.md) for what's
-> coming.
+> Topica is nearly 1.0. [docs/LIMITS.md](docs/LIMITS.md) says what it
+> doesn't do, and [TODO.md](TODO.md) what's coming.
 
 ## What it does today
 
@@ -88,7 +88,8 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 | Topica | the Mac Plus and later, System 6.0.8 to 7.6.1 | 6 windows, 32 KB of undo per window |
 
 Both run on a 68000. Topica opens posts of up to 32,000 characters (it uses
-the Toolbox's TextEdit for now).
+the Toolbox's TextEdit for now); [docs/LIMITS.md](docs/LIMITS.md) has the
+rest of the limits.
 
 ## Building
 
