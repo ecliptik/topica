@@ -161,15 +161,16 @@ static void AdjustMenus(void)
 		SetMenuItemText(edit, kWordSvcItem, s);
 		Enable(edit, kWordSvcItem, d != NULL);
 	}
-	Enable(post, kPostInfoItem, d != NULL);
-	Enable(post, kInsertImageItem, d != NULL);
-	Enable(post, kInsertLinkItem, d != NULL);
-	Enable(post, kFormattingItem, d != NULL && DocCanStyle(d));
+	/* with the preview's window in front, they're for its post */
+	Enable(post, kPostInfoItem, target != NULL);
+	Enable(post, kInsertImageItem, target != NULL);
+	Enable(post, kInsertLinkItem, target != NULL);
+	Enable(post, kFormattingItem, target != NULL && DocCanStyle(target));
 	SetMenuItemText(post, kFormattingItem, gPrefs.format ? "\pHide Formatting" : "\pShow Formatting");
 	SetMenuItemText(post, kPreviewItem, PreviewShowing(target) ? "\pHide Preview" : "\pShow Preview");
 	Enable(post, kPreviewItem, target != NULL);
 	SetMenuItemText(post, kPublishItem, PublishBusy() ? "\pStop Publishing" : "\pPublish\311");
-	Enable(post, kPublishItem, d != NULL || PublishBusy());
+	Enable(post, kPublishItem, target != NULL || PublishBusy());
 	{
 		MenuHandle theme = GetMenuHandle(kThemeMenu);
 		short i;
@@ -306,6 +307,8 @@ static void DoMenu(long choice)
 			PublishStop();              /* Stop Publishing, with or without a post in front */
 			break;
 		}
+		if (d == NULL && (d = Target()) != NULL && (item == kInsertImageItem || item == kInsertLinkItem))
+			SelectWindow(DocWindow(d));     /* from the preview: inserted where it can be seen */
 		if (d == NULL)
 			break;
 		DocSealUndo(d);

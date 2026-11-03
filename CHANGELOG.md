@@ -29,6 +29,13 @@
   - Publish names a post after its file, as it does a draft
     (notes.md goes to _posts/2026-11-03-notes.md); a post with no date
     known shows _posts/YYYY-MM-DD-..., to fill in.
+  - With the preview's window in front, the Post menu works on its post:
+    Post Info, Publish and Show Formatting; Insert Image and Insert Link
+    bring the post forward first.
+  - Find and Replace All say "Not found" in the status line as well as
+    beeping, for a Mac with its sound turned down.
+  - In Dark without color, a post window redrawn under an alert stays
+    dark (it was drawn in Light where a dialog had just closed).
   - Find, Check Spelling and Post Info keep the scroll bar and the status
     line's Line with the selection they move.
   - The Headings menu works with the preview's window in front: it brings

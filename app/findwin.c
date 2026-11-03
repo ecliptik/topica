@@ -40,6 +40,7 @@ static Boolean FindNext(Doc *d)
 	EdUnlockText(ed);
 	if (at < 0) {
 		SysBeep(10);
+		DocNote(d, "Not found");        /* the beep may be off */
 		return false;
 	}
 	EdSetSelection(ed, at, at + (long) strlen(gFind));
@@ -82,6 +83,7 @@ static void ReplaceAll(Doc *d)
 	EdUnlockText(ed);
 	if (count == 0) {
 		SysBeep(10);
+		DocNote(d, "Not found");
 		return;
 	}
 	if (len > EdMaxLength()) {

@@ -33,6 +33,9 @@ void DocShowStatus(Doc *d);         /* its status line drawn again (what Publish
 /* Scrolls the selection into view, with the scroll bar and the status
    line's Line following (for Find and Check Spelling, between events) */
 void DocShowSelection(Doc *d);
+/* A word in the status line for a few seconds, for what has nothing else
+   to show (Find's "Not found"); note is a literal, kept as it is */
+void DocNote(Doc *d, const char *note);
 Doc *DocFront(void);               /* the front document window, or NULL */
 short DocCount(void);
 short DocMaxCount(void);

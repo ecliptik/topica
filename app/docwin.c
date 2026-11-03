@@ -96,6 +96,8 @@ struct Doc {
 	Vi vi;                              /* vi mode's state */
 	const char *viText;                 /* the text, locked while vi reads it */
 	char viShown[20];                   /* the mode the status line shows */
+	const char *note;                   /* a word for a moment ("Not found"), or NULL */
+	unsigned long noteUntil;
 };
 
 static void Resized(Doc *d);
@@ -288,7 +290,9 @@ static void DrawStatus(Doc *d)
 	if (words > 0)
 		tp_sprintf(s + strlen(s), "   %ld min", post_minutes(words));   /* System 6's Geneva 9 has no middle dot */
 	tp_sprintf(s + strlen(s), "   Line %ld", d->line + 1);
-	if ((step = PublishStatus(d->id)) != NULL)
+	if (d->note != NULL)
+		tp_sprintf(s + strlen(s), "   %s", d->note);
+	else if ((step = PublishStatus(d->id)) != NULL)
 		tp_sprintf(s + strlen(s), "   %s", step);     /* Publish, in the background */
 	PStr(p, s);
 	MoveTo((short) (r.left + 6), (short) (r.bottom - 4));
@@ -330,6 +334,10 @@ static void UpdateStatus(Doc *d, Boolean force)
 
 	if (d->countDue && TickCount() >= d->countAt)
 		CountWords(d);
+	if (d->note != NULL && TickCount() >= d->noteUntil) {
+		d->note = NULL;
+		force = true;
+	}
 	EdGetSelection(d->ed, &start, &end);
 	line = EdLineOf(d->ed, end);
 	if (!force && line == d->line && words == d->words && strcmp(d->viShown, vi_status(&d->vi)) == 0)
@@ -339,6 +347,13 @@ static void UpdateStatus(Doc *d, Boolean force)
 	SetPort(d->w);
 	DrawStatus(d);
 	SetPort(save);
+}
+
+void DocNote(Doc *d, const char *note)
+{
+	d->note = note;
+	d->noteUntil = TickCount() + 4 * 60;
+	DocShowStatus(d);
 }
 
 void DocShowSelection(Doc *d)
@@ -1228,6 +1243,7 @@ void DocUpdate(Doc *d)
 	SetPort(d->w);
 	BlockOff(d);                        /* everywhere, not just in the update */
 	BeginUpdate(d->w);
+	ThemePort();                        /* whatever drew in it last */
 	EdDraw(d->ed);
 	if (d->pane > 0)
 		PreviewPaneDraw();
