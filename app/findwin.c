@@ -126,8 +126,7 @@ void FindDialog(Doc *d)
 		SysBeep(10);
 		return;
 	}
-	if (IsSystem7())
-		HideDialogItem(dlg, kHeading);
+	DropHeading(dlg, kHeading);
 	OutlineDefault(dlg, kOutline);
 	SetItemText(dlg, kFindField, gFind);
 	SetItemText(dlg, kReplaceField, gReplace);

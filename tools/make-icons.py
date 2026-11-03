@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Draws Topica's Finder icons and writes resources/icons.r (ICN# with masks).
+"""Draws Topica's Finder icons and writes resources/icons.r (ICN# with masks,
+and the application's ICON for the About box).
 
     tools/make-icons.py [--show]
 
@@ -110,6 +111,12 @@ def rez(rid, name, bits, mask):
     return "data 'ICN#' (%d, \"%s\", purgeable) {\n%s\n};\n" % (rid, name, "\n".join(lines))
 
 
+def rez_icon(rid, name, bits):
+    rows = hexrows(bits)
+    lines = ['\t$"%s %s %s %s"' % tuple(rows[i:i + 4]) for i in range(0, 32, 4)]
+    return "data 'ICON' (%d, \"%s\", purgeable) {\n%s\n};\n" % (rid, name, "\n".join(lines))
+
+
 def show(name, bits):
     print(name)
     for row in bits:
@@ -130,6 +137,8 @@ def main():
         f.write(rez(128, "Topica", app, appmask))
         f.write("\n")
         f.write(rez(129, "Topica post", doc, docmask))
+        f.write("\n/* The About box's */\n")
+        f.write(rez_icon(128, "Topica", app))
     print("make-icons: wrote", os.path.normpath(out))
 
 

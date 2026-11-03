@@ -371,6 +371,19 @@ static void Context(const char *t, long n, long at, int len, char *out)
 		a--;
 	while (b < n && b - at - len < kContext && t[b] != '\r' && t[b] != '\n')
 		b++;
+	/* whole words at the ends */
+	if (a > 0 && t[a - 1] != ' ' && t[a - 1] != '\r' && t[a - 1] != '\n') {
+		for (k = a; k < at && t[k] != ' '; k++)
+			;
+		if (k < at)
+			a = k + 1;
+	}
+	if (b < n && t[b] != ' ' && t[b] != '\r' && t[b] != '\n') {
+		for (k = b; k > at + len && t[k - 1] != ' '; k--)
+			;
+		if (k > at + len)
+			b = k - 1;
+	}
 	if (a > 0 && t[a - 1] != '\r' && t[a - 1] != '\n')
 		*o++ = (char) 0xC9;             /* an ellipsis */
 	for (k = a; k < at; k++)
@@ -386,6 +399,29 @@ static void Context(const char *t, long n, long at, int len, char *out)
 	*o = '\0';
 }
 
+/* Along the bottom of the screen, below the word; at the top when the
+   word is down there (a small screen, a long window) */
+static void Place(DialogPtr dlg, Doc *d, long at)
+{
+	Rect word, s = qd.screenBits.bounds;
+	short width = (short) (dlg->portRect.right - dlg->portRect.left);
+	short top = (short) (s.bottom - (dlg->portRect.bottom - dlg->portRect.top) - 8);
+	Point p, now;
+
+	SetPort(DocWindow(d));
+	EdCaretRect(DocEditor(d), at, &word);
+	p.h = word.left;
+	p.v = word.bottom;
+	LocalToGlobal(&p);
+	if (p.v > top - 8)
+		top = IsSystem7() ? 46 : 28;   /* below the menu bar, and a title bar on 7 */
+	SetPort(dlg);
+	now.h = now.v = 0;
+	LocalToGlobal(&now);
+	if (now.v != top || !((WindowPeek) dlg)->visible)
+		MoveWindow(dlg, (short) ((s.right - width) / 2), top, false);
+}
+
 static DialogPtr MakeDialog(void)
 {
 	DialogPtr d = GetModalDialog(kSpellDialog);
@@ -393,14 +429,9 @@ static DialogPtr MakeDialog(void)
 	Handle h;
 	Rect r, bounds;
 	Point cell;
-	short width, height;
 
 	if (d == NULL)
 		return NULL;
-	/* along the bottom of the screen, below the word */
-	width = (short) (d->portRect.right - d->portRect.left);
-	height = (short) (d->portRect.bottom - d->portRect.top);
-	MoveWindow(d, (short) ((qd.screenBits.bounds.right - width) / 2), (short) (qd.screenBits.bounds.bottom - height - 8), false);
 	OutlineDefault(d, kOutline);
 	GetDialogItem(d, kList, &type, &h, &r);
 	SetDialogItem(d, kList, userItem, (Handle) NewUserItemUPP(DrawList), &r);
@@ -495,8 +526,10 @@ void SpellCheck(Doc *d)
 				SysBeep(10);
 				break;
 			}
-			ShowWindow(dlg);
 		}
+		Place(dlg, d, at);
+		if (!((WindowPeek) dlg)->visible)
+			ShowWindow(dlg);
 		SetPort(dlg);
 		SetItemText(dlg, kWordText, context);
 		SetItemText(dlg, kChangeField, count > 0 ? sug[0] : word);

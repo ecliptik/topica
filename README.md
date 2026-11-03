@@ -146,8 +146,9 @@ to write to a real floppy. The `.sit` and
 
 Both run on a 68000. Publishing needs MacTCP, or for the talkip build
 LocalTalk and a MacIP gateway, and the bridge on your network. Topica
-opens posts of up to 32,000 characters (it uses the Toolbox's TextEdit for
-now); [docs/LIMITS.md](docs/LIMITS.md) has the rest of the limits.
+opens posts of up to 32,000 characters, about 5,000 words (it uses the
+Toolbox's TextEdit); [docs/LIMITS.md](docs/LIMITS.md) has the rest of the
+limits.
 
 ## Building
 
@@ -182,7 +183,7 @@ released version) and publishes them with the version's CHANGELOG section;
   dictionary and spelling, and Publish's request and reply. Tested on the
   host.
 - `app/`: the Macintosh application. Every edit goes through one call
-  (`EdReplace` in `app/editor.h`), with TextEdit behind it today.
+  (`EdReplace` in `app/editor.h`), with the Toolbox's TextEdit behind it.
 - `resources/`: menus, dialogs, alerts and icons (Rez).
 - `bridge/`: topica-bridge, the server Publish sends posts to (Python).
 - `scripts/`, `tests/`, `tools/`: building, emulators, tests, icons, the

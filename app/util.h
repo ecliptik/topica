@@ -55,6 +55,9 @@ DialogPtr GetModalDialog(short id);
 void NoDialogHelp(void);
 /* Centres a window on the main screen, a third of the way down (the HIG's spot) */
 void CenterWindow(WindowPtr w);
+/* On System 7, hides the dialog's heading (the title bar says it) and
+   moves the items up into its room; on System 6 the heading stays */
+void DropHeading(DialogPtr d, short heading);
 /* Item outline: a user item drawn as the default button's ring */
 void OutlineDefault(DialogPtr d, short item);
 /* The filter every dialog uses: Return and Enter press OK, Escape and

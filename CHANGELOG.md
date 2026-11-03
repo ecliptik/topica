@@ -14,6 +14,15 @@
   QuickTime 2.5 or later draws JPEG, GIF, PNG and its other formats; any
   Mac draws PICT. Pictures are drawn once at the size shown and kept
   (16 at most, in temporary memory when there is some).
+- Polish:
+  - On System 7, dialogs no longer have an empty band at the top where
+    System 6's heading goes.
+  - The About box shows Topica's icon, without a word left on a line of
+    its own.
+  - Check Spelling's suggestions are six whole rows, its line around the
+    word starts and ends on whole words, and on a small screen it moves to
+    the top when the word would be under it.
+  - Italics in the preview leave room for their slant before the next word.
 - The preview's byline puts a bullet between the date and the category:
   System 6's Geneva has no middle dot, which showed as a box.
 - docs/LIMITS.md: what Topica doesn't do, and what it's been tried on.

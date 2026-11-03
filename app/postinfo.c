@@ -40,8 +40,7 @@ static short RunDialog(DialogPtr dlg, short firstField, short heading)
 {
 	short item;
 
-	if (IsSystem7())
-		HideDialogItem(dlg, heading);   /* the movable dialog's title bar says it */
+	DropHeading(dlg, heading);
 	OutlineDefault(dlg, kOutline);
 	ShowWindow(dlg);
 	SelectDialogItemText(dlg, firstField, 0, 32767);

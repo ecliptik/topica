@@ -152,6 +152,46 @@ void CenterWindow(WindowPtr w)
 	MoveWindow(w, left, top, false);
 }
 
+#define kTopMargin 12
+
+void DropHeading(DialogPtr d, short heading)
+{
+	DialogPeek dp = (DialogPeek) d;
+	short count = **(short **) dp->items + 1, i, type, top = 32767, dy;
+	Handle h;
+	Rect r;
+
+	if (!IsSystem7())
+		return;
+	HideDialogItem(d, heading);
+	for (i = 1; i <= count; i++)
+		if (i != heading) {
+			GetDialogItem(d, i, &type, &h, &r);
+			if (r.top < top)
+				top = r.top;
+		}
+	dy = (short) (top - kTopMargin);
+	if (dy <= 0)
+		return;
+	for (i = 1; i <= count; i++) {
+		if (i == heading)
+			continue;
+		GetDialogItem(d, i, &type, &h, &r);
+		OffsetRect(&r, 0, (short) -dy);
+		SetDialogItem(d, i, type, h, &r);
+		if (type & ctrlItem) {
+			ControlHandle c = (ControlHandle) h;
+			MoveControl(c, (*c)->contrlRect.left, (short) ((*c)->contrlRect.top - dy));
+		}
+	}
+	if (dp->editField >= 0 && dp->textH != NULL) {
+		OffsetRect(&(*dp->textH)->destRect, 0, (short) -dy);
+		OffsetRect(&(*dp->textH)->viewRect, 0, (short) -dy);
+	}
+	SizeWindow(d, (short) (d->portRect.right - d->portRect.left), (short) (d->portRect.bottom - d->portRect.top - dy), false);
+	CenterWindow(d);
+}
+
 static pascal void DrawOutline(DialogPtr d, short item)
 {
 	short type;

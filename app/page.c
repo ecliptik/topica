@@ -899,7 +899,7 @@ static void DrawLine(Page *pg, const PgBlock *p, const LayLine *line, short x, s
 			DrawText(pg->buf, (short) i, (short) (e - i));
 		}
 		if ((pg->face[mf] & italic) && e < end && !(pg->face[mp_font(&p->b, pg->sty[e])] & italic))
-			Move(1, 0);                 /* room for the slant */
+			Move((short) (pg->f.ascent[mf] / 3), 0);   /* room for the slant: the top of an italic leans right */
 		i = e;
 	}
 	Black(color);

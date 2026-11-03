@@ -78,12 +78,16 @@
 
 ## Later
 
-- [ ] A custom text engine instead of TextEdit: no 32,000-character limit,
-      inline styling, faster vi motions
 - [x] A template file for New Post ("Topica Template", `{{date}}`)
 - [x] Stationery pads (System 7): open as an untitled post, `{{date}}`
       filled in
 - [x] Drag and drop text on System 7.5 (moves within a post, copies out)
 - [x] Themes: Light and Dark everywhere, color themes on a color Mac
-- [ ] A quick-note desk accessory
 - [x] Release script: `.dsk`, `.hqx` and `.sit` for each build
+
+## Not for now
+
+- A custom text engine instead of TextEdit (no 32,000-character limit,
+  inline styling, faster vi motions): TextEdit's 32K is about 5,000 words
+- A quick-note desk accessory: on System 7 and under MultiFinder, Topica
+  itself runs beside other programs

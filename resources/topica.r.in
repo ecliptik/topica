@@ -96,7 +96,7 @@ resource 'MENU' (132, "Headings") {
 /* Alert rectangles are where System 6 puts them, centred on a 512x342
    screen; System 7 centres them on any screen (alertPositionMainScreen). */
 resource 'ALRT' (128, "About", purgeable) {
-	{ 77, 86, 227, 426 }, 128,
+	{ 77, 86, 235, 426 }, 128,
 	{
 		OK, visible, silent;
 		OK, visible, silent;
@@ -108,11 +108,12 @@ resource 'ALRT' (128, "About", purgeable) {
 
 resource 'DITL' (128, "About", purgeable) {
 	{
-		{ 116, 256, 136, 324 }, Button { enabled, "OK" };
-		{ 12, 16, 32, 324 }, StaticText { disabled, "Topica @TOPICA_VERSION_DISPLAY@" };
-		{ 38, 16, 108, 324 }, StaticText { disabled,
+		{ 126, 256, 146, 324 }, Button { enabled, "OK" };
+		{ 12, 16, 44, 48 }, Icon { disabled, 128 };
+		{ 12, 64, 30, 324 }, StaticText { disabled, "Topica @TOPICA_VERSION_DISPLAY@" };
+		{ 36, 64, 116, 324 }, StaticText { disabled,
 			"A Markdown writer for blogs.\r"
-			"Named for Aristotle\325s Topics, on finding things to say.\r"
+			"Named for Aristotle\325s Topics, his book on finding things to say.\r\r"
 			"\251 2026 Topica contributors" };
 	}
 };
@@ -333,8 +334,8 @@ resource 'DITL' (145, "Check Spelling", purgeable) {
 		{ 10, 96, 26, 458 }, StaticText { disabled, "" };
 		{ 38, 12, 54, 96 }, StaticText { disabled, "Change to:" };
 		{ 38, 100, 54, 312 }, EditText { enabled, "" };
-		{ 64, 96, 168, 312 }, UserItem { enabled };
-		{ 64, 12, 80, 92 }, StaticText { disabled, "Suggested:" };
+		{ 70, 96, 168, 312 }, UserItem { enabled };            /* six rows of 16 and the frame */
+		{ 70, 12, 86, 92 }, StaticText { disabled, "Suggested:" };
 	}
 };
 

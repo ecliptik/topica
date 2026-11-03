@@ -104,8 +104,7 @@ Boolean SettingsDialog(void)
 		SysBeep(10);
 		return false;
 	}
-	if (IsSystem7())
-		HideDialogItem(d, kHeading);
+	DropHeading(d, kHeading);
 	OutlineDefault(d, 3);
 	for (i = 0; i < 3; i++) {
 		if (strcmp(p.font, kFonts[i]) == 0)

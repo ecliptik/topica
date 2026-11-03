@@ -413,8 +413,7 @@ void PublishPost(Doc *d)
 		SysBeep(10);
 		return;
 	}
-	if (IsSystem7())
-		HideDialogItem(dlg, kHeading);
+	DropHeading(dlg, kHeading);
 	Value(d, "title", title, 120);
 	if (title[0] == '\0') {
 		Str255 w;
