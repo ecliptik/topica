@@ -2100,7 +2100,14 @@ static void TestPublish(void)
 	pub_path(0, 0, 0, "Hello World", "Hello, W\x9Arld!", "2026-10-23 09:00:00 -0700", out, sizeof(out));
 	CHECK_STR(out, "_posts/2026-10-23-hello-world.md");
 	pub_path(0, 0, 0, "untitled", "", "", out, sizeof(out));
-	CHECK_STR(out, "_posts/untitled.md");                  /* no date: the dialog asks for one */
+	CHECK_STR(out, "_posts/YYYY-MM-DD-untitled.md");       /* no date: the dialog asks for one */
+	CHECK(!pub_path_ok(out));
+	pub_path(0, 0, 0, "notes.md", "Other", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_posts/2026-10-23-notes.md");          /* the file's name, as a draft has it */
+	pub_path(0, 0, 0, "pict-test.md", "A Picture", "", out, sizeof(out));
+	CHECK_STR(out, "_posts/YYYY-MM-DD-pict-test.md");
+	pub_path(0, 0, 1, "notes.md", "x", "2026-10-23", out, sizeof(out));
+	CHECK_STR(out, "_posts/2026/2026-10-23-notes.md");
 	pub_path(0, 1, 0, "2026-10-23-hello.md", "x", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "_drafts/hello.md");
 	pub_path(0, 1, 0, "notes.md", "x", "2026-10-23", out, sizeof(out));
@@ -2128,7 +2135,7 @@ static void TestPublish(void)
 	pub_path(0, 0, 1, "Hello World", "Hello", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "_posts/2026/2026-10-23-hello.md");
 	pub_path(0, 0, 1, "untitled", "", "", out, sizeof(out));
-	CHECK_STR(out, "_posts/untitled.md");
+	CHECK_STR(out, "_posts/YYYY-MM-DD-untitled.md");
 	pub_path(0, 1, 1, "Hello World", "Hello", "2026-10-23", out, sizeof(out));
 	CHECK_STR(out, "_drafts/hello.md");
 	pub_path(1, 0, 1, "Hello World", "Hello", "2026-10-23", out, sizeof(out));

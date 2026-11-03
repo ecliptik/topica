@@ -23,6 +23,12 @@
     word starts and ends on whole words, and on a small screen it moves to
     the top when the word would be under it.
   - Italics in the preview leave room for their slant before the next word.
+  - A Mac whose clock says 1926 means 2026: System 6's Control Panel sets
+    the year in two digits. Post Info, New Post, Save and Publish read a
+    year in the 1920s or 1930s as the 2020s or 2030s.
+  - Publish names a post after its file, as it does a draft
+    (notes.md goes to _posts/2026-11-03-notes.md); a post with no date
+    known shows _posts/YYYY-MM-DD-..., to fill in.
   - Find, Check Spelling and Post Info keep the scroll bar and the status
     line's Line with the selection they move.
   - The Headings menu works with the preview's window in front: it brings

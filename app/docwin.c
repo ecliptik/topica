@@ -1019,7 +1019,6 @@ static Boolean Write(Doc *d, const FileRef *f)
 static void SuggestName(Doc *d, char *out, int cap)
 {
 	char title[128];
-	unsigned long secs;
 	DateTimeRec dt;
 	const char *t;
 
@@ -1030,14 +1029,9 @@ static void SuggestName(Doc *d, char *out, int cap)
 	t = EdLockText(d->ed);
 	(void) fm_get(t, EdLength(d->ed), "title", title, sizeof(title));
 	EdUnlockText(d->ed);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Warray-bounds"   /* the clock is a low-memory global */
-	GetDateTime(&secs);
-#pragma GCC diagnostic pop
-	SecondsToDate(secs, &dt);
 	/* a Mac with no clock battery wakes up in 1904: no date then; Hugo
 	   posts carry their date inside */
-	post_filename(dt.year >= 1990 && gPrefs.profile != kProfileHugo ? dt.year : 0, dt.month, dt.day,
+	post_filename(ClockDate(&dt) && gPrefs.profile != kProfileHugo ? dt.year : 0, dt.month, dt.day,
 		title, 31, out, cap);
 }
 

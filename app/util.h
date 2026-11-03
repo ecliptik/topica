@@ -6,6 +6,7 @@
 
 #include <Dialogs.h>
 #include <Files.h>
+#include <OSUtils.h>
 
 /* Toolbox constants Retro68's interfaces leave out */
 enum {
@@ -70,8 +71,11 @@ void FlashButton(DialogPtr d, short item);
 void GetItemText(DialogPtr d, short item, char *out, short cap);
 void SetItemText(DialogPtr d, short item, const char *s);
 
-/* Today as "2026-10-23", or "" when the clock is plainly wrong (a Mac
+/* The clock's date, a 1920s or 1930s year read as the 2020s or 2030s
+   (System 6 sets years in two digits); 0 when it's plainly wrong (a Mac
    without its PRAM battery thinks it's 1904) */
+Boolean ClockDate(DateTimeRec *dt);
+/* Today as "2026-10-23", or "" when the clock is plainly wrong */
 void Today(char out[16]);
 
 /* An alert that says what went wrong: what we were doing, then the reason */

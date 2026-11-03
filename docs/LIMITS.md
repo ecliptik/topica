@@ -21,8 +21,11 @@ black and white, and networks without encryption.
   a longer name on the blog.
 - **The Mac's clock decides "today".** Post Info's date, New Post's
   `{{date}}`, Save's suggested name and Publish's path all come from it.
-  A Mac whose clock battery is flat may think it's 1904 or 1926: put the
-  date in the front matter yourself and Publish uses that.
+  System 6's Control Panel sets the year in two digits, so 2026 is 1926
+  to the Mac: Topica reads a year in the 1920s or 1930s as the 2020s or
+  2030s. A Mac whose clock battery is flat thinks it's 1904, and Topica
+  leaves the date out: put it in the front matter yourself and Publish
+  uses that. The Mac's clock runs out in 2040.
 - **Front matter:** Post Info edits the title, description, category,
   tags, layout and date. It reads YAML's plain and quoted values and lists,
   and TOML's strings, one-line arrays, booleans, numbers and dates. Other

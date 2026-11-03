@@ -390,17 +390,27 @@ void DebugLog(const char *fmt, ...)
 }
 #endif
 
-void Today(char out[16])
+Boolean ClockDate(DateTimeRec *dt)
 {
 	unsigned long secs;
-	DateTimeRec dt;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"   /* the clock is a low-memory global */
 	GetDateTime(&secs);
 #pragma GCC diagnostic pop
-	SecondsToDate(secs, &dt);
-	if (dt.year < 1990)
+	SecondsToDate(secs, dt);
+	/* System 6's Control Panel takes a year in two digits, 20 to 19: a
+	   year set as 26 is 1926 to the Mac. The clock runs out in 2040. */
+	if (dt->year >= 1920 && dt->year < 1940)
+		dt->year += 100;
+	return dt->year >= 1990;
+}
+
+void Today(char out[16])
+{
+	DateTimeRec dt;
+
+	if (!ClockDate(&dt))
 		out[0] = '\0';
 	else
 		tp_sprintf(out, "%04d-%02d-%02d", dt.year % 10000, dt.month % 100, dt.day % 100);

@@ -135,16 +135,6 @@ static int Ymd(const char *s)
 	return !IS_DIGIT(s[10]);
 }
 
-/* The n digits at s */
-static int Number(const char *s, int n)
-{
-	int v = 0;
-
-	while (n-- > 0)
-		v = v * 10 + (*s++ - '0');
-	return v;
-}
-
 /* A Jekyll post's name: "2026-10-23-..." */
 static int Dated(const char *n)
 {
@@ -183,19 +173,21 @@ void pub_path(int hugo, int draft, int years, const char *name, const char *titl
 {
 	const char *dir = hugo ? "content/posts/" : draft ? "_drafts/" : "_posts/";
 	char file[96], year[8];
-	int y = 0, m = 0, d = 0;
+	int post = !hugo && !draft;
 
-	if (NameOk(name) && strlen(name) < sizeof(file) && (hugo || draft || Dated(name))) {
+	/* the file's own name when it's one the blog can take, else the title's */
+	if (NameOk(name) && strlen(name) < sizeof(file) - 11)
 		strcpy(file, name);
-		if (draft && !hugo && Dated(file))
-			memmove(file, file + 11, strlen(file + 11) + 1);
-	} else {
-		if (!draft && !hugo && Ymd(date)) {
-			y = Number(date, 4);
-			m = Number(date + 5, 2);
-			d = Number(date + 8, 2);
-		}
-		post_filename(y, m, d, title, 0, file, (int) sizeof(file));
+	else
+		post_filename(0, 0, 0, title, 0, file, (int) sizeof(file) - 11);   /* room for a date */
+	if (draft && !hugo && Dated(file))
+		memmove(file, file + 11, strlen(file + 11) + 1);
+	else if (post && !Dated(file)) {
+		/* a Jekyll post is named with its date: with none known, the
+		   dialog shows where it goes (and won't publish until it's there) */
+		memmove(file + 11, file, strlen(file) + 1);
+		memcpy(file, Ymd(date) ? date : "YYYY-MM-DD", 10);
+		file[10] = '-';
 	}
 	year[0] = '\0';
 	if (years && !hugo && !draft && Dated(file)) {
