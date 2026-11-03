@@ -341,6 +341,18 @@ static void UpdateStatus(Doc *d, Boolean force)
 	SetPort(save);
 }
 
+void DocShowSelection(Doc *d)
+{
+	GrafPtr save;
+
+	GetPort(&save);
+	SetPort(d->w);
+	EdShowSelection(d->ed);
+	SyncScrollBar(d);
+	UpdateStatus(d, false);
+	SetPort(save);
+}
+
 /* After any change: the scroll bar, and the words soon. Undone (or redone)
    back to the saved text, the post is unchanged again. */
 static void Changed(Doc *d)

@@ -30,6 +30,9 @@ long DocId(Doc *d);                 /* a number for Apple events, unique while T
 Doc *DocFromId(long id);            /* NULL when there's none */
 Doc *DocNth(short n);               /* the nth post window from the front, 1-based */
 void DocShowStatus(Doc *d);         /* its status line drawn again (what Publish is doing) */
+/* Scrolls the selection into view, with the scroll bar and the status
+   line's Line following (for Find and Check Spelling, between events) */
+void DocShowSelection(Doc *d);
 Doc *DocFront(void);               /* the front document window, or NULL */
 short DocCount(void);
 short DocMaxCount(void);

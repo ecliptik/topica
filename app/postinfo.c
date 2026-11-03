@@ -127,7 +127,7 @@ Boolean PostInfo(Doc *d)
 		if (DocReplace(d, kUndoPostInfo, start, end, block, n)) {
 			if (selStart >= end) {
 				EdSetSelection(ed, selStart + delta, selEnd + delta);
-				EdShowSelection(ed);
+				DocShowSelection(d);
 			}
 		}
 		DocSealUndo(d);

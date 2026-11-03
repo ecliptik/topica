@@ -519,7 +519,7 @@ void SpellCheck(Doc *d)
 		EdUnlockText(ed);
 		SetPort(DocWindow(d));
 		EdSetSelection(ed, at, at + len);
-		EdShowSelection(ed);
+		DocShowSelection(d);
 		if (dlg == NULL) {
 			dlg = MakeDialog();
 			if (dlg == NULL) {

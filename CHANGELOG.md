@@ -23,6 +23,10 @@
     word starts and ends on whole words, and on a small screen it moves to
     the top when the word would be under it.
   - Italics in the preview leave room for their slant before the next word.
+  - Find, Check Spelling and Post Info keep the scroll bar and the status
+    line's Line with the selection they move.
+  - The Headings menu works with the preview's window in front: it brings
+    the post forward at that heading, as a double-click in the preview does.
 - The preview's byline puts a bullet between the date and the category:
   System 6's Geneva has no middle dot, which showed as a box.
 - docs/LIMITS.md: what Topica doesn't do, and what it's been tried on.

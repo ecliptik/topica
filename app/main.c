@@ -179,7 +179,7 @@ static void AdjustMenus(void)
 		}
 	}
 	/* whole menus */
-	if (EnableMenu(post, target != NULL || PublishBusy()) | EnableMenu(GetMenuHandle(kHeadingsMenu), d != NULL))
+	if (EnableMenu(post, target != NULL || PublishBusy()) | EnableMenu(GetMenuHandle(kHeadingsMenu), target != NULL))
 		DrawMenuBar();
 }
 
@@ -324,6 +324,10 @@ static void DoMenu(long choice)
 		}
 		break;
 	case kHeadingsMenu:
+		if (d == NULL && Target() != NULL) {
+			d = Target();               /* from the preview: to the post, as a double-click does */
+			SelectWindow(DocWindow(d));
+		}
 		HeadingsGo(d, item);
 		break;
 	case kThemeMenu:
@@ -346,7 +350,7 @@ static void DoMouseDown(EventRecord *e)
 	switch (part) {
 	case inMenuBar:
 		AdjustMenus();
-		HeadingsMenu(DocFront());
+		HeadingsMenu(Target());
 		DoMenu(MenuSelect(e->where));
 		break;
 	case inSysWindow:

@@ -43,7 +43,7 @@ static Boolean FindNext(Doc *d)
 		return false;
 	}
 	EdSetSelection(ed, at, at + (long) strlen(gFind));
-	EdShowSelection(ed);
+	DocShowSelection(d);
 	DocSealUndo(d);
 	return true;
 }
