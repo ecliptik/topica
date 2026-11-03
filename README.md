@@ -15,10 +15,18 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 its Markdown formatted as it's written, and its preview on the
 right](docs/images/color.png)
 
-| | | |
-|---|---|---|
-| ![A post in Topica on a Mac Plus, with headings and strong text in bold, emphasis in italics and the link underlined](docs/images/editor.png) | ![The preview: the post laid out like its web page, with the title, date and category, lists, a quote and a code block](docs/images/preview.png) | ![Check Spelling stopped at "teh", suggesting "the"](docs/images/spelling.png) |
-| Writing on a Mac Plus (System 6): the formatting shows as you type. | The preview lays the post out like its web page. | Check Spelling, with suggestions from an 89,000-word dictionary. |
+<table>
+<tr>
+<td width="33%" valign="top"><img src="docs/images/editor.png" width="100%" alt="A post in Topica on a Mac Plus, with headings and strong text in bold, emphasis in italics and the link underlined"></td>
+<td width="33%" valign="top"><img src="docs/images/preview.png" width="100%" alt="The preview: the post laid out like its web page, with the title, date and category, lists, a quote and a code block"></td>
+<td width="33%" valign="top"><img src="docs/images/spelling.png" width="100%" alt="Check Spelling stopped at &quot;teh&quot;, suggesting &quot;the&quot;"></td>
+</tr>
+<tr>
+<td valign="top">Formatting as you type</td>
+<td valign="top">The preview</td>
+<td valign="top">Check Spelling</td>
+</tr>
+</table>
 
 *Above: System 7.6.1 in 256 colors in Basilisk II. Below it: System 6.0.8
 on a Mac Plus in Snow, pixel for pixel.*
