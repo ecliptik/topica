@@ -7,6 +7,8 @@
 - docs/LIMITS.md: what Topica doesn't do, and what it's been tried on.
 - The README shows Topica at work, and says which download is which.
 - Releases are on GitHub.
+- About Topica, on the disk, covers themes, Check Spelling With, and
+  Publish in the background and by name.
 
 ## 0.8.0 (2026-11-02)
 

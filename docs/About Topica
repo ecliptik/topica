@@ -13,6 +13,8 @@ Writing a post
 Formatting
 Topica shows Markdown's formatting as you write: headings and strong text in bold, emphasis in italics, code in Monaco, link text underlined. Post > Hide Formatting shows plain text. On a 68000 Mac (the Macintosh Plus, SE, 512Ke) formatting starts off, because it makes long posts slow to open; Post > Show Formatting turns it on.
 
+Post > Theme colors the post, its status line and the preview: Light or Dark on any Mac, and on a color Mac Solarized, TokyoNight, Amber CRT, System 7, Dracula, Nord, Green Screen, Classic, Monokai and Gruvbox. Printing stays black on white. Topica Lite has Light and Dark.
+
 The Headings menu lists the post's headings. Choose one to go there.
 
 Post > Insert Link (Command-K) puts a link around the selected text.
@@ -24,13 +26,14 @@ Printing and HTML
 File > Print (Command-P) prints the post as the preview shows it. File > Export HTML saves it as a web page you can open in a browser.
 
 Spelling
-Edit > Check Spelling (Command-;) goes through the post from the caret and stops at each word it doesn't know, with suggestions. Learn keeps a word in Topica Words, in the Preferences folder (System 7) or the System Folder. The dictionary is the file Topica Dictionary, in the same folder as Topica; it is made from SCOWL, by Kevin Atkinson and others (see Dictionary Licence).
+Edit > Check Spelling (Command-;) goes through the post from the caret and stops at each word it doesn't know, with suggestions. Learn keeps a word in Topica Words, in the Preferences folder (System 7) or the System Folder. The dictionary is the file Topica Dictionary, in the same folder as Topica; it is made from SCOWL, by Kevin Atkinson and others (see Dictionary Licence). On System 7, Edit > Check Spelling With hands the post to a Word Services spelling checker such as Excalibur instead; one Undo takes back all of its corrections.
 
 vi keys
 Edit > Preferences can turn on vi keys: normal, insert and visual modes, as in vi. Escape is the Esc key, or Command-period on keyboards without one; "jk leaves insert mode" makes typing j then k quickly do it too. The status line shows INSERT and VISUAL.
 
 Publishing
-Post > Publish sends the post to topica-bridge, a small server on your network, which puts it on your blog's drafts branch; you merge that branch when you want the post on the site. The dialog suggests where the post goes (_posts with its date, _drafts for a draft, or content/posts for Hugo) and remembers the bridge's address and key. If your blog keeps posts in a folder for each year, publish one as _posts/2026/2026-10-23-title.md and Topica suggests that form from then on. Command-period, or Cancel, stops it while it waits. Topica needs MacTCP for this, or the talkip build of Topica Lite on a Mac with LocalTalk and a MacIP gateway.
+Post > Publish sends the post to topica-bridge, a small server on your network, which puts it on your blog's drafts branch; you merge that branch when you want the post on the site. The dialog suggests where the post goes (_posts with its date, _drafts for a draft, or content/posts for Hugo) and remembers the bridge and its key. The bridge is an address or a name with its port, like 192.0.2.5:8023 or bridge.example.com:8023. If your blog keeps posts in a folder for each year, publish one as _posts/2026/2026-10-23-title.md and Topica suggests that form from then on.
+Publishing goes on in the background, so you can go on writing, or close the post: it sends the post as it was when you chose Publish. The post's status line says how far it has got, and Post > Publish becomes Stop Publishing until it's done. The result comes in a note; if you're in another program, the Mac tells you first. Topica needs MacTCP for this, or the talkip build of Topica Lite on a Mac with LocalTalk and a MacIP gateway.
 
 Undo and Redo
 Command-Z undoes, many steps back. Command-Shift-Z redoes.
@@ -48,7 +51,7 @@ Other characters
 Posts are saved in UTF-8, the way a blog wants them. Characters the Macintosh can't show, such as emoji, appear as codes like &#x1F600; while you write and go back to the real character when you save.
 
 Limits
-Topica opens posts of up to 32,000 characters. Topica Lite, for 512K Macs, opens two windows at a time.
+Topica opens posts of up to 32,000 characters. Topica Lite, for 512K Macs, opens two windows at a time. The rest of the limits, and news of Topica, are at github.com/ecliptik/topica.
 
 Topica is free software under the ISC licence.
 Copyright 2026 Topica contributors.
