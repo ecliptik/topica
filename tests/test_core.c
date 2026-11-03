@@ -999,7 +999,7 @@ static void TestMdpage(void)
 	BLOCKS("---\ntitle:\n---\nbody", "P");
 
 	SHOWN(kPost, 0, "Hello", NULL);
-	SHOWN(kPost, 1, "Oct 22, 2026 \xE1 retro", NULL);
+	SHOWN(kPost, 1, "Oct 22, 2026 \xA5 retro", NULL);
 	SHOWN(kPost, 2, "A short one.", NULL);
 	SHOWN(kPost, 3, "Some text and https://a.b.", ".....llll.....lllllllllll.");
 	SHOWN("Some **bold** and *it*\nnext  \nline\\\nend", 0, "Some bold and it next|line|end",

@@ -8,7 +8,9 @@
 
 /* Mac Roman's lozenge, for a character it doesn't have */
 #define kMissing ((char) 0xD7)
-#define kMiddleDot ((char) 0xE1)
+/* between the date and the category: a bullet, which every Mac font has
+   (System 6's Geneva and Times have no middle dot) */
+#define kBylineDot ((char) 0xA5)
 
 #define IsSpace(c) ((c) == ' ' || (c) == '\t')
 #define IsEol(c) ((c) == '\r' || (c) == '\n')
@@ -247,7 +249,7 @@ static void HeadText(const char *t, long n, int kind, char *buf, long cap)
 			if (date[0] && cat[0]) {
 				long k = (long) strlen(buf);
 				buf[k] = ' ';
-				buf[k + 1] = kMiddleDot;
+				buf[k + 1] = kBylineDot;
 				buf[k + 2] = ' ';
 				buf[k + 3] = 0;
 			}
