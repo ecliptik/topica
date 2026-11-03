@@ -7,6 +7,7 @@
 #include "../core/find.h"
 #include "../core/fmt.h"
 #include "../core/frontmatter.h"
+#include "../core/imgpath.h"
 #include "../core/layout.h"
 #include "../core/mdhtml.h"
 #include "../core/mdpage.h"
@@ -2185,6 +2186,49 @@ static void TestPublish(void)
 	}
 }
 
+static void TestImgPath(void)
+{
+	char p[300], l[64];
+
+#define IP(u, kind, want) do { CHECK(ip_path(u, (long) strlen(u), p, (int) sizeof(p)) == (kind)); \
+		CHECK_STR(p, want); } while (0)
+	IP("/assets/images/posts/retro/mac-plus.jpg", IP_SITE, ":assets:images:posts:retro:mac-plus.jpg");
+	IP("images/x.png", IP_HERE, ":images:x.png");
+	IP("./x.png", IP_HERE, ":x.png");
+	IP("../x.png", IP_HERE, "::x.png");
+	IP("../../img/x.png", IP_HERE, ":::img:x.png");
+	IP("a/../b/x.gif", IP_HERE, ":b:x.gif");
+	IP("/../x.gif", IP_SITE, ":x.gif");
+	IP("/a//b/x.gif?v=2#top", IP_SITE, ":a:b:x.gif");
+	IP("<my%20photo.jpg>", IP_HERE, ":my photo.jpg");
+	IP("caf%C3%A9.jpg", IP_HERE, ":caf\x8E.jpg");
+	IP("100%.jpg", IP_HERE, ":100%.jpg");
+	IP("https://example.com/x.jpg", IP_NONE, "");
+	IP("//example.com/x.jpg", IP_NONE, "");
+	IP("data:image/png;base64,AAAA", IP_NONE, "");
+	IP("", IP_NONE, "");
+	IP("/", IP_NONE, "");
+	IP("a:b/x.jpg", IP_NONE, "");
+	IP("x/a%3Ab.jpg", IP_NONE, "");
+	IP("/this-file-name-is-longer-than-31.jpg", IP_NONE, "");
+	IP("/this-file-name-is-exactly-31.jp", IP_SITE, ":this-file-name-is-exactly-31.jp");
+#undef IP
+	CHECK(ip_path("x.jpg", 5, p, 6) == IP_NONE);    /* ":x.jpg" and its NUL need 7 */
+	CHECK(ip_path("x.jpg", 5, p, 7) == IP_HERE);
+	ip_leaf(":assets:images:x.jpg", l, (int) sizeof(l));
+	CHECK_STR(l, ":x.jpg");
+	ip_leaf("x.jpg", l, (int) sizeof(l));
+	CHECK_STR(l, ":x.jpg");
+	CHECK(ip_type(":a:x.JPG") == 0x4A504547UL);
+	CHECK(ip_type(":a:x.jpeg") == 0x4A504547UL);
+	CHECK(ip_type(":x.png") == 0x504E4766UL);
+	CHECK(ip_type(":x.gif") == 0x47494666UL);
+	CHECK(ip_type(":x.pict") == 0x50494354UL);
+	CHECK(ip_type(":x.webp") == 0);
+	CHECK(ip_type(":a.b:x") == 0);
+	CHECK(ip_type(":x") == 0);
+}
+
 int main(void)
 {
 	TestTextconv();
@@ -2209,6 +2253,7 @@ int main(void)
 	TestPrefixes();
 	TestSpell();
 	TestPublish();
+	TestImgPath();
 	printf("%d checks, %d failed\n", gRun, gFailed);
 	return gFailed ? 1 : 0;
 }

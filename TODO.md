@@ -24,6 +24,8 @@
 - [x] Headings, emphasis, code and links styled in place (styled TextEdit)
 - [x] Insert Link, a Headings menu to jump around the post
 - [x] Image placeholders drawn as framed boxes in the preview
+- [x] Pictures in the preview, from the blog's files on the Mac (QuickTime
+      for JPEG, GIF and PNG; PICT without it)
 - [x] Faster styling on a 68000: style the visible lines first and the
       rest while idle, or build TextEdit's style runs directly
 
@@ -38,6 +40,8 @@
 - [x] A "Printing" status dialog that says how to cancel (Command-period)
 - [x] Measure fonts from the Font Manager's width table (1.5 s on a 68000),
       and keep them when the preview closes (reopening measures again)
+- [x] The preview as a pane in the post's window where the screen has room,
+      with a divider that drags
 
 ## vi mode and spelling
 

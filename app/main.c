@@ -166,7 +166,7 @@ static void AdjustMenus(void)
 	Enable(post, kInsertLinkItem, d != NULL);
 	Enable(post, kFormattingItem, d != NULL && DocCanStyle(d));
 	SetMenuItemText(post, kFormattingItem, gPrefs.format ? "\pHide Formatting" : "\pShow Formatting");
-	SetMenuItemText(post, kPreviewItem, PreviewIsFront() ? "\pHide Preview" : "\pShow Preview");
+	SetMenuItemText(post, kPreviewItem, PreviewShowing(target) ? "\pHide Preview" : "\pShow Preview");
 	Enable(post, kPreviewItem, target != NULL);
 	SetMenuItemText(post, kPublishItem, PublishBusy() ? "\pStop Publishing" : "\pPublish\311");
 	Enable(post, kPublishItem, d != NULL || PublishBusy());
@@ -296,7 +296,7 @@ static void DoMenu(long choice)
 	}
 	case kPostMenu:
 		if (item == kPreviewItem) {
-			if (PreviewIsFront())
+			if (PreviewShowing(Target()))
 				PreviewClose();
 			else if (d != NULL)
 				PreviewShow(d);

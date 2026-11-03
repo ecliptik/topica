@@ -2,6 +2,18 @@
 
 ## 1.0.0 (unreleased)
 
+- The preview is a pane in the post's window, on its right, where the
+  screen has room (wider than 568 pixels); the line between them drags.
+  Show Preview on another post moves it there; Hide Preview gives the
+  window back its width. On a 512x342 screen it stays a window of its own.
+- Pictures in the preview (and printing): an image whose file is on the
+  Mac is drawn, scaled to fit, in place of its box. The address is looked
+  for from the post's folder: a relative one there, one from the site's
+  top (/assets/...) in the post's folder and each one above it (and their
+  static folders, for Hugo), then the file's name beside the post.
+  QuickTime 2.5 or later draws JPEG, GIF, PNG and its other formats; any
+  Mac draws PICT. Pictures are drawn once at the size shown and kept
+  (16 at most, in temporary memory when there is some).
 - The preview's byline puts a bullet between the date and the category:
   System 6's Geneva has no middle dot, which showed as a box.
 - docs/LIMITS.md: what Topica doesn't do, and what it's been tried on.

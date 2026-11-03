@@ -504,3 +504,67 @@ OSErr FileIndexed(const FileRef *dir, short index, FileRef *f)
 	CopyName(f->name, name);
 	return (pb.hFileInfo.ioFlAttrib & kDirectoryBit) ? dirNFErr : noErr;
 }
+
+OSErr FileFolder(short vRefNum, long dirID, long *id, long *parID, Str63 name)
+{
+	CInfoPBRec pb;
+	Str63 n;
+	OSErr err;
+
+	memset(&pb, 0, sizeof(pb));
+	n[0] = 0;
+	pb.dirInfo.ioNamePtr = n;
+	pb.dirInfo.ioVRefNum = vRefNum;
+	pb.dirInfo.ioDrDirID = dirID;
+	pb.dirInfo.ioFDirIndex = -1;        /* the folder itself, by its ID */
+	err = PBGetCatInfoSync(&pb);
+	if (err != noErr)
+		return err;
+	*id = pb.dirInfo.ioDrDirID;
+	*parID = pb.dirInfo.ioDrParID;
+	if (name != NULL)
+		CopyName(name, n);
+	return noErr;
+}
+
+OSErr FileFind(short vRefNum, long dirID, const char *path, FileRef *f, OSType *type)
+{
+	CInfoPBRec pb;
+	Str255 p;
+	const char *leaf = strrchr(path, ':');
+	OSErr err;
+
+	PStr(p, path);
+	memset(&pb, 0, sizeof(pb));
+	pb.hFileInfo.ioNamePtr = p;
+	pb.hFileInfo.ioVRefNum = vRefNum;
+	pb.hFileInfo.ioDirID = dirID;
+	err = PBGetCatInfoSync(&pb);
+	if (err != noErr)
+		return err;
+	if (pb.hFileInfo.ioFlAttrib & kDirectoryBit)
+		return fnfErr;
+	f->vRefNum = vRefNum;
+	f->dirID = pb.hFileInfo.ioFlParID;
+	PStr(p, leaf != NULL ? leaf + 1 : path);
+	CopyName(f->name, p);
+	*type = pb.hFileInfo.ioFlFndrInfo.fdType;
+	return noErr;
+}
+
+OSErr FileRealFolder(short *vRefNum, long *dirID)
+{
+	WDPBRec pb;
+	OSErr err;
+
+	if (*dirID != 0)
+		return noErr;
+	memset(&pb, 0, sizeof(pb));
+	pb.ioVRefNum = *vRefNum;
+	err = PBGetWDInfoSync(&pb);
+	if (err != noErr)
+		return err;
+	*vRefNum = pb.ioWDVRefNum;
+	*dirID = pb.ioWDDirID;
+	return noErr;
+}

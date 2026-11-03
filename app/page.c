@@ -14,6 +14,7 @@
 
 #include "../core/layout.h"
 #include "../core/mdpage.h"
+#include "images.h"
 #include "page.h"
 #include "theme.h"
 #include "util.h"
@@ -416,6 +417,27 @@ static void SpliceLinks(Page *pg, long start, long end)
 	pg->linksDue = true;
 }
 
+/* An image's size on the page: its picture's, made to fit the line, when
+   there's one on the Mac (images.h); a framed box when not */
+static Boolean ImageFit(const Page *pg, const char *text, long n, const PgBlock *p, char *url, long *len,
+		short *w, short *h)
+{
+	short room = LineRoom(pg, p);
+
+	*len = mp_link_url(text, n, p->b.at, url, 256);
+	if (*len <= 0 || !ImgSize(url, *len, w, h))
+		return false;
+	if (*w > room) {
+		*h = (short) ((long) *h * room / *w);
+		*w = room;
+	}
+	if (*h < 1)
+		*h = 1;
+	if (*h > 4000)
+		*h = 4000;
+	return true;
+}
+
 /* Lays block i out exactly; 0 when memory ran out */
 static Boolean Exact(Page *pg, const char *text, long n, long i)
 {
@@ -427,7 +449,10 @@ static Boolean Exact(Page *pg, const char *text, long n, long i)
 	if (p.b.kind == MP_RULE) {
 		h = kRuleHeight;
 	} else if (p.b.kind == MP_IMAGE) {
-		h = kImageHeight;
+		char url[256];
+		short w;
+		if (!ImageFit(pg, text, n, &p, url, &len, &w, &h))
+			h = kImageHeight;
 	} else {
 		pg->nfound = 0;
 		len = Text(pg, text, n, &p, p.what == kBody ? Found : NULL, pg);
@@ -954,9 +979,17 @@ static void DrawBlock(Page *pg, const char *text, long n, const PgBlock *p, long
 		return;
 	}
 	if (p->b.kind == MP_IMAGE) {
-		/* a framed box: the description, and the file */
+		/* the picture, if it's on the Mac; else a framed box: the
+		   description, and the file */
 		char url[256];
-		short w;
+		short w, h;
+		if (ImageFit(pg, text, n, p, url, &len, &w, &h)) {
+			Rect pic;
+			SetRect(&pic, (short) (x + (right - x - w) / 2), py, 0, (short) (py + h));
+			pic.right = (short) (pic.left + w);
+			if (ImgDraw(url, len, &pic))
+				return;
+		}
 		if (color) {
 			Color(true, kThShade);
 			PaintRect(&box);

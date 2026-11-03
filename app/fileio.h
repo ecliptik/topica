@@ -58,6 +58,16 @@ OSErr FileOpenRead(const FileRef *f, short *ref);
 OSErr FileReadAt(short ref, long offset, void *buf, long len, long *got);
 void FileClose(short ref);
 
+/* A working directory (dirID 0) as the volume and folder ID it stands for */
+OSErr FileRealFolder(short *vRefNum, long *dirID);
+/* A folder by its ID (0 with a working directory): its own ID, its
+   parent's (1 above the disk's top) and its name (name may be NULL) */
+OSErr FileFolder(short vRefNum, long dirID, long *id, long *parID, Str63 name);
+/* A file by an HFS partial path (":a:b.jpg", "::b.jpg") from a folder:
+   fnfErr for a folder or nothing there. f gets its folder and name, type
+   its file type. */
+OSErr FileFind(short vRefNum, long dirID, const char *path, FileRef *f, OSType *type);
+
 /* The index-th file (1-based) in a folder; fnfErr past the last */
 OSErr FileIndexed(const FileRef *dir, short index, FileRef *f);
 

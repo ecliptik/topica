@@ -14,6 +14,7 @@
 #include "../core/textconv.h"
 #include "editor.h"
 #include "fileio.h"
+#include "images.h"
 #include "page.h"
 #include "print.h"
 #include "util.h"
@@ -128,6 +129,10 @@ void PrintDoc(Doc *d)
 	}
 	GetPort(&save);
 	SetCursor(*GetCursor(watchCursor));
+	{
+		FileRef f;
+		ImgSetBase(DocFile(d, &f) ? &f : NULL);
+	}
 	text = EdLockText(ed);
 	n = EdLength(ed);
 	port = PrOpenDoc(gPrint, NULL, NULL);

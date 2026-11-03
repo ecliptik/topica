@@ -1,6 +1,10 @@
 /*
  * preview.c: the Preview window (see preview.h).
  *
+ * On a screen with room for both, the preview is a pane in the post's own
+ * window, on its right (docwin.c keeps the window's halves); gHost is that
+ * post, and gWin its window. On a small screen it's a window of its own.
+ *
  * The page is drawn off screen and copied to the window, so scrolling and
  * a new layout don't flicker: into a GWorld on a color Mac, a plain bitmap
  * on a black-and-white one. When there's no memory for it, the window is
@@ -18,6 +22,7 @@
 
 #include "docwin.h"
 #include "editor.h"
+#include "images.h"
 #include "page.h"
 #include "preview.h"
 #include "theme.h"
@@ -25,12 +30,14 @@
 
 enum { kScrollWidth = 16, kMargin = 10 };
 enum { kMinWidth = 200, kMinHeight = 120 };
+enum { kPaneWidth = 480, kMinPost = 320, kMinPane = 240 };
 enum { kPause = 45 };                   /* ticks of quiet before laying out again */
 enum { kArrowStep = 16 };
 enum { kUpArrow = 0x1E, kDownArrow = 0x1F, kHomeKey = 0x01, kEndKey = 0x04,
 	kPageUp = 0x0B, kPageDown = 0x0C };
 
-static WindowPtr gWin;
+static WindowPtr gWin;                  /* its window, or the post's it's a pane in */
+static Doc *gHost;                      /* the post it's a pane of, or NULL */
 static ControlHandle gBar;
 static Page *gPage;
 static Doc *gDoc;                       /* the post shown */
@@ -53,12 +60,17 @@ static Rect gOffRect;
 
 Boolean IsPreview(WindowPtr w)
 {
-	return w != NULL && w == gWin;
+	return w != NULL && w == gWin && gHost == NULL;
 }
 
 Boolean PreviewIsFront(void)
 {
-	return gWin != NULL && FrontWindow() == gWin;
+	return gWin != NULL && gHost == NULL && FrontWindow() == gWin;
+}
+
+Boolean PreviewShowing(Doc *d)
+{
+	return PreviewIsFront() || (gHost != NULL && gHost == d);
 }
 
 Doc *PreviewDoc(void)
@@ -68,19 +80,31 @@ Doc *PreviewDoc(void)
 
 /* ---- geometry ---- */
 
+/* Where the preview is in gWin: the window, or the post's pane */
+static void PaneRect(Rect *r)
+{
+	if (gHost != NULL)
+		DocPaneRect(gHost, r);
+	else
+		*r = gWin->portRect;
+}
+
 static void ContentRect(Rect *r)
 {
-	*r = gWin->portRect;
+	PaneRect(r);
 	r->right -= kScrollWidth - 1;
 }
 
 static void BarRect(Rect *r)
 {
-	*r = gWin->portRect;
+	PaneRect(r);
 	r->left = r->right - kScrollWidth + 1;
 	r->top -= 1;
 	r->right += 1;
-	r->bottom -= kScrollWidth - 2;
+	if (gHost != NULL)
+		r->bottom += 1;                 /* down to the status line, above the grow box */
+	else
+		r->bottom -= kScrollWidth - 2;
 }
 
 static short PageWidth(void)
@@ -183,6 +207,15 @@ static void MakeOffscreen(void)
 
 /* ---- drawing ---- */
 
+/* Pictures are looked for from the post's folder (printing may have
+   pointed them elsewhere) */
+static void ImageBase(void)
+{
+	FileRef f;
+
+	ImgSetBase(gDoc != NULL && DocFile(gDoc, &f) ? &f : NULL);
+}
+
 static void DrawEmpty(const Rect *r)
 {
 	static char kMsg[] = "Open a post to preview it.";
@@ -214,6 +247,7 @@ static void DrawPage(const Rect *r)
 		return;
 	}
 	ed = DocEditor(gDoc);
+	ImageBase();
 	pr.left += kMargin;
 	pr.right -= kMargin;
 	PageDraw(gPage, EdLockText(ed), EdLength(ed), gTop, &pr, ColorScreen());
@@ -240,6 +274,7 @@ static void Render(void)
 	GetPort(&save);
 	SetPort(gWin);
 	ContentRect(&content);
+	ImgSetInverted(mode == notSrcCopy);
 	if (gWorld != NULL) {
 		CGrafPtr oldPort;
 		GDHandle oldDevice;
@@ -276,6 +311,9 @@ static void Render(void)
 		SetClip(clip);
 		DisposeRgn(clip);
 	}
+	ImgSetInverted(false);              /* for printing */
+	if (gHost != NULL)
+		ThemePort();                    /* the post's colors, for its TextEdit */
 	SetPort(save);
 }
 
@@ -289,6 +327,7 @@ static void Refine(void)
 	if (gDoc == NULL || !gLaidOut)
 		return;
 	ed = DocEditor(gDoc);
+	ImageBase();
 	(void) PageRefine(gPage, EdLockText(ed), EdLength(ed), gTop, gTop + ViewHeight(), 0, &shift, &redraw);
 	EdUnlockText(ed);
 }
@@ -315,6 +354,8 @@ static void SetTitle(void)
 {
 	Str255 name, title;
 
+	if (gHost != NULL)
+		return;                         /* a pane: the window is the post's */
 	if (gDoc == NULL) {
 		SetWTitle(gWin, "\pPreview");
 		return;
@@ -351,6 +392,7 @@ static void Layout(Boolean full)
 		}
 		GetPort(&save);
 		SetPort(gWin);
+		ImageBase();
 		text = EdLockText(ed);
 #ifdef TOPICA_DEBUG
 		{
@@ -385,6 +427,7 @@ static void Follow(Doc *d)
 	gDoc = d;
 	gTop = 0;
 	gLaidOut = false;
+	ImgFlush();                         /* pictures added since are found */
 	Layout(true);
 }
 
@@ -413,10 +456,42 @@ static void WindowRect(Rect *r)
 		r->bottom = s.bottom;
 }
 
+/* Room on the screen for a post and the preview beside it */
+static Boolean Dockable(void)
+{
+	return qd.screenBits.bounds.right - qd.screenBits.bounds.left - 8 >= kMinPost + kMinPane;
+}
+
 void PreviewShow(Doc *d)
 {
 	Rect r;
 
+	if (gHost != NULL && gHost != d)
+		PreviewClose();                 /* the pane moves to this post */
+	if (gWin == NULL && Dockable()) {
+		gPage = PageNew();
+		if (gPage == NULL) {
+			ErrorAlert("The preview couldn\xD5t be opened.", memFullErr);
+			return;
+		}
+		gWin = DocWindow(d);
+		SetPort(gWin);
+		ThemePlain();
+		SetRect(&r, 0, 0, kScrollWidth, kScrollWidth);     /* PreviewPaneResized places it */
+		gBar = NewControl(gWin, &r, "\p", true, 0, 0, 0, scrollBarProc, 0);
+		ThemePort();
+		if (gBar == NULL) {
+			PageDispose(gPage);
+			gPage = NULL;
+			gWin = NULL;
+			ErrorAlert("The preview couldn\xD5t be opened.", memFullErr);
+			return;
+		}
+		gHost = d;
+		gDoc = NULL;
+		gLaidOut = false;
+		DocSetPane(d, kPaneWidth, kMinPane);
+	}
 	if (gWin == NULL) {
 		gPage = PageNew();
 		if (gPage == NULL) {
@@ -449,21 +524,44 @@ void PreviewShow(Doc *d)
 		Follow(d);
 }
 
-void PreviewClose(void)
+/* Lets go of everything; the window is the caller's to put away */
+static void TearDown(void)
 {
-	if (gWin == NULL)
-		return;
 	FreeOffscreen();
-	DisposeWindow(gWin);
+	ImgFlush();
 	PageDispose(gPage);
 	gWin = NULL;
+	gHost = NULL;
+	gBar = NULL;
 	gPage = NULL;
 	gDoc = NULL;
 	gLaidOut = false;
 }
 
+void PreviewClose(void)
+{
+	WindowPtr w = gWin;
+	Doc *host = gHost;
+	ControlHandle bar = gBar;
+
+	if (w == NULL)
+		return;
+	TearDown();
+	if (host != NULL) {
+		SetPort(w);
+		DisposeControl(bar);
+		DocSetPane(host, 0, 0);         /* the window back to the post's width */
+	} else {
+		DisposeWindow(w);
+	}
+}
+
 void PreviewForget(Doc *d)
 {
+	if (gHost != NULL && gHost == d) {
+		TearDown();                     /* its window is closing, the bar with it */
+		return;
+	}
 	if (gWin == NULL || d != gDoc)
 		return;
 	gDoc = NULL;
@@ -477,6 +575,10 @@ void PreviewApplyTheme(void)
 {
 	if (gWin == NULL)
 		return;
+	if (gHost != NULL) {
+		Render();                       /* the post's window is redrawn too */
+		return;
+	}
 	ThemeWindow(gWin);
 	SetPort(gWin);
 	ThemePlain();
@@ -566,13 +668,42 @@ static void Resized(void)
 	Rect r;
 
 	SetPort(gWin);
+	ThemePlain();
 	BarRect(&r);
 	MoveControl(gBar, r.left, r.top);
 	SizeControl(gBar, (short) (r.right - r.left), (short) (r.bottom - r.top));
-	InvalRect(&gWin->portRect);
+	if (gHost != NULL)
+		ThemePort();
+	PaneRect(&r);
+	InvalRect(&r);
 	MakeOffscreen();
 	if (gDoc != NULL)
 		Layout(true);
+}
+
+void PreviewPaneResized(void)
+{
+	if (gHost == NULL)
+		return;
+	Resized();
+	if (gDoc == NULL)
+		Follow(gHost);
+}
+
+void PreviewPaneDraw(void)
+{
+	if (gHost != NULL)
+		Render();
+}
+
+void PreviewPaneActivate(Boolean active)
+{
+	if (gHost == NULL)
+		return;
+	SetPort(gWin);
+	ThemePlain();
+	HiliteControl(gBar, active ? 0 : 255);
+	ThemePort();
 }
 
 void PreviewGrow(Point where)
@@ -606,7 +737,7 @@ void PreviewIdle(void)
 	if (gWin == NULL)
 		return;
 	front = DocFront();
-	if (front != NULL && front != gDoc) {
+	if (gHost == NULL && front != NULL && front != gDoc) {
 		Follow(front);
 		return;
 	}
@@ -630,6 +761,7 @@ void PreviewIdle(void)
 		GrafPtr save;
 		GetPort(&save);
 		SetPort(gWin);
+		ImageBase();
 		gRefining = !PageRefine(gPage, EdLockText(ed), EdLength(ed), gTop, gTop + ViewHeight(), 3, &shift, &redraw);
 		EdUnlockText(ed);
 		SetPort(save);

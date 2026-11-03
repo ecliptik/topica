@@ -12,8 +12,8 @@ The name is Aristotle's *Topics*, his book on finding things to say: the
 > doesn't do, and [TODO.md](TODO.md) what's coming.
 
 ![Topica on System 7 in the TokyoNight theme: a post on the left with
-its Markdown formatted as it's written, and its preview on the
-right](docs/images/color.png)
+its Markdown formatted as it's written, and its preview in a pane on the
+right of the same window, with the post's picture](docs/images/color.png)
 
 <table>
 <tr>
@@ -75,9 +75,16 @@ to write to a real floppy. The `.sit` and
   Printing stays black on white.
 - **The Headings menu** lists the post's headings; choose one to go there.
 - **Preview** (⌘R) shows the post laid out like its web page: the title and
-  date from the front matter, headings, lists, quotes, code, tables, images
-  as framed boxes, and the links listed at the end. It follows the post as
+  date from the front matter, headings, lists, quotes, code, tables,
+  pictures, and the links listed at the end. On a screen with room for both
+  it's a pane beside the post, in the same window (drag the line between
+  them); on a 512×342 screen, a window of its own. It follows the post as
   you write; double-click to go to that place in the post.
+- **Pictures in the preview** come from the blog's files when they're on
+  the Mac: an image's address is looked for from the post's folder, and
+  from the folders above it for one from the site's top (`/assets/...`).
+  QuickTime 2.5 or later draws JPEG, GIF, PNG and the rest; any Mac draws
+  PICT files. A picture that isn't there shows as a framed box.
 - **Print** (⌘P) prints that layout, and **Export HTML** writes the post
   as a web page of its own.
 - **Check Spelling** (⌘;) with suggestions, Skip All and Learn, leaving

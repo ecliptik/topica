@@ -45,6 +45,7 @@ set(TOPICA_SOURCES
     app/settings.c
     app/headings.c
     app/page.c
+    app/images.c
     app/preview.c
     app/print.c
     app/spellwin.c
@@ -59,6 +60,7 @@ set(TOPICA_SOURCES
     core/recovery.c
     core/mdscan.c
     core/mdpage.c
+    core/imgpath.c
     core/layout.c
     core/mdhtml.c
     core/vi.c

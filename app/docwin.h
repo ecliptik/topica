@@ -57,7 +57,15 @@ int DocUndoKind(Doc *d, Boolean redo);
 Boolean DocHasSelection(Doc *d);
 Boolean DocIsDirty(Doc *d);
 Boolean DocHasFile(Doc *d);
+/* Where it is saved; 0 while it has no file */
+Boolean DocFile(Doc *d, FileRef *f);
 void DocSealUndo(Doc *d);
+/* The preview's pane on the right of the window: width wide (made room
+   for, the post giving way down to half the screen), never narrower than
+   min; 0 takes it away and the window back to the post's width */
+void DocSetPane(Doc *d, short width, short min);
+/* Where the pane is (local coordinates) */
+void DocPaneRect(Doc *d, Rect *r);
 /* The text's area in the window (local coordinates) */
 void DocTextRect(Doc *d, Rect *r);
 /* Edits between begin and end undo as one (a drag that moves text) */

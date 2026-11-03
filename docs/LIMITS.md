@@ -58,8 +58,17 @@ black and white, and networks without encryption.
 ## The preview, printing and HTML
 
 - The preview is laid out like a post's page, not like your blog's theme:
-  Geneva and Times, images as framed boxes with their description, links
-  listed at the end.
+  Geneva and Times, links listed at the end.
+- **Pictures** show only when the file is on the Mac, where the address
+  leads from the post's folder (a relative address), from the post's
+  folder or one above it, or its `static` folder (an address from the
+  site's top, `/assets/...`), or as a file of the same name beside the
+  post. Web addresses (`https://...`) aren't fetched. Without QuickTime 2.5
+  (any Mac on System 6, Topica Lite) only PICT files draw. Anything else
+  is a framed box with the description.
+- **The preview is a pane in the post's window** on screens wider than 568
+  pixels, and a window of its own on smaller ones (the Mac Plus, SE and
+  512Ke). One post at a time has the pane.
 - **Export HTML** writes the Markdown as Topica reads it (above), with its
   own simple style. Liquid tags can't run outside the blog and show as text.
 - **Printing** prints that layout, in black and white whatever the theme.

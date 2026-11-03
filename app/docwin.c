@@ -50,6 +50,7 @@
 #endif
 
 enum { kScrollWidth = 16, kStatusHeight = 15 };
+enum { kDivider = 5 };                  /* the pane's edge that drags */
 enum { kMinWidth = 200, kMinHeight = 120 };
 enum { kStatusEvery = 30 };             /* ticks between word counts */
 enum { kRecoveryPause = 120 };          /* ticks of quiet before a recovery copy */
@@ -59,6 +60,8 @@ enum { kStylePause = 30 };              /* ticks of quiet before restyling */
 
 struct Doc {
 	WindowPtr w;
+	short pane;                         /* the preview's pane on the right: its width, or 0 */
+	short paneMin;
 	char viCmd;                         /* a :w :q ... for after the key: w W(q) x q Q(q!) */
 	Boolean blockOn;                    /* vi's block cursor is drawn, over block */
 	Boolean teOff;                      /* TextEdit deactivated for it (no caret) */
@@ -96,6 +99,7 @@ struct Doc {
 };
 
 static void Resized(Doc *d);
+static void DragDivider(Doc *d);
 static void ViClicked(Doc *d);
 static void ViSettings(Doc *d);
 
@@ -174,6 +178,13 @@ Boolean DocHasFile(Doc *d)
 	return d->hasFile;
 }
 
+Boolean DocFile(Doc *d, FileRef *f)
+{
+	if (d->hasFile)
+		*f = d->file;
+	return d->hasFile;
+}
+
 void DocSealUndo(Doc *d)
 {
 	undo_seal(&d->undo);
@@ -181,9 +192,16 @@ void DocSealUndo(Doc *d)
 
 /* ---- layout ---- */
 
-static void ViewRect(Doc *d, Rect *r)
+/* The post's half of the window: all of it, or left of the preview's pane */
+static void PostArea(Doc *d, Rect *r)
 {
 	*r = d->w->portRect;
+	r->right -= d->pane;
+}
+
+static void ViewRect(Doc *d, Rect *r)
+{
+	PostArea(d, r);
 	r->right -= kScrollWidth - 1;
 	r->bottom -= kStatusHeight;
 }
@@ -210,11 +228,20 @@ void DocJoinEdits(Doc *d, short kind, Boolean begin)
 
 static void BarRect(Doc *d, Rect *r)
 {
-	*r = d->w->portRect;
+	PostArea(d, r);
 	r->left = r->right - kScrollWidth + 1;
 	r->top -= 1;
 	r->right += 1;
 	r->bottom -= kStatusHeight - 1;
+}
+
+/* Right of the post's scroll bar, above the status line, which runs under
+   both */
+void DocPaneRect(Doc *d, Rect *r)
+{
+	*r = d->w->portRect;
+	r->left = (short) (r->right - d->pane + 1);
+	r->bottom -= kStatusHeight;
 }
 
 static void StatusRect(Doc *d, Rect *r)
@@ -1196,6 +1223,8 @@ void DocUpdate(Doc *d)
 	BlockOff(d);                        /* everywhere, not just in the update */
 	BeginUpdate(d->w);
 	EdDraw(d->ed);
+	if (d->pane > 0)
+		PreviewPaneDraw();
 	ThemePlain();
 	DrawControls(d->w);
 	DrawGrowIcon(d->w);
@@ -1214,6 +1243,8 @@ void DocActivate(Doc *d, Boolean active)
 	HiliteControl(d->vbar, active ? 0 : 255);
 	DrawGrowIcon(d->w);
 	ThemePort();
+	if (d->pane > 0)
+		PreviewPaneActivate(active);
 	if (active)
 		undo_seal(&d->undo);
 }
@@ -1333,6 +1364,18 @@ void DocClick(Doc *d, EventRecord *e)
 		ThemePort();
 		SyncScrollBar(d);
 		return;
+	}
+	if (d->pane > 0) {
+		DocPaneRect(d, &v);
+		if (p.h >= v.left && p.h < v.left + kDivider && p.v < v.bottom) {
+			DragDivider(d);
+			return;
+		}
+		v.bottom += 1;                  /* its scroll bar's end */
+		if (PtInRect(p, &v)) {
+			PreviewClick(e);
+			return;
+		}
 	}
 	ViewRect(d, &v);
 	if (PtInRect(p, &v)) {
@@ -1619,8 +1662,16 @@ void DocKey(Doc *d, EventRecord *e)
 static void Resized(Doc *d)
 {
 	Rect r;
+	short width = (short) (d->w->portRect.right - d->w->portRect.left);
 
 	SetPort(d->w);
+	if (d->pane > 0) {
+		/* the pane keeps its width while the post has room */
+		if (width - d->pane < kMinWidth)
+			d->pane = (short) (width - kMinWidth);
+		if (d->pane < d->paneMin)
+			d->pane = d->paneMin;
+	}
 	ViewRect(d, &r);
 	EdSetView(d->ed, &r);
 	BarRect(d, &r);
@@ -1630,6 +1681,83 @@ static void Resized(Doc *d)
 	ThemePort();
 	SyncScrollBar(d);
 	InvalRect(&d->w->portRect);
+	if (d->pane > 0)
+		PreviewPaneResized();
+}
+
+/* Drags the line between the post and the pane */
+static void DragDivider(Doc *d)
+{
+	Rect port = d->w->portRect;
+	short split = (short) (port.right - d->pane), x = split, nx;
+	short lo = (short) (port.left + kMinWidth), hi = (short) (port.right - d->paneMin);
+	PenState pen;
+	Point m;
+
+	GetPenState(&pen);
+	ThemePlain();
+	PenMode(patXor);
+	PenPat(&qd.gray);
+	MoveTo(x, port.top);
+	LineTo(x, port.bottom);
+	while (StillDown()) {
+		GetMouse(&m);
+		nx = m.h < lo ? lo : m.h > hi ? hi : m.h;
+		if (nx != x) {
+			MoveTo(x, port.top);
+			LineTo(x, port.bottom);
+			x = nx;
+			MoveTo(x, port.top);
+			LineTo(x, port.bottom);
+		}
+	}
+	MoveTo(x, port.top);
+	LineTo(x, port.bottom);
+	SetPenState(&pen);
+	ThemePort();
+	if (x != split) {
+		d->pane = (short) (port.right - x);
+		Resized(d);
+	}
+}
+
+void DocSetPane(Doc *d, short width, short min)
+{
+	Rect s = qd.screenBits.bounds, g;
+	short post, total, avail;
+	GrafPtr save;
+
+	GetPort(&save);
+	SetPort(d->w);
+	g = d->w->portRect;
+	LocalToGlobal((Point *) &g.top);
+	LocalToGlobal((Point *) &g.bottom);
+	SetPort(save);
+	s.top += 20 + 18;                   /* the menu bar and a title bar */
+	InsetRect(&s, 4, 4);
+	avail = (short) (s.right - s.left);
+	post = (short) (g.right - g.left - d->pane);
+	if (width > 0 && post + width > avail) {
+		/* not both as they are: the post gives way, to half the screen */
+		post = (short) (avail - width);
+		if (post < avail / 2)
+			post = (short) (avail / 2);
+		if (post < kMinWidth)
+			post = kMinWidth;
+		width = (short) (avail - post);
+		if (width < min)
+			width = min;
+	}
+	total = (short) (post + width);
+	if (g.left + total > s.right)
+		g.left = (short) (s.right - total);
+	if (g.left < s.left)
+		g.left = s.left;
+	d->pane = width;
+	d->paneMin = min;
+	MoveWindow(d->w, g.left, g.top, false);
+	SizeWindow(d->w, total, (short) (g.bottom - g.top), true);
+	Resized(d);
 }
 
 void DocGrow(Doc *d, Point where)
@@ -1637,7 +1765,7 @@ void DocGrow(Doc *d, Point where)
 	Rect limits = qd.screenBits.bounds;
 	long size;
 
-	limits.left = kMinWidth;
+	limits.left = (short) (kMinWidth + (d->pane > 0 ? d->paneMin : 0));
 	limits.top = kMinHeight;
 	size = GrowWindow(d->w, where, &limits);
 	if (size == 0)

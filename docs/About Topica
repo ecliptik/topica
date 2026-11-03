@@ -20,7 +20,8 @@ The Headings menu lists the post's headings. Choose one to go there.
 Post > Insert Link (Command-K) puts a link around the selected text.
 
 Preview
-Post > Show Preview (Command-R) shows the post laid out like its web page, with the title and date from the front matter, the pictures as boxes and the links listed at the end. It follows the post you're writing and catches up when you pause. Double-click in the preview to go to that place in the post.
+Post > Show Preview (Command-R) shows the post laid out like its web page, with the title and date from the front matter, its pictures and the links listed at the end. On a big enough screen it opens beside the post, in the same window; drag the line between them to change their widths. On a Macintosh Plus or SE it's a window of its own. It follows the post you're writing and catches up when you pause. Double-click in the preview to go to that place in the post.
+Pictures show when the blog's files are on the Mac: Topica looks for an image's address from the post's folder, and for an address from the site's top (/assets/...) in the folders above it. QuickTime 2.5 or later draws JPEG, GIF and PNG; without it, PICT files show. A picture Topica can't find or draw shows as a box.
 
 Printing and HTML
 File > Print (Command-P) prints the post as the preview shows it. File > Export HTML saves it as a web page you can open in a browser.
